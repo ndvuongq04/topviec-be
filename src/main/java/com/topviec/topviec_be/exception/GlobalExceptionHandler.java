@@ -2,32 +2,60 @@ package com.topviec.topviec_be.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.util.Map;
+import com.topviec.topviec_be.dto.response.RestResponse;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-        var errors = ex.getBindingResult().getFieldErrors().stream()
-                .collect(Collectors.toMap(
-                        e -> e.getField(),
-                        e -> e.getDefaultMessage() != null ? e.getDefaultMessage() : "Invalid"
-                ));
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Validation failed", "errors", errors));
-    }
+        @ExceptionHandler(MethodArgumentNotValidException.class)
+        public ResponseEntity<RestResponse<Object>> handleValidation(MethodArgumentNotValidException ex) {
+                var errors = ex.getBindingResult().getFieldErrors().stream()
+                                .collect(Collectors.toMap(
+                                                e -> e.getField(),
+                                                e -> e.getDefaultMessage() != null ? e.getDefaultMessage()
+                                                                : "Invalid"));
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Map<String, String>> handleRuntime(RuntimeException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", ex.getMessage()));
-    }
+                RestResponse<Object> res = new RestResponse<>();
+                res.setStatusCode(HttpStatus.BAD_REQUEST.value());
+                res.setError("Validation failed");
+                res.setMessage(errors);
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
+        }
+
+        @ExceptionHandler(AppException.class)
+        public ResponseEntity<RestResponse<Object>> handleAppException(AppException ex) {
+                RestResponse<Object> res = new RestResponse<>();
+                res.setStatusCode(ex.getStatus().value());
+                res.setError(ex.getStatus().getReasonPhrase());
+                res.setMessage(ex.getMessage());
+
+                return ResponseEntity.status(ex.getStatus()).body(res);
+        }
+
+        @ExceptionHandler(BadCredentialsException.class)
+        public ResponseEntity<RestResponse<Object>> handleBadCredentials(BadCredentialsException ex) {
+                RestResponse<Object> res = new RestResponse<>();
+                res.setStatusCode(HttpStatus.UNAUTHORIZED.value());
+                res.setError("Unauthorized");
+                res.setMessage("Email hoặc mật khẩu không chính xác");
+
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(res);
+        }
+
+        @ExceptionHandler(Exception.class)
+        public ResponseEntity<RestResponse<Object>> handleException(Exception ex) {
+                ex.printStackTrace();
+                RestResponse<Object> res = new RestResponse<>();
+                res.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
+                res.setError("Internal Server Error");
+                res.setMessage("Lỗi hệ thống, vui lòng thử lại sau");
+
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(res);
+        }
 }
