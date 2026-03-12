@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpHeaders;
+
+import com.topviec.topviec_be.dto.request.ReqForgotPasswordDTO;
 import com.topviec.topviec_be.dto.request.ReqLoginDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
+import com.topviec.topviec_be.dto.request.ReqResetPasswordDTO;
 import com.topviec.topviec_be.dto.response.ResLoginDTO;
 import com.topviec.topviec_be.security.CustomUserDetails;
 import com.topviec.topviec_be.security.JwtService;
@@ -42,11 +45,6 @@ public class AuthController {
 
         @Value("${app.jwt.refresh-token-expiration}")
         private long refreshTokenExpiration;
-
-        @GetMapping("/test")
-        public String getMethodName() {
-                return new String("Hello World");
-        }
 
         @PostMapping("/login")
         public ResponseEntity<ResLoginDTO> login(
@@ -119,4 +117,30 @@ public class AuthController {
                 authService.verifyEmail(token);
                 return ResponseEntity.ok("Xác thực email thành công!");
         }
+
+        // Endpoint này chỉ nhận email, không trả về thông tin nào → tránh email
+        // enumeration attack
+        @PostMapping("/forgot-password")
+        public ResponseEntity<String> forgotPassword(@RequestBody @Valid ReqForgotPasswordDTO request) {
+                authService.forgotPassword(request.getEmail());
+                // Luôn trả về thông báo chung → tránh email enumeration attack
+                return ResponseEntity.ok("Nếu email tồn tại, chúng tôi đã gửi link đặt lại mật khẩu");
+        }
+
+        // Endpoint này nhận token(verify của "/forgot-password") + newPassword, không
+        // cần email nữa vì đã lấy email từ token trong service
+        @PostMapping("/reset-password")
+        public ResponseEntity<String> resetPassword(@RequestBody @Valid ReqResetPasswordDTO request) {
+                authService.resetPassword(request.getToken(), request.getNewPassword());
+                return ResponseEntity.ok("Đặt lại mật khẩu thành công!");
+        }
+
+        // Token verify email hết hạn → user có thể yêu cầu gửi lại token mới
+        @PostMapping("/resend-verify-email")
+        public ResponseEntity<String> resendVerifyEmail(
+                        @RequestBody @Valid ReqForgotPasswordDTO request) {
+                authService.resendVerifyEmail(request.getEmail());
+                return ResponseEntity.ok("Email xác thực đã được gửi lại!");
+        }
+
 }

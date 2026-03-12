@@ -91,11 +91,44 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void forgotPassword(String email) {
-        throw new UnsupportedOperationException("Unimplemented method 'forgotPassword'");
+        // Không báo lỗi nếu email không tồn tại → tránh email enumeration attack
+        // (kẻ tấn công không biết email nào đã đăng ký)
+        if (!userRepository.existsByEmail(email))
+            return;
+
+        User user = userRepository.findByEmail(email).get();
+
+        String token = tokenService.generateResetPasswordToken(email);
+        emailService.sendResetPasswordEmail(email, token, user.getEmail());
     }
 
     @Override
     public void resetPassword(String token, String newPassword) {
-        throw new UnsupportedOperationException("Unimplemented method 'resetPassword'");
+        // 1. Xác thực token → lấy email (token tự động bị xóa)
+        String email = tokenService.verifyResetPasswordToken(token);
+
+        // 2. Tìm user
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> AppException.notFound("User không tồn tại"));
+
+        // 3. Cập nhật password mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
+    @Override
+    public void resendVerifyEmail(String email) {
+        // 1. Kiểm tra user tồn tại
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> AppException.notFound("Email không tồn tại"));
+
+        // 2. Đã verify rồi thì không cần gửi lại
+        if (user.getEmailVerifiedAt() != null) {
+            throw AppException.badRequest("Email này đã được xác thực rồi");
+        }
+
+        // 3. Tạo token mới → gửi lại email
+        String token = tokenService.resendVerifyEmailToken(email);
+        emailService.sendVerifyEmail(email, token);
     }
 }

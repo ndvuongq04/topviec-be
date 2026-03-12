@@ -51,4 +51,40 @@ public class TokenServiceImpl implements TokenService {
         redisTemplate.delete(key); // Xóa ngay sau khi dùng → không dùng lại được
         return email;
     }
+
+    @Override
+    public String generateResetPasswordToken(String email) {
+        String token = UUID.randomUUID().toString();
+        String key = RESET_PASSWORD_PREFIX + token;
+
+        redisTemplate.opsForValue()
+                .set(key, email, Duration.ofMinutes(RESET_PASSWORD_TTL));
+
+        return token;
+    }
+
+    @Override
+    public String verifyResetPasswordToken(String token) {
+        String key = RESET_PASSWORD_PREFIX + token;
+        String email = redisTemplate.opsForValue().get(key);
+
+        if (email == null) {
+            throw AppException.badRequest("Link đặt lại mật khẩu đã hết hạn hoặc không hợp lệ");
+        }
+
+        redisTemplate.delete(key); // Xóa sau khi dùng → không dùng lại được
+        return email;
+    }
+
+    @Override
+    public String resendVerifyEmailToken(String email) {
+        // Tạo token mới → lưu Redis (token cũ tự hết hạn, không cần xóa thủ công)
+        String token = UUID.randomUUID().toString();
+        String key = VERIFY_EMAIL_PREFIX + token;
+
+        redisTemplate.opsForValue()
+                .set(key, email, Duration.ofMinutes(VERIFY_EMAIL_TTL));
+
+        return token;
+    }
 }

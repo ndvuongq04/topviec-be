@@ -40,6 +40,16 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Xác thực tài khoản", htmlBody);
     }
 
+    @Override
+    public void sendResetPasswordEmail(String toEmail, String token, String fullName) {
+        Context context = new Context();
+        context.setVariable("fullName", fullName);
+        context.setVariable("resetLink", baseUrl + "/reset-password?token=" + token);
+
+        String htmlBody = templateEngine.process("email/reset-password", context);
+        sendHtmlEmail(toEmail, "[Topviec] Đặt lại mật khẩu", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

@@ -10,9 +10,11 @@ public interface AuthService {
 
     void updateLastLogin(Long userId, String ip);
 
+    void verifyEmail(String token);
+
     void forgotPassword(String email);
 
-    void resetPassword(String token, String newPassword);
+    void resetPassword(String token, String newPassword); // tự động lấy email từ token forgot, không cần truyền vào nữa
 
-    void verifyEmail(String token);
+    void resendVerifyEmail(String email);
 }
