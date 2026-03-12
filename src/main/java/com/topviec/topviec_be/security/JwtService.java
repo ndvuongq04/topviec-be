@@ -5,6 +5,7 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
 import com.topviec.topviec_be.config.JwtConfig;
+import com.topviec.topviec_be.enums.users.UserStatus;
 
 import java.time.Instant;
 
@@ -16,7 +17,7 @@ public class JwtService {
     private final JwtProperties jwtProperties;
 
     // Tạo Access Token
-    public String generateAccessToken(Long userId, String email, String role) {
+    public String generateAccessToken(Long userId, String email, String role, UserStatus status) {
         Instant now = Instant.now();
 
         JwsHeader header = JwsHeader.with(JwtConfig.JWT_ALGORITHM).build();
@@ -25,6 +26,7 @@ public class JwtService {
                 .subject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("role", role)
+                .claim("emailVerified", status != UserStatus.PENDING)
                 .issuedAt(now)
                 .expiresAt(now.plusMillis(jwtProperties.getAccessTokenExpiration()))
                 .build();

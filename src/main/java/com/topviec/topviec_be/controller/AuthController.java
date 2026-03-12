@@ -7,6 +7,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpHeaders;
 import com.topviec.topviec_be.dto.request.ReqLoginDTO;
@@ -15,8 +16,7 @@ import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.dto.response.ResLoginDTO;
 import com.topviec.topviec_be.security.CustomUserDetails;
 import com.topviec.topviec_be.security.JwtService;
-import com.topviec.topviec_be.service.EmailService;
-import com.topviec.topviec_be.service.UserService;
+import com.topviec.topviec_be.service.AuthService;
 import com.topviec.topviec_be.service.UserSessionService;
 import com.topviec.topviec_be.util.IpUtil;
 
@@ -35,9 +35,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class AuthController {
 
         private final AuthenticationManager authenticationManager;
-        private final UserService userService;
+        private final AuthService authService;
         private final JwtService jwtService;
-        private final EmailService emailService;
         private final UserSessionService userSessionService;
         private final IpUtil ipUtil;
 
@@ -69,11 +68,12 @@ public class AuthController {
                 String accessToken = jwtService.generateAccessToken(
                                 userDetails.getId(),
                                 userDetails.getEmail(),
-                                userDetails.getUserType().name());
+                                userDetails.getUserType().name(),
+                                userDetails.getStatus());
                 String refreshToken = jwtService.generateRefreshToken(userDetails.getId());
 
                 // Bước 4.0 — Cập nhật lastLoginAt + lastLoginIp
-                userService.updateLastLogin(userDetails.getId(), ipUtil.getClientIp(httpRequest));
+                authService.updateLastLogin(userDetails.getId(), ipUtil.getClientIp(httpRequest));
 
                 // Bước 4.1 — Lưu session vào DB
                 userSessionService.createSession(userDetails.getId(), refreshToken, httpRequest);
@@ -104,22 +104,19 @@ public class AuthController {
 
         @PostMapping("/register/candidate")
         public ResponseEntity<String> register(@Valid @RequestBody ReqRegisterCandidateDTO request) {
-                userService.registerCandidate(request);
+                authService.registerCandidate(request);
                 return ResponseEntity.ok("Đăng ký thành công");
         }
 
         @PostMapping("/register/employer")
         public ResponseEntity<String> registerEmployer(@Valid @RequestBody ReqRegisterEmployerDTO request) {
-                userService.registerEmployer(request);
+                authService.registerEmployer(request);
                 return ResponseEntity.ok("Đăng ký thành công");
         }
 
-        @GetMapping("/test-email")
-        public ResponseEntity<Void> testEmail() {
-                emailService.sendVerifyEmail(
-                                "nguyenvanthang2315@gmail.com",
-                                "Nguyễn Văn Thắng",
-                                "http://localhost:3000/verify-email?token=test-token-123");
-                return ResponseEntity.ok(null);
+        @GetMapping("/verify-email")
+        public ResponseEntity<String> verifyEmail(@RequestParam String token) {
+                authService.verifyEmail(token);
+                return ResponseEntity.ok("Xác thực email thành công!");
         }
 }

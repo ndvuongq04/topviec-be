@@ -38,4 +38,11 @@ app:
     secret: ${JWT_SECRET}
     access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15 phút (ms)
     refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7 ngày (ms)
-
+  token:
+    verify-email-ttl: ${VERIFY_EMAIL_TTL:1440} # 24 giờ (phút)
+    reset-password-ttl: ${RESET_PASSWORD_TTL:15} # 15 phút
+    verify-email-prefix: ${VERIFY_EMAIL_PREFIX:verify-email}
+    reset-password-prefix: ${RESET_PASSWORD_PREFIX:reset-password}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  verify-email-url: ${APP_VERIFY_EMAIL_URL:http://localhost:5173/verify-email}
+  reset-password-url: ${APP_RESET_PASSWORD_URL:http://localhost:5173/reset-password}

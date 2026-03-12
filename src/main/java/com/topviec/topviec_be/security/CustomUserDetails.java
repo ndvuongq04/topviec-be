@@ -58,7 +58,9 @@ public class CustomUserDetails implements UserDetails {
     // chặn)
     @Override
     public boolean isEnabled() {
-        return status == UserStatus.ACTIVE;
+        // Cho phép ACTIVE và PENDING đăng nhập
+        // Chỉ chặn BANNED, LOCKED_PERM, DELETED...
+        return status == UserStatus.ACTIVE || status == UserStatus.PENDING;
     }
 
     // Tài khoản không có khái niệm hết hạn → luôn true
