@@ -53,4 +53,33 @@ public class UserSessionServiceImpl implements UserSessionService {
 
         userSessionRepository.save(session);
     }
+
+    @Override
+    public UserSession validateRefreshToken(String refreshToken) {
+        String hash = hashUtil.hashSHA256(refreshToken);
+        UserSession session = userSessionRepository.findByRefreshTokenHash(hash)
+                .orElseThrow(() -> AppException.unauthorized("Refresh token không hợp lệ"));
+
+        // Kiểm tra session còn hợp lệ không (hết hạn hoặc đã bị revoke)
+        if (!session.isValid()) {
+            throw AppException.unauthorized("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        }
+
+        // Cập nhật lastUsedAt
+        session.setLastUsedAt(LocalDateTime.now());
+        userSessionRepository.save(session);
+
+        return session;
+    }
+
+    @Override
+    public void revokeSession(String refreshToken) {
+        String hash = hashUtil.hashSHA256(refreshToken);
+        userSessionRepository.findByRefreshTokenHash(hash)
+                .ifPresent(session -> {
+                    session.revoke();
+                    userSessionRepository.save(session);
+                });
+    }
+
 }

@@ -17,6 +17,9 @@ import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.dto.request.ReqResetPasswordDTO;
 import com.topviec.topviec_be.dto.response.ResLoginDTO;
+import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.entity.UserSession;
+import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.security.CustomUserDetails;
 import com.topviec.topviec_be.security.JwtService;
 import com.topviec.topviec_be.service.AuthService;
@@ -30,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @RestController
@@ -81,7 +85,7 @@ public class AuthController {
                                 .from("refresh_token", refreshToken)
                                 .httpOnly(true)
                                 .secure(true)
-                                .path("/api/v1/auth/refresh")
+                                .path("/api/v1/auth")
                                 .maxAge(refreshTokenExpiration)
                                 .build();
 
@@ -141,6 +145,63 @@ public class AuthController {
                         @RequestBody @Valid ReqForgotPasswordDTO request) {
                 authService.resendVerifyEmail(request.getEmail());
                 return ResponseEntity.ok("Email xác thực đã được gửi lại!");
+        }
+
+        @PostMapping("/refresh")
+        public ResponseEntity<ResLoginDTO> refresh(
+                        @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+
+                // 1. Kiểm tra có cookie không
+                if (refreshToken == null) {
+                        throw AppException.unauthorized("Không tìm thấy refresh token");
+                }
+
+                // 2. Validate session trong DB
+                UserSession session = userSessionService.validateRefreshToken(refreshToken);
+                User user = session.getUser();
+
+                // 3. Tạo access token mới
+                String newAccessToken = jwtService.generateAccessToken(
+                                user.getId(),
+                                user.getEmail(),
+                                user.getUserType().name(),
+                                user.getStatus());
+
+                // 4. Trả về access token mới
+                ResLoginDTO resLoginDTO = ResLoginDTO.builder()
+                                .accessToken(newAccessToken)
+                                .user(ResLoginDTO.UserInfo.builder()
+                                                .id(user.getId())
+                                                .email(user.getEmail())
+                                                .role(user.getUserType().name())
+                                                .build())
+                                .build();
+
+                return ResponseEntity.ok(resLoginDTO);
+        }
+
+        @PostMapping("/logout")
+        public ResponseEntity<String> logout(
+                        @CookieValue(name = "refresh_token", required = false) String refreshToken,
+                        HttpServletResponse response) {
+
+                // 1. Revoke session trong DB
+                if (refreshToken != null) {
+                        userSessionService.revokeSession(refreshToken);
+                }
+
+                // 2. Xóa cookie refresh token
+                ResponseCookie deleteCookie = ResponseCookie
+                                .from("refresh_token", "")
+                                .httpOnly(true)
+                                .secure(true)
+                                .path("/api/v1/auth")
+                                .maxAge(0)
+                                .build();
+
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                                .body("Đăng xuất thành công!");
         }
 
 }
