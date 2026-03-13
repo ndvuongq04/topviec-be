@@ -13,6 +13,7 @@ import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.AuthService;
+import com.topviec.topviec_be.service.CandidateProfileService;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.TokenService;
 
@@ -26,6 +27,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final EmailService emailService;
+    private final CandidateProfileService candidateProfileService;
 
     @Override
     public void registerCandidate(ReqRegisterCandidateDTO request) {
@@ -40,7 +42,10 @@ public class AuthServiceImpl implements AuthService {
                 .status(UserStatus.PENDING) // chờ xác thực email
                 .build();
 
-        userRepository.save(user);
+        user = userRepository.save(user);
+
+        // Gọi qua service, không gọi thẳng repo
+        candidateProfileService.createDefaultProfile(user.getId(), request.getEmail());
 
         // Tạo token → lưu Redis → gửi email
         String token = tokenService.generateVerifyEmailToken(request.getEmail());
