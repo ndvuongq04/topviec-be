@@ -4,14 +4,17 @@ import java.time.LocalDateTime;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
+import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.users.UserStatus;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.AuthService;
 import com.topviec.topviec_be.service.CandidateProfileService;
@@ -30,8 +33,10 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final CandidateProfileService candidateProfileService;
     private final AdminUserRepository adminUserRepository;
+    private final CompanyRepository companyRepository;
 
     @Override
+    @Transactional
     public void registerCandidate(ReqRegisterCandidateDTO request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw AppException.conflict("Email đã được sử dụng");
@@ -55,21 +60,43 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public void registerEmployer(ReqRegisterEmployerDTO request) {
+        // Kiểm tra email
         if (userRepository.existsByEmail(request.getEmail())) {
             throw AppException.badRequest("Email đã được sử dụng");
         }
 
+        // Kiểm tra slug công ty chưa tồn tại
+        if (companyRepository.existsBySlug(request.getCompanySlug())) {
+            throw AppException.conflict("Slug đã được sử dụng, vui lòng chọn slug khác");
+        }
+
+        // Bước 1: Tạo User
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .userType(UserType.EMPLOYER)
-                .status(UserStatus.PENDING) // chờ xác thực email
+                .status(UserStatus.PENDING)
                 .build();
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
-        // Tạo token → lưu Redis → gửi email
+        // Bước 2: Tạo Company gắn với User vừa tạo
+        // status = pending, verificationStatus = pending → chờ admin duyệt
+        Company company = Company.builder()
+                .userId(savedUser.getId())
+                .name(request.getCompanyName())
+                .slug(request.getCompanySlug())
+                .description("") // bắt buộc not null trong entity → để trống, NTT bổ sung sau
+                .industryId(0L) // bắt buộc not null → placeholder, NTT cập nhật sau
+                .companySize("1-50") // default, NTT cập nhật sau
+                .createdBy(savedUser.getId())
+                .build();
+
+        companyRepository.save(company);
+
+        // Bước 3: Gửi email xác thực
         String token = tokenService.generateVerifyEmailToken(request.getEmail());
         emailService.sendVerifyEmail(request.getEmail(), token);
     }

@@ -51,11 +51,11 @@ public class EmployerCompanyController {
     }
 
     /**
-     * PUT /employer/company
+     * Patch /employer/company
      * Employer cập nhật hồ sơ công ty.
      * Nếu hồ sơ đang bị rejected → tự động chuyển về pending để admin duyệt lại.
      */
-    @PutMapping
+    @PatchMapping
     public ResponseEntity<ResCompanyDTO> updateMyCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqUpdateCompanyDTO request) {

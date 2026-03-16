@@ -27,145 +27,145 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCompanyController {
 
-    private final CompanyService companyService;
+        private final CompanyService companyService;
 
-    // -------------------------------------------------------------------------
-    // Read — tất cả admin đều xem được
-    // -------------------------------------------------------------------------
+        // -------------------------------------------------------------------------
+        // Read — tất cả admin đều xem được
+        // -------------------------------------------------------------------------
 
-    /**
-     * GET /admin/companies?status=pending&page=0&size=10
-     * Lấy danh sách tất cả công ty, có thể lọc theo status.
-     */
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
-            + AdminRoleConstants.SUPPORT_ADMIN + "', '"
-            + AdminRoleConstants.FINANCE_ADMIN + "')")
-    public ResponseEntity<ResultPaginationDTO> getAllCompanies(
-            @RequestParam(required = false) String status,
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        /**
+         * GET /admin/companies?status=pending&page=0&size=10
+         * Lấy danh sách tất cả công ty, có thể lọc theo status.
+         */
+        @GetMapping
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "', '"
+                        + AdminRoleConstants.FINANCE_ADMIN + "')")
+        public ResponseEntity<ResultPaginationDTO> getAllCompanies(
+                        @RequestParam(required = false) String status,
+                        @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
-        return ResponseEntity.ok(companyService.getAllCompanies(status, pageable));
-    }
+                return ResponseEntity.ok(companyService.getAllCompanies(status, pageable));
+        }
 
-    /**
-     * GET /admin/companies/{id}
-     * Admin xem chi tiết 1 công ty bất kỳ (kể cả pending/suspended).
-     */
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
-            + AdminRoleConstants.SUPPORT_ADMIN + "', '"
-            + AdminRoleConstants.FINANCE_ADMIN + "')")
-    public ResponseEntity<ResCompanyDTO> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(companyService.adminGetById(id));
-    }
+        /**
+         * GET /admin/companies/{id}
+         * Admin xem chi tiết 1 công ty bất kỳ (kể cả pending/suspended).
+         */
+        @GetMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "', '"
+                        + AdminRoleConstants.FINANCE_ADMIN + "')")
+        public ResponseEntity<ResCompanyDTO> getById(@PathVariable Long id) {
+                return ResponseEntity.ok(companyService.adminGetById(id));
+        }
 
-    // -------------------------------------------------------------------------
-    // Verification — content_moderator + super_admin
-    // -------------------------------------------------------------------------
+        // -------------------------------------------------------------------------
+        // Verification — content_moderator + super_admin
+        // -------------------------------------------------------------------------
 
-    /**
-     * GET /admin/companies/pending-verification
-     * Lấy danh sách công ty đang chờ duyệt hồ sơ.
-     */
-    @GetMapping("/pending-verification")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "')")
-    public ResponseEntity<ResultPaginationDTO> getPendingVerification(
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        /**
+         * GET /admin/companies/pending-verification
+         * Lấy danh sách công ty đang chờ duyệt hồ sơ.
+         */
+        @GetMapping("/pending-verification")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "')")
+        public ResponseEntity<ResultPaginationDTO> getPendingVerification(
+                        @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
-        return ResponseEntity.ok(companyService.getPendingVerification(pageable));
-    }
+                return ResponseEntity.ok(companyService.getPendingVerification(pageable));
+        }
 
-    /**
-     * PATCH /admin/companies/{id}/verify
-     * Duyệt hoặc từ chối hồ sơ công ty.
-     * Body: { "approved": true } hoặc { "approved": false, "rejectionReason": "..."
-     * }
-     */
-    @PatchMapping("/{id}/verify")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "')")
-    public ResponseEntity<ResCompanyDTO> verifyCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id,
-            @Valid @RequestBody ReqVerifyCompanyDTO request) {
+        /**
+         * PATCH /admin/companies/{id}/verify
+         * Duyệt hoặc từ chối hồ sơ công ty.
+         * Body: { "approved": true } hoặc { "approved": false, "rejectionReason": "..."
+         * }
+         */
+        @PatchMapping("/{id}/verify")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "')")
+        public ResponseEntity<ResCompanyDTO> verifyCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id,
+                        @Valid @RequestBody ReqVerifyCompanyDTO request) {
 
-        return ResponseEntity.ok(companyService.verifyCompany(id, extractUserId(jwt), request));
-    }
+                return ResponseEntity.ok(companyService.verifyCompany(id, extractUserId(jwt), request));
+        }
 
-    /**
-     * PATCH /admin/companies/{id}/suspend
-     * Suspend công ty vi phạm.
-     */
-    @PatchMapping("/{id}/suspend")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "')")
-    public ResponseEntity<ResCompanyDTO> suspendCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id,
-            @Valid @RequestBody ReqSuspendCompanyDTO request) {
+        /**
+         * PATCH /admin/companies/{id}/suspend
+         * Suspend công ty vi phạm.
+         */
+        @PatchMapping("/{id}/suspend")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "')")
+        public ResponseEntity<ResCompanyDTO> suspendCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id,
+                        @Valid @RequestBody ReqSuspendCompanyDTO request) {
 
-        return ResponseEntity.ok(companyService.suspendCompany(id, extractUserId(jwt), request));
-    }
+                return ResponseEntity.ok(companyService.suspendCompany(id, extractUserId(jwt), request));
+        }
 
-    /**
-     * PATCH /admin/companies/{id}/unsuspend
-     * Mở khóa công ty đang bị suspend.
-     */
-    @PatchMapping("/{id}/unsuspend")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "', '"
-            + AdminRoleConstants.CONTENT_MODERATOR + "')")
-    public ResponseEntity<ResCompanyDTO> unsuspendCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id) {
+        /**
+         * PATCH /admin/companies/{id}/unsuspend
+         * Mở khóa công ty đang bị suspend.
+         */
+        @PatchMapping("/{id}/unsuspend")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "')")
+        public ResponseEntity<ResCompanyDTO> unsuspendCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id) {
 
-        return ResponseEntity.ok(companyService.unsuspendCompany(id, extractUserId(jwt)));
-    }
+                return ResponseEntity.ok(companyService.unsuspendCompany(id, extractUserId(jwt)));
+        }
 
-    // -------------------------------------------------------------------------
-    // Management — chỉ super_admin
-    // -------------------------------------------------------------------------
+        // -------------------------------------------------------------------------
+        // Management — chỉ super_admin
+        // -------------------------------------------------------------------------
 
-    /**
-     * PUT /admin/companies/{id}
-     * Admin sửa thông tin công ty bất kỳ.
-     */
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
-    public ResponseEntity<ResCompanyDTO> adminUpdateCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id,
-            @Valid @RequestBody ReqUpdateCompanyDTO request) {
+        /**
+         * Patch /admin/companies/{id}
+         * Admin sửa thông tin công ty bất kỳ.
+         */
+        @PatchMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "')")
+        public ResponseEntity<ResCompanyDTO> adminUpdateCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id,
+                        @Valid @RequestBody ReqUpdateCompanyDTO request) {
 
-        return ResponseEntity.ok(companyService.adminUpdateCompany(id, extractUserId(jwt), request));
-    }
+                return ResponseEntity.ok(companyService.adminUpdateCompany(id, extractUserId(jwt), request));
+        }
 
-    /**
-     * DELETE /admin/companies/{id}
-     * Xóa mềm công ty.
-     */
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
-    public ResponseEntity<Void> deleteCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id) {
+        /**
+         * DELETE /admin/companies/{id}
+         * Xóa mềm công ty.
+         */
+        @DeleteMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "')")
+        public ResponseEntity<Void> deleteCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id) {
 
-        companyService.deleteCompany(id, extractUserId(jwt));
-        return ResponseEntity.noContent().build();
-    }
+                companyService.deleteCompany(id, extractUserId(jwt));
+                return ResponseEntity.noContent().build();
+        }
 
-    private Long extractUserId(Jwt jwt) {
-        return Long.parseLong(jwt.getSubject());
-    }
+        private Long extractUserId(Jwt jwt) {
+                return Long.parseLong(jwt.getSubject());
+        }
 }

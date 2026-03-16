@@ -44,6 +44,8 @@ public class Company {
     @Column(name = "id", nullable = false)
     private Long id;
 
+    private Long userId; // FK → users.id, chủ tài khoản công ty
+
     @Column(name = "slug", nullable = false, unique = true, length = 255)
     private String slug;
 
