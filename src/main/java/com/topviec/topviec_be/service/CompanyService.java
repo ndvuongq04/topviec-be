@@ -37,27 +37,35 @@ public interface CompanyService {
     ResCompanyDTO adminGetById(Long id);
 
     // -------------------------------------------------------------------------
-    // Admin
+    // Admin — Read
     // -------------------------------------------------------------------------
+
+    /** Admin lấy danh sách tất cả công ty. */
+    ResultPaginationDTO getAllCompanies(String status, Pageable pageable);
 
     /** Admin lấy danh sách công ty chờ duyệt. */
     ResultPaginationDTO getPendingVerification(Pageable pageable);
 
-    /** Admin duyệt hoặc từ chối hồ sơ công ty. */
+    // -------------------------------------------------------------------------
+    // Admin — Verification (content_moderator)
+    // -------------------------------------------------------------------------
+
+    /** Duyệt hoặc từ chối hồ sơ công ty. */
     ResCompanyDTO verifyCompany(Long companyId, Long adminId, ReqVerifyCompanyDTO request);
 
-    /** Admin suspend công ty vi phạm. */
+    /** Suspend công ty vi phạm. */
     ResCompanyDTO suspendCompany(Long companyId, Long adminId, ReqSuspendCompanyDTO request);
 
-    /** Admin mở khóa công ty bị suspend. */
+    /** Mở khóa công ty bị suspend. */
     ResCompanyDTO unsuspendCompany(Long companyId, Long adminId);
+
+    // -------------------------------------------------------------------------
+    // Admin — Management (super_admin)
+    // -------------------------------------------------------------------------
 
     /** Admin sửa thông tin công ty. */
     ResCompanyDTO adminUpdateCompany(Long companyId, Long adminId, ReqUpdateCompanyDTO request);
 
     /** Admin xóa mềm công ty. */
     void deleteCompany(Long companyId, Long adminId);
-
-    /** Admin lấy danh sách tất cả công ty. */
-    ResultPaginationDTO getAllCompanies(String status, Pageable pageable);
 }
