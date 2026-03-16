@@ -1,8 +1,11 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +19,22 @@ import org.springframework.web.bind.annotation.*;
 public class PublicCompanyController {
 
     private final CompanyService companyService;
+
+    /**
+     * GET /companies
+     * GET /companies?keyword=abc&provinceId=1&industryId=5&page=0&size=10
+     * Lấy danh sách công ty active, hỗ trợ tìm kiếm + lọc + phân trang.
+     */
+    @GetMapping
+    public ResponseEntity<ResultPaginationDTO> getPublicCompanies(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer provinceId,
+            @RequestParam(required = false) Long industryId,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        return ResponseEntity.ok(
+                companyService.getPublicCompanies(keyword, provinceId, industryId, pageable));
+    }
 
     /**
      * GET /companies/{slug}

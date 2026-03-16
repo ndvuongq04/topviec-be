@@ -1,68 +1,38 @@
 package com.topviec.topviec_be.service;
 
-import com.topviec.topviec_be.dto.request.ReqCreateCompanyDTO;
-import com.topviec.topviec_be.dto.request.ReqSuspendCompanyDTO;
+import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
-import com.topviec.topviec_be.dto.request.ReqVerifyCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
 public interface CompanyService {
 
-    // -------------------------------------------------------------------------
-    // Employer
-    // -------------------------------------------------------------------------
+        /** Employer xem hồ sơ công ty của chính mình. */
+        ResCompanyDTO getMyCompany(Long userId);
 
-    /** Employer xem hồ sơ công ty của chính mình. */
-    ResCompanyDTO getMyCompany(Long userId);
+        /** Employer cập nhật hồ sơ công ty của mình. */
+        ResCompanyDTO updateMyCompany(Long userId, ReqUpdateCompanyDTO request);
 
-    /** Employer cập nhật hồ sơ công ty của mình. */
-    ResCompanyDTO updateMyCompany(Long userId, ReqUpdateCompanyDTO request);
+        ResCompanyDTO getBySlug(String slug);
 
-    // -------------------------------------------------------------------------
-    // Public
-    // -------------------------------------------------------------------------
+        ResCompanyDTO getById(Long id);
 
-    /** Lấy thông tin công ty theo slug (public, dùng cho trang chi tiết). */
-    ResCompanyDTO getBySlug(String slug);
+        ResultPaginationDTO getPublicCompanies(String keyword, Integer provinceId,
+                        Long industryId, Pageable pageable);
 
-    /** Lấy thông tin công ty theo id (public - chỉ active). */
-    ResCompanyDTO getById(Long id);
+        ResCompanyDTO adminGetById(Long id);
 
-    /** Admin lấy thông tin công ty theo id (mọi trạng thái). */
-    ResCompanyDTO adminGetById(Long id);
+        ResultPaginationDTO getAllCompanies(String status, String verificationStatus,
+                        String keyword, Pageable pageable);
 
-    // -------------------------------------------------------------------------
-    // Admin — Read
-    // -------------------------------------------------------------------------
+        /**
+         * Gộp updateCompanyStatus + adminUpdateCompany thành 1:
+         * - action != null → xử lý status (verify/suspend/unsuspend)
+         * - field info != null → partial update thông tin công ty
+         * - Có thể thực hiện cả 2 cùng lúc
+         */
+        ResCompanyDTO adminUpdateCompany(Long companyId, Long adminId, ReqAdminUpdateCompanyDTO request);
 
-    /** Admin lấy danh sách tất cả công ty. */
-    ResultPaginationDTO getAllCompanies(String status, Pageable pageable);
-
-    /** Admin lấy danh sách công ty chờ duyệt. */
-    ResultPaginationDTO getPendingVerification(Pageable pageable);
-
-    // -------------------------------------------------------------------------
-    // Admin — Verification (content_moderator)
-    // -------------------------------------------------------------------------
-
-    /** Duyệt hoặc từ chối hồ sơ công ty. */
-    ResCompanyDTO verifyCompany(Long companyId, Long adminId, ReqVerifyCompanyDTO request);
-
-    /** Suspend công ty vi phạm. */
-    ResCompanyDTO suspendCompany(Long companyId, Long adminId, ReqSuspendCompanyDTO request);
-
-    /** Mở khóa công ty bị suspend. */
-    ResCompanyDTO unsuspendCompany(Long companyId, Long adminId);
-
-    // -------------------------------------------------------------------------
-    // Admin — Management (super_admin)
-    // -------------------------------------------------------------------------
-
-    /** Admin sửa thông tin công ty. */
-    ResCompanyDTO adminUpdateCompany(Long companyId, Long adminId, ReqUpdateCompanyDTO request);
-
-    /** Admin xóa mềm công ty. */
-    void deleteCompany(Long companyId, Long adminId);
+        void deleteCompany(Long companyId, Long adminId);
 }

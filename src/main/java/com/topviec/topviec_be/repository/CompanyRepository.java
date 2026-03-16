@@ -23,11 +23,30 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
     boolean existsByCreatedBy(Long userId);
 
-    // Dùng cho admin: lấy danh sách công ty theo verificationStatus
-    @Query("SELECT c FROM Company c WHERE c.verificationStatus = :status")
-    Page<Company> findAllByVerificationStatus(@Param("status") String status, Pageable pageable);
+    // ── Admin — getAllCompanies ─────────────────────
+    @Query("""
+            SELECT c FROM Company c
+            WHERE (:status IS NULL OR c.status = :status)
+            AND (:verificationStatus IS NULL OR c.verificationStatus = :verificationStatus)
+            AND (:keyword IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Company> findAllWithFilter(
+            @Param("status") String status,
+            @Param("verificationStatus") String verificationStatus,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 
-    // Dùng cho admin: lấy danh sách công ty theo status
-    @Query("SELECT c FROM Company c WHERE c.status = :status")
-    Page<Company> findAllByStatus(@Param("status") String status, Pageable pageable);
+    // ── Public — UV lấy danh sách công ty active ─────────────────────────────
+    @Query("""
+            SELECT c FROM Company c
+            WHERE c.status = 'active'
+            AND (:keyword IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (:provinceId IS NULL OR c.provinceId = :provinceId)
+            AND (:industryId IS NULL OR c.industryId = :industryId)
+            """)
+    Page<Company> findPublicCompanies(
+            @Param("keyword") String keyword,
+            @Param("provinceId") Integer provinceId,
+            @Param("industryId") Long industryId,
+            Pageable pageable);
 }
