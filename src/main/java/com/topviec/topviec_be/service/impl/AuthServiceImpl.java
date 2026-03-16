@@ -102,6 +102,44 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public void registerEmployer(Long adminId, ReqRegisterEmployerDTO request) {
+        // Kiểm tra email
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw AppException.badRequest("Email đã được sử dụng");
+        }
+
+        // Kiểm tra slug công ty chưa tồn tại
+        if (companyRepository.existsBySlug(request.getCompanySlug())) {
+            throw AppException.conflict("Slug đã được sử dụng, vui lòng chọn slug khác");
+        }
+
+        // Bước 1: Tạo User
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .userType(UserType.EMPLOYER)
+                .status(UserStatus.PENDING)
+                .build();
+
+        User savedUser = userRepository.save(user);
+
+        // Bước 2: Tạo Company gắn với User vừa tạo
+        // status = pending, verificationStatus = pending → chờ admin duyệt
+        Company company = Company.builder()
+                .userId(savedUser.getId())
+                .name(request.getCompanyName())
+                .slug(request.getCompanySlug())
+                .description("") // bắt buộc not null trong entity → để trống, NTT bổ sung sau
+                .industryId(0L) // bắt buộc not null → placeholder, NTT cập nhật sau
+                .companySize("1-50") // default, NTT cập nhật sau
+                .createdBy(adminId) // admin tạo giúp → createdBy = adminId, không phải userId
+                .build();
+
+        companyRepository.save(company);
+    }
+
+    @Override
     public void verifyEmail(String token) {
         // Lấy email từ Redis (tự động xóa token sau khi lấy)
         String email = tokenService.verifyEmailToken(token);

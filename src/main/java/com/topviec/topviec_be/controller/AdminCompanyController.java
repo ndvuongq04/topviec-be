@@ -1,16 +1,20 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.dto.request.ReqCreateCompanyDTO;
+import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.dto.request.ReqSuspendCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqVerifyCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
+import com.topviec.topviec_be.service.AuthService;
 import com.topviec.topviec_be.service.CompanyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +32,24 @@ import org.springframework.web.bind.annotation.*;
 public class AdminCompanyController {
 
         private final CompanyService companyService;
+        private final AuthService authService;
+
+        /**
+         * POST /employer/company
+         * Admin hỗ trợ tạo hồ sơ công ty cho employer (trường hợp employer không tự tạo
+         * được do lỗi kỹ thuật hoặc bị khóa tài khoản). Sau khi admin tạo xong → công
+         * ty sẽ ở trạng thái pending để content_moderator hoặc super_admin duyệt.
+         */
+        @PostMapping
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "')")
+        public ResponseEntity<String> createCompany(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody ReqRegisterEmployerDTO request) {
+                authService.registerEmployer(extractUserId(jwt), request);
+                return ResponseEntity.ok("Đăng ký thành công");
+        }
 
         // -------------------------------------------------------------------------
         // Read — tất cả admin đều xem được

@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateCompanyDTO;
+import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.dto.request.ReqSuspendCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqVerifyCompanyDTO;
@@ -10,6 +11,7 @@ import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.enums.company.CompanySize;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
+import com.topviec.topviec_be.enums.users.UserStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.service.CompanyService;
@@ -26,51 +28,6 @@ import java.time.LocalDateTime;
 public class CompanyServiceImpl implements CompanyService {
 
     private final CompanyRepository companyRepository;
-
-    // -------------------------------------------------------------------------
-    // Employer — Create
-    // -------------------------------------------------------------------------
-
-    @Override
-    @Transactional
-    public ResCompanyDTO createCompany(Long userId, ReqCreateCompanyDTO request) {
-        // Mỗi employer chỉ được tạo 1 công ty
-        if (companyRepository.existsByCreatedBy(userId)) {
-            throw AppException.conflict("Bạn đã có hồ sơ công ty rồi");
-        }
-
-        if (companyRepository.existsBySlug(request.getSlug())) {
-            throw AppException.conflict("Slug đã được sử dụng, vui lòng chọn slug khác");
-        }
-
-        if (request.getTaxCode() != null && companyRepository.existsByTaxCode(request.getTaxCode())) {
-            throw AppException.conflict("Mã số thuế đã được đăng ký");
-        }
-
-        Company company = Company.builder()
-                .slug(request.getSlug())
-                .name(request.getName())
-                .logoUrl(request.getLogoUrl())
-                .coverUrl(request.getCoverUrl())
-                .description(request.getDescription())
-                .industryId(request.getIndustryId())
-                .companySize(request.getCompanySize() != null ? request.getCompanySize().getValue() : null)
-                .foundedYear(request.getFoundedYear())
-                .website(request.getWebsite())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .address(request.getAddress())
-                .provinceId(request.getProvinceId())
-                .taxCode(request.getTaxCode())
-                .businessLicenseUrl(request.getBusinessLicenseUrl())
-                .culture(request.getCulture())
-                .benefits(request.getBenefits())
-                .socialLinks(request.getSocialLinks())
-                .createdBy(userId)
-                .build();
-
-        return toResponse(companyRepository.save(company));
-    }
 
     // -------------------------------------------------------------------------
     // Employer — Read

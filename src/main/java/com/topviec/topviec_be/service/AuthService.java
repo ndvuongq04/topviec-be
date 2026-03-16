@@ -8,6 +8,9 @@ public interface AuthService {
 
     void registerEmployer(ReqRegisterEmployerDTO request);
 
+    // Dành riêng cho admin tạo employer + company giúp user
+    void registerEmployer(Long adminId, ReqRegisterEmployerDTO request);
+
     void updateLastLogin(Long userId, String ip);
 
     void verifyEmail(String token);

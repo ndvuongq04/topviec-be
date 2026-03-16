@@ -26,19 +26,6 @@ public class EmployerCompanyController {
     private final CompanyService companyService;
 
     /**
-     * POST /employer/company
-     * Tạo hồ sơ công ty lần đầu. Mỗi employer chỉ tạo được 1 công ty.
-     */
-    @PostMapping
-    public ResponseEntity<ResCompanyDTO> createCompany(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ReqCreateCompanyDTO request) {
-
-        ResCompanyDTO data = companyService.createCompany(extractUserId(jwt), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(data);
-    }
-
-    /**
      * GET /employer/company/me
      * Employer xem hồ sơ công ty của chính mình.
      */

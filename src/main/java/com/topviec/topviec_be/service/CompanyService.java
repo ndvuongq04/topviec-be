@@ -14,9 +14,6 @@ public interface CompanyService {
     // Employer
     // -------------------------------------------------------------------------
 
-    /** Tạo hồ sơ công ty. Mỗi employer chỉ được tạo 1 công ty. */
-    ResCompanyDTO createCompany(Long userId, ReqCreateCompanyDTO request);
-
     /** Employer xem hồ sơ công ty của chính mình. */
     ResCompanyDTO getMyCompany(Long userId);
 
