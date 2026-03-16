@@ -31,4 +31,20 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, Long> {
 
     @Query("SELECT a FROM AdminUser a WHERE a.department = :department AND a.deletedAt IS NULL")
     List<AdminUser> findAllByDepartment(@Param("department") String department);
+
+    /**
+     * Tìm kiếm + lọc theo role — cả 2 optional:
+     * - keyword null → không lọc theo tên
+     * - adminRole null → không lọc theo role
+     */
+    @Query("""
+            SELECT a FROM AdminUser a
+            WHERE a.deletedAt IS NULL
+            AND (:keyword IS NULL OR LOWER(a.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (:adminRole IS NULL OR a.adminRole = :adminRole)
+            """)
+    Page<AdminUser> findAllWithFilter(
+            @Param("keyword") String keyword,
+            @Param("adminRole") String adminRole,
+            Pageable pageable);
 }

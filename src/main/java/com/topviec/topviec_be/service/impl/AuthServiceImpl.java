@@ -11,6 +11,7 @@ import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.users.UserStatus;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.AuthService;
 import com.topviec.topviec_be.service.CandidateProfileService;
@@ -28,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
     private final TokenService tokenService;
     private final EmailService emailService;
     private final CandidateProfileService candidateProfileService;
+    private final AdminUserRepository adminUserRepository;
 
     @Override
     public void registerCandidate(ReqRegisterCandidateDTO request) {
@@ -135,5 +137,12 @@ public class AuthServiceImpl implements AuthService {
         // 3. Tạo token mới → gửi lại email
         String token = tokenService.resendVerifyEmailToken(email);
         emailService.sendVerifyEmail(email, token);
+    }
+
+    @Override
+    public String getAdminRoleByUserId(Long userId) {
+        return adminUserRepository.findActiveByUserId(userId)
+                .map(admin -> admin.getAdminRole())
+                .orElse(null);
     }
 }

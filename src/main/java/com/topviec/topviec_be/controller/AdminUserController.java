@@ -23,93 +23,102 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
-    private final AdminUserService adminUserService;
+        private final AdminUserService adminUserService;
 
-    /**
-     * POST /api/admin/users
-     * Chỉ super_admin được tạo admin mới
-     */
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "')")
-    public ResponseEntity<ResAdminUser> createAdmin(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ReqCreateAdmin request) {
+        /**
+         * POST /api/admin/users
+         * Chỉ super_admin được tạo admin mới
+         */
+        @PostMapping
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
+                        + "')")
+        public ResponseEntity<ResAdminUser> createAdmin(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody ReqCreateAdmin request) {
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(adminUserService.createAdmin(request, extractUserId(jwt)));
-    }
+                return ResponseEntity
+                                .status(HttpStatus.CREATED)
+                                .body(adminUserService.createAdmin(request, extractUserId(jwt)));
+        }
 
-    /**
-     * GET /api/admin/users?page=0&size=10
-     * super_admin + content_moderator + support_admin xem được danh sách
-     */
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "', '" + AdminRoleConstants.CONTENT_MODERATOR + "', '" + AdminRoleConstants.SUPPORT_ADMIN + "')")
-    public ResponseEntity<ResultPaginationDTO> getAllAdmins(
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        /**
+         * GET /admin/users?keyword=nguyen&adminRole=content_moderator&page=0&size=10
+         * Lấy danh sách admin, hỗ trợ tìm theo tên và lọc theo role
+         * - keyword : tìm kiếm theo fullName (optional)
+         * - adminRole : lọc theo role (optional) — "super_admin" | "content_moderator"
+         * | "support_admin" | "finance_admin"
+         */
+        @GetMapping
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "')")
+        public ResponseEntity<ResultPaginationDTO> getAllAdmins(
+                        @RequestParam(required = false) String keyword,
+                        @RequestParam(required = false) String adminRole,
+                        @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
-        return ResponseEntity.ok(adminUserService.getAllAdmins(pageable));
-    }
+                return ResponseEntity.ok(adminUserService.getAllAdmins(keyword, adminRole, pageable));
+        }
 
-    /**
-     * GET /api/admin/users/{id}
-     * super_admin + content_moderator + support_admin xem được chi tiết
-     */
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "', '" + AdminRoleConstants.CONTENT_MODERATOR + "', '" + AdminRoleConstants.SUPPORT_ADMIN + "')")
-    public ResponseEntity<ResAdminUser> getAdminById(@PathVariable Long id) {
-        return ResponseEntity.ok(adminUserService.getAdminById(id));
-    }
+        /**
+         * GET /api/admin/users/{id}
+         * super_admin + content_moderator + support_admin xem được chi tiết
+         */
+        @GetMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN
+                        + "', '" + AdminRoleConstants.CONTENT_MODERATOR + "', '" + AdminRoleConstants.SUPPORT_ADMIN
+                        + "')")
+        public ResponseEntity<ResAdminUser> getAdminById(@PathVariable Long id) {
+                return ResponseEntity.ok(adminUserService.getAdminById(id));
+        }
 
-    /**
-     * PUT /api/admin/users/{id}
-     * Chỉ super_admin được cập nhật thông tin admin
-     */
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "')")
-    public ResponseEntity<ResAdminUser> updateAdmin(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id,
-            @Valid @RequestBody ReqUpdateAdmin request) {
+        /**
+         * PUT /api/admin/users/{id}
+         * Chỉ super_admin được cập nhật thông tin admin
+         */
+        @PutMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
+                        + "')")
+        public ResponseEntity<ResAdminUser> updateAdmin(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id,
+                        @Valid @RequestBody ReqUpdateAdmin request) {
 
-        return ResponseEntity.ok(adminUserService.updateAdmin(id, request, extractUserId(jwt)));
-    }
+                return ResponseEntity.ok(adminUserService.updateAdmin(id, request, extractUserId(jwt)));
+        }
 
-    /**
-     * PATCH /api/admin/users/{id}/toggle-active
-     * Chỉ super_admin được bật/tắt tài khoản
-     */
-    @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "')")
-    public ResponseEntity<ResAdminUser> toggleActive(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id) {
+        /**
+         * PATCH /api/admin/users/{id}/toggle-active
+         * Chỉ super_admin được bật/tắt tài khoản
+         */
+        @PatchMapping("/{id}/toggle-active")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
+                        + "')")
+        public ResponseEntity<ResAdminUser> toggleActive(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id) {
 
-        return ResponseEntity.ok(adminUserService.toggleActive(id, extractUserId(jwt)));
-    }
+                return ResponseEntity.ok(adminUserService.toggleActive(id, extractUserId(jwt)));
+        }
 
-    /**
-     * DELETE /api/admin/users/{id}
-     * Chỉ super_admin được xóa admin
-     */
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
-            + "')")
-    public ResponseEntity<Void> deleteAdmin(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id) {
+        /**
+         * DELETE /api/admin/users/{id}
+         * Chỉ super_admin được xóa admin
+         */
+        @DeleteMapping("/{id}")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
+                        + "')")
+        public ResponseEntity<Void> deleteAdmin(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable Long id) {
 
-        adminUserService.deleteAdmin(id, extractUserId(jwt));
-        return ResponseEntity.noContent().build();
-    }
+                adminUserService.deleteAdmin(id, extractUserId(jwt));
+                return ResponseEntity.noContent().build();
+        }
 
-    private Long extractUserId(Jwt jwt) {
-        return Long.parseLong(jwt.getSubject());
-    }
+        private Long extractUserId(Jwt jwt) {
+                return Long.parseLong(jwt.getSubject());
+        }
 }

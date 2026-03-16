@@ -15,9 +15,6 @@ public interface AdminUserService {
     // Lấy thông tin admin theo id
     ResAdminUser getAdminById(Long adminUsersId);
 
-    // Lấy tất cả admin chưa bị xóa
-    ResultPaginationDTO getAllAdmins(Pageable pageable);
-
     // Cập nhật thông tin admin
     ResAdminUser updateAdmin(Long adminUsersId, ReqUpdateAdmin request, Long updatedByUserId);
 
@@ -26,4 +23,7 @@ public interface AdminUserService {
 
     // Soft delete admin
     void deleteAdmin(Long adminUsersId, Long deletedByUserId);
+
+    // keyword: tìm theo tên, adminRole: lọc theo role (cả 2 optional)
+    ResultPaginationDTO getAllAdmins(String keyword, String adminRole, Pageable pageable);
 }

@@ -69,8 +69,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getAllAdmins(Pageable pageable) {
-        Page<AdminUser> page = adminUserRepository.findAllNotDeleted(pageable);
+    public ResultPaginationDTO getAllAdmins(String keyword, String adminRole, Pageable pageable) {
+        // Chuẩn hóa input: blank string → null để query không lọc
+        String keywordParam = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+        String adminRoleParam = (adminRole != null && !adminRole.isBlank()) ? adminRole.trim() : null;
+
+        Page<AdminUser> page = adminUserRepository.findAllWithFilter(keywordParam, adminRoleParam, pageable);
         return toResultPagination(page, pageable);
     }
 
