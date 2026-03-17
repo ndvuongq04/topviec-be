@@ -119,9 +119,9 @@ public class CompanyServiceImpl implements CompanyService {
     public ResultPaginationDTO getAllCompanies(String status, String verificationStatus,
             String keyword, Pageable pageable) {
 
-        String statusParam = (status != null && !status.isBlank()) ? status.trim() : null;
+        String statusParam = (status != null && !status.isBlank()) ? status.trim().toLowerCase() : null;
         String verificationStatusParam = (verificationStatus != null && !verificationStatus.isBlank())
-                ? verificationStatus.trim()
+                ? verificationStatus.trim().toLowerCase()
                 : null;
         String keywordParam = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
@@ -147,8 +147,10 @@ public class CompanyServiceImpl implements CompanyService {
             switch (request.getAction().toLowerCase()) {
 
                 case "verify" -> {
-                    if (!VerificationStatus.PENDING.getValue().equals(company.getVerificationStatus())) {
-                        throw AppException.badRequest("Chỉ có thể duyệt hồ sơ đang ở trạng thái chờ duyệt");
+                    if (!VerificationStatus.PENDING.getValue().equals(company.getVerificationStatus())
+                            && !VerificationStatus.REJECTED.getValue().equals(company.getVerificationStatus())) {
+                        throw AppException
+                                .badRequest("Chỉ có thể duyệt hồ sơ đang ở trạng thái chờ duyệt hoặc đã từ chối");
                     }
                     if (Boolean.TRUE.equals(request.getApproved())) {
                         company.setVerificationStatus(VerificationStatus.VERIFIED.getValue());
