@@ -62,11 +62,23 @@ public class GlobalExceptionHandler {
 
         @ExceptionHandler(Exception.class)
         public ResponseEntity<RestResponse<Object>> handleException(Exception ex) {
+                // If the exception is wrapped (e.g., by Spring's Transactional proxy), unwrap it
+                Throwable cause = ex;
+                while (cause != null) {
+                        if (cause instanceof AppException) {
+                                return handleAppException((AppException) cause);
+                        }
+                        // Also check for common spring security or data integrity exceptions if needed
+                        cause = cause.getCause();
+                }
+
+                // If it's truly an unexpected exception, print it
                 ex.printStackTrace();
                 RestResponse<Object> res = new RestResponse<>();
                 res.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
                 res.setError("Internal Server Error");
-                res.setMessage("Lỗi hệ thống, vui lòng thử lại sau");
+                // Provide a safe message, maybe the actual exception message for development, but secure for production
+                res.setMessage("Lỗi hệ thống, vui lòng thử lại sau (" + ex.getMessage() + ")");
 
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(res);
         }
