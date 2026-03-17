@@ -30,8 +30,6 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "companies")
-@SQLDelete(sql = "UPDATE companies SET deleted_at = NOW() WHERE id = ?")
-@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
