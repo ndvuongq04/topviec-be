@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public interface AdminUserRepository extends JpaRepository<AdminUser, Long> {
 
-    @Query("SELECT a FROM AdminUser a WHERE a.adminUsersId = :id AND a.isActive = true AND a.deletedAt IS NULL")
+    @Query("SELECT a FROM AdminUser a WHERE a.adminUsersId = :id ")
     Optional<AdminUser> findActiveById(@Param("id") Long id);
 
     @Query("SELECT a FROM AdminUser a WHERE a.user.id = :userId AND a.isActive = true AND a.deletedAt IS NULL")
