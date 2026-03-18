@@ -17,6 +17,9 @@ public class JobPostLocation {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "job_post_id", nullable = false)
+    private Long jobPostId;
+
     @Column(name = "province_id", nullable = false)
     private Long provinceId;
 

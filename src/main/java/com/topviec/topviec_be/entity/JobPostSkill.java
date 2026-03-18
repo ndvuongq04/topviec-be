@@ -19,6 +19,9 @@ public class JobPostSkill {
     @Column(name = "skill_id", nullable = false)
     private Long skillId;
 
+    @Column(name = "job_post_id", nullable = false)
+    private Long jobPostId;
+
     @Column(name = "is_required", nullable = false)
     private Boolean isRequired;
 

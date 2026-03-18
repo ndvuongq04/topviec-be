@@ -18,6 +18,9 @@ public class JobRenewalLog {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "job_post_id", nullable = false)
+    private Long jobPostId;
+
     @Column(name = "renewed_by", nullable = false)
     private Long renewedBy;
 

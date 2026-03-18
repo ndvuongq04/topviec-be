@@ -32,6 +32,7 @@ public class SecurityConfig {
         private static final String[] PUBLIC_URLS = {
                         "/auth/**",
                         "/companies/**",
+                        "/job-postings/**",
                         "/actuator/health",
                         "/swagger-ui/**",
                         "/v3/api-docs/**"
@@ -45,9 +46,9 @@ public class SecurityConfig {
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(PUBLIC_URLS).permitAll()
-                                                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                                                .requestMatchers("/api/v1/employer/**").hasRole("EMPLOYER")
-                                                .requestMatchers("/api/v1/candidate/**").hasRole("CANDIDATE")
+                                                .requestMatchers("/employer/**").hasRole("EMPLOYER")
+                                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/candidate/**").hasRole("CANDIDATE")
                                                 .anyRequest().authenticated())
 
                                 .exceptionHandling(ex -> ex

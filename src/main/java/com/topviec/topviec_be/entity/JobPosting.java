@@ -3,14 +3,6 @@ package com.topviec.topviec_be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.topviec.topviec_be.enums.jobs.CloseReason;
-import com.topviec.topviec_be.enums.jobs.JobPostStatus;
-import com.topviec.topviec_be.enums.jobs.RejectionReason;
-import com.topviec.topviec_be.enums.jobs.WorkType;
 
 @Entity
 @Table(name = "job_postings")
@@ -68,10 +60,11 @@ public class JobPosting {
     @Column(name = "salary_negotiable", nullable = false)
     private Boolean salaryNegotiable;
 
-    @Enumerated(EnumType.STRING)
+    // Dùng String — nhất quán với pattern toàn project
+    // Giá trị hợp lệ: full_time | part_time | remote | hybrid | freelance (WorkType
+    // enum)
     @Column(name = "work_type", nullable = false, length = 20)
-    @Builder.Default
-    private WorkType workType = WorkType.FULL_TIME;
+    private String workType;
 
     @Column(name = "headcount", nullable = false)
     private Integer headcount;
@@ -79,10 +72,9 @@ public class JobPosting {
     @Column(name = "deadline", nullable = false)
     private LocalDateTime deadline;
 
-    @Enumerated(EnumType.STRING)
+    // Giá trị hợp lệ: xem JobPostStatus enum
     @Column(name = "status", nullable = false, length = 30)
-    @Builder.Default
-    private JobPostStatus status = JobPostStatus.DRAFT;
+    private String status;
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
@@ -90,9 +82,9 @@ public class JobPosting {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
-    @Enumerated(EnumType.STRING)
+    // Giá trị hợp lệ: filled | cancelled | other (CloseReason enum)
     @Column(name = "close_reason")
-    private CloseReason closeReason;
+    private String closeReason;
 
     @Column(name = "close_note", columnDefinition = "TEXT")
     private String closeNote;
@@ -118,9 +110,10 @@ public class JobPosting {
     @Column(name = "moderation_note", columnDefinition = "TEXT")
     private String moderationNote;
 
-    @Enumerated(EnumType.STRING)
+    // Giá trị hợp lệ: spam | fraudulent | wrong_info | incomplete | other
+    // (RejectionReason enum)
     @Column(name = "rejection_reason")
-    private RejectionReason rejectionReason;
+    private String rejectionReason;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -140,18 +133,14 @@ public class JobPosting {
     // @JdbcTypeCode(SqlTypes.VECTOR)
     // private float[] embedding;
 
-    // Relationships (comment để mở sau khi có đủ các entity liên quan)
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "company_id", insertable = false, updatable = false)
-    // private Company company;
+    // Relationships
+    // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
+    // = true, fetch = FetchType.LAZY)
+    // private List<JobPostSkill> skills = new ArrayList<>();
 
-    @JsonIgnore
-    @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<JobPostSkill> skills = new ArrayList<>();
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<JobPostLocation> locations = new ArrayList<>();
+    // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
+    // = true, fetch = FetchType.LAZY)
+    // private List<JobPostLocation> locations = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

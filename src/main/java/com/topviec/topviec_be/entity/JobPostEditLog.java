@@ -5,7 +5,6 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
-import com.topviec.topviec_be.enums.jobs.EditType;
 
 @Entity
 @Table(name = "job_post_edit_logs")
@@ -30,12 +29,11 @@ public class JobPostEditLog {
     // Snapshot toàn bộ dữ liệu của tin trước khi chỉnh sửa (dùng cho rollback /
     // audit)
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "snapshot_before", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "snapshot_before", nullable = false, columnDefinition = "json")
     private String snapshotBefore;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "edit_type", nullable = false)
-    private EditType editType;
+    private String editType;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
