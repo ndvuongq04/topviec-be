@@ -66,6 +66,9 @@ dependencies {
     // Dev tools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
+    // Cloudinary 
+    implementation 'com.cloudinary:cloudinary-http44:1.38.0'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
