@@ -44,6 +44,7 @@ dependencies {
     // Cache + Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'org.apache.commons:commons-pool2'
 
     // Elasticsearch
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
@@ -64,6 +65,9 @@ dependencies {
 
     // Dev tools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Cloudinary 
+    implementation 'com.cloudinary:cloudinary-http44:1.38.0'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

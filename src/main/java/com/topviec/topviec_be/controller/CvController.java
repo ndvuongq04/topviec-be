@@ -1,0 +1,163 @@
+package com.topviec.topviec_be.controller;
+
+import com.topviec.topviec_be.dto.request.ReqRenameCvDTO;
+import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
+import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
+import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
+import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
+import com.topviec.topviec_be.service.CvService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+
+@Slf4j
+@RestController
+@RequestMapping("/cvs")
+@RequiredArgsConstructor
+public class CvController {
+
+    private final CvService cvService;
+
+    /**
+     * POST /api/v1/cvs/upload
+     * Upload CV từ máy tính (PDF/DOCX)
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ResCvDTO> uploadCv(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("title") String title,
+            @RequestParam(value = "isDefault", defaultValue = "false") boolean isDefault,
+            @AuthenticationPrincipal Jwt jwt) {
+        ReqUploadCvDTO request = ReqUploadCvDTO.builder()
+                .title(title)
+                .isDefault(isDefault)
+                .build();
+
+        ResCvDTO data = cvService.uploadCv(extractUserId(jwt), file, request);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(data);
+    }
+
+    /**
+     * GET /api/v1/cvs
+     * Lấy danh sách CV của user đang đăng nhập
+     */
+    @GetMapping
+    public ResponseEntity<List<ResCvDTO>> getMyCvs(
+            @AuthenticationPrincipal Jwt jwt) {
+        List<ResCvDTO> data = cvService.getMyCvs(extractUserId(jwt));
+
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * PATCH /api/v1/cvs/:id/rename
+     * Đổi tên CV
+     */
+    @PatchMapping("/{id}/rename")
+    public ResponseEntity<ResCvDTO> renameCv(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqRenameCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvDTO data = cvService.renameCv(extractUserId(jwt), id, request.getTitle());
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * PATCH /api/v1/cvs/:id/default
+     * Đặt CV làm mặc định
+     */
+    @PatchMapping("/{id}/default")
+    public ResponseEntity<ResCvDTO> setDefaultCv(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvDTO data = cvService.setDefaultCv(extractUserId(jwt), id);
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * POST /api/v1/cvs/:id/duplicate
+     * Sao chép CV
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<ResCvDTO> duplicateCv(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvDTO data = cvService.duplicateCv(extractUserId(jwt), id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(data);
+    }
+
+    /**
+     * DELETE /api/v1/cvs/:id
+     * Xóa CV (Soft delete)
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCv(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        cvService.deleteCv(extractUserId(jwt), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/v1/cvs/:id/download
+     * Tải CV (Redirect ra Cloudinary URL)
+     */
+
+    /**
+     * PATCH /api/v1/cvs/:id/share
+     * update visibility
+     */
+    @PatchMapping("/{id}/share")
+    public ResponseEntity<ResCvDTO> shareCv(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqShareCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvDTO data = cvService.shareCv(extractUserId(jwt), id, request);
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * POST /api/v1/cvs/:id/share-token
+     * Tạo token chia sẻ CV với TTL
+     */
+    @PostMapping("/{id}/share-token")
+    public ResponseEntity<ResShareTokenDTO> createShareToken(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqCreateShareTokenDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResShareTokenDTO data = cvService.createShareToken(extractUserId(jwt), id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(data);
+    }
+
+    /**
+     * GET /api/v1/cvs/public/:shareToken
+     * Xem CV công khai qua token
+     */
+    @GetMapping("/public/{shareToken}")
+    public ResponseEntity<ResCvDTO> getPublicCv(@PathVariable String shareToken) {
+        ResCvDTO data = cvService.getPublicCv(shareToken);
+        return ResponseEntity.ok(data);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lấy userId từ JWT subject
+     * JwtService.generateAccessToken() đặt userId vào subject
+     */
+    private Long extractUserId(Jwt jwt) {
+        return Long.parseLong(jwt.getSubject());
+    }
+}
