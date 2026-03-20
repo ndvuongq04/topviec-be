@@ -183,14 +183,13 @@ public class JobPostingServiceImpl implements JobPostingService {
         if (request.getIsUrgent() != null)
             jobPosting.setIsUrgent(request.getIsUrgent());
 
-        // Chỉ tăng editCount khi đang published
-        // để kiểm soát chỉ được sửa 1 lần sau khi đăng
+        // Tăng editCount khi đang published (kiểm soát chỉ được sửa 1 lần sau khi đăng)
         if (JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())) {
             jobPosting.setEditCount(jobPosting.getEditCount() + 1);
-
-            // Nếu đang published → chuyển về draft
-            jobPosting.setStatus(JobPostStatus.DRAFT.getValue());
         }
+
+        // Mỗi lần chỉnh sửa đều chuyển về DRAFT (cần duyệt lại)
+        jobPosting.setStatus(JobPostStatus.DRAFT.getValue());
 
         JobPosting updated = jobPostingRepository.save(jobPosting);
 
