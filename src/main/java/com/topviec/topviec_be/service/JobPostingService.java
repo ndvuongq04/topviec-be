@@ -49,4 +49,17 @@ public interface JobPostingService {
 
     /** Employer làm mới tin tuyển dụng (đẩy lên đầu). */
     ResJobPostingDetail refresh(Long id, Long companyId, Long updatedByUserId);
+
+    // -------------------------------------------------------------------------
+    // Admin (Content Mod) — Moderation
+    // -------------------------------------------------------------------------
+
+    /** Admin duyệt tin tuyển dụng. */
+    ResJobPostingDetail approve(Long id, Long adminId);
+
+    /** Admin từ chối tin tuyển dụng. */
+    ResJobPostingDetail reject(Long id, Long adminId, com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request);
+
+    /** Admin gỡ tin tuyển dụng vi phạm. */
+    ResJobPostingDetail takedown(Long id, Long adminId, com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request);
 }
