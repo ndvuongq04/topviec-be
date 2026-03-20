@@ -33,5 +33,5 @@ public interface JobPostingService {
     ResJobPostingDetail getDetail(Long id);
 
     /** Employer chỉnh sửa tin tuyển dụng. */
-    ResJobPostingDetail update(Long id, ReqUpdateJobPostingDTO request, Long updatedByUserId);
+    ResJobPostingDetail update(Long id, ReqUpdateJobPostingDTO request, Long updatedByUserId, Long companyId);
 }

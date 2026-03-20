@@ -147,8 +147,12 @@ public class JobPostingServiceImpl implements JobPostingService {
 
     @Override
     @Transactional
-    public ResJobPostingDetail update(Long id, ReqUpdateJobPostingDTO request, Long updatedByUserId) {
+    public ResJobPostingDetail update(Long id, ReqUpdateJobPostingDTO request, Long updatedByUserId, Long companyId) {
         JobPosting jobPosting = findByIdOrThrow(id);
+
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền chỉnh sửa tin tuyển dụng của công ty khác");
+        }
 
         validateEditable(jobPosting);
         saveEditLog(jobPosting, updatedByUserId);

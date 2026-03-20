@@ -84,7 +84,8 @@ public class EmployerJobPostingController {
             @Valid @RequestBody ReqUpdateJobPostingDTO request) {
 
         Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
 
-        return ResponseEntity.ok(jobPostingService.update(id, request, userId));
+        return ResponseEntity.ok(jobPostingService.update(id, request, userId, companyId));
     }
 }
