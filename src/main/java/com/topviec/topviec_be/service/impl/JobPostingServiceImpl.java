@@ -29,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO;
 
 import java.text.Normalizer;
 import java.util.List;
@@ -204,6 +205,98 @@ public class JobPostingServiceImpl implements JobPostingService {
         }
 
         return toDetailResponse(updated);
+    }
+
+    // -------------------------------------------------------------------------
+    // Employer — Lifecycle Methods
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail pause(Long id, Long companyId, Long updatedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        if (!JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể tạm dừng tin khi đang ở trạng thái PUBLISHED");
+        }
+        saveEditLog(jobPosting, updatedByUserId);
+        jobPosting.setStatus(JobPostStatus.PAUSED.getValue());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail resume(Long id, Long companyId, Long updatedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        if (!JobPostStatus.PAUSED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể mở lại tin khi đang ở trạng thái PAUSED");
+        }
+        saveEditLog(jobPosting, updatedByUserId);
+        jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail close(Long id, Long companyId, Long updatedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        String status = jobPosting.getStatus();
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status) && !JobPostStatus.PAUSED.getValue().equals(status)) {
+            throw AppException.badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED hoặc PAUSED");
+        }
+        saveEditLog(jobPosting, updatedByUserId);
+        jobPosting.setStatus(JobPostStatus.CLOSED.getValue());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail extend(Long id, Long companyId, Long updatedByUserId, ReqExtendJobPostDTO request) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        if (!JobPostStatus.EXPIRED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể gia hạn tin khi đã hết hạn (EXPIRED)");
+        }
+        saveEditLog(jobPosting, updatedByUserId);
+        jobPosting.setDeadline(request.getNewDeadline());
+        jobPosting.setStatus(JobPostStatus.RENEWED.getValue());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail refresh(Long id, Long companyId, Long updatedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        if (!JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())
+                && !JobPostStatus.RENEWED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể làm mới tin khi đang ở trạng thái PUBLISHED hoặc RENEWED");
+        }
+        jobPosting.setPublishedAt(java.time.LocalDateTime.now());
+        jobPosting.setRefreshedAt(java.time.LocalDateTime.now());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
     }
 
     // -------------------------------------------------------------------------

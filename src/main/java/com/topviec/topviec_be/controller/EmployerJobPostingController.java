@@ -88,4 +88,61 @@ public class EmployerJobPostingController {
 
         return ResponseEntity.ok(jobPostingService.update(id, request, userId, companyId));
     }
+
+    /**
+     * PATCH /employer/job-postings/{id}/pause
+     * Tạm dừng tin tuyển dụng.
+     */
+    @PatchMapping("/{id}/pause")
+    public ResponseEntity<ResJobPostingDetail> pause(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.pause(id, companyId, userId));
+    }
+
+    /**
+     * PATCH /employer/job-postings/{id}/resume
+     * Mở lại tin tuyển dụng.
+     */
+    @PatchMapping("/{id}/resume")
+    public ResponseEntity<ResJobPostingDetail> resume(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.resume(id, companyId, userId));
+    }
+
+    /**
+     * PATCH /employer/job-postings/{id}/close
+     * Đóng tin tuyển dụng.
+     */
+    @PatchMapping("/{id}/close")
+    public ResponseEntity<ResJobPostingDetail> close(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.close(id, companyId, userId));
+    }
+
+    /**
+     * PATCH /employer/job-postings/{id}/extend
+     * Gia hạn tin tuyển dụng.
+     */
+    @PatchMapping("/{id}/extend")
+    public ResponseEntity<ResJobPostingDetail> extend(
+            @PathVariable Long id,
+            @Valid @RequestBody com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO request) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.extend(id, companyId, userId, request));
+    }
+
+    /**
+     * PATCH /employer/job-postings/{id}/refresh
+     * Làm mới tin tuyển dụng (đẩy lên đầu).
+     */
+    @PatchMapping("/{id}/refresh")
+    public ResponseEntity<ResJobPostingDetail> refresh(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.refresh(id, companyId, userId));
+    }
 }

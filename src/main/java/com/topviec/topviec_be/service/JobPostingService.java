@@ -34,4 +34,19 @@ public interface JobPostingService {
 
     /** Employer chỉnh sửa tin tuyển dụng. */
     ResJobPostingDetail update(Long id, ReqUpdateJobPostingDTO request, Long updatedByUserId, Long companyId);
+
+    /** Employer tạm dừng tin tuyển dụng. */
+    ResJobPostingDetail pause(Long id, Long companyId, Long updatedByUserId);
+
+    /** Employer mở lại tin tuyển dụng. */
+    ResJobPostingDetail resume(Long id, Long companyId, Long updatedByUserId);
+
+    /** Employer đóng tin tuyển dụng. */
+    ResJobPostingDetail close(Long id, Long companyId, Long updatedByUserId);
+
+    /** Employer gia hạn tin tuyển dụng. */
+    ResJobPostingDetail extend(Long id, Long companyId, Long updatedByUserId, com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO request);
+
+    /** Employer làm mới tin tuyển dụng (đẩy lên đầu). */
+    ResJobPostingDetail refresh(Long id, Long companyId, Long updatedByUserId);
 }
