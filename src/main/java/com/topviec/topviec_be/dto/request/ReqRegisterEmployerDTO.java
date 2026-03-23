@@ -2,12 +2,9 @@ package com.topviec.topviec_be.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
@@ -15,6 +12,9 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReqRegisterEmployerDTO {
+
+    // ── Tài khoản ─────────────────────────────────────────────────────────────
+
     @NotBlank(message = "Email không được để trống")
     @Email(message = "Email không hợp lệ")
     private String email;
@@ -23,5 +23,12 @@ public class ReqRegisterEmployerDTO {
     @Size(min = 6, message = "Password phải có ít nhất 6 ký tự")
     private String password;
 
-    // Các trường khác như tên công ty, địa chỉ, số điện thoại có thể thêm vào đây
+    // ── Thông tin công ty ─────────────────────────────────────────────────────
+
+    @NotBlank(message = "Tên công ty không được để trống")
+    private String companyName;
+
+    @NotBlank(message = "Slug không được để trống")
+    @Pattern(regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$", message = "Slug chỉ được chứa chữ thường, số và dấu gạch ngang (ví dụ: cong-ty-abc)")
+    private String companySlug;
 }

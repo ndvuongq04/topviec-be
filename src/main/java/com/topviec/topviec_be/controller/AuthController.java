@@ -19,6 +19,7 @@ import com.topviec.topviec_be.dto.request.ReqResetPasswordDTO;
 import com.topviec.topviec_be.dto.response.ResLoginDTO;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.entity.UserSession;
+import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.security.CustomUserDetails;
 import com.topviec.topviec_be.security.JwtService;
@@ -66,12 +67,25 @@ public class AuthController {
                 // Bước 2 — Lấy thông tin user
                 CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
-                // Bước 3 — Generate tokens
-                String accessToken = jwtService.generateAccessToken(
-                                userDetails.getId(),
-                                userDetails.getEmail(),
-                                userDetails.getUserType().name(),
-                                userDetails.getStatus());
+                // Bước 3 — Generate access token
+                // Nếu là ADMIN → lấy adminRole qua service để đưa vào JWT claim
+                String accessToken;
+                if (userDetails.getUserType() == UserType.ADMIN) {
+                        String adminRole = authService.getAdminRoleByUserId(userDetails.getId());
+                        accessToken = jwtService.generateAccessToken(
+                                        userDetails.getId(),
+                                        userDetails.getEmail(),
+                                        userDetails.getUserType().name(),
+                                        userDetails.getStatus(),
+                                        adminRole);
+                } else {
+                        accessToken = jwtService.generateAccessToken(
+                                        userDetails.getId(),
+                                        userDetails.getEmail(),
+                                        userDetails.getUserType().name(),
+                                        userDetails.getStatus());
+                }
+
                 String refreshToken = jwtService.generateRefreshToken(userDetails.getId());
 
                 // Bước 4.0 — Cập nhật lastLoginAt + lastLoginIp
@@ -161,11 +175,23 @@ public class AuthController {
                 User user = session.getUser();
 
                 // 3. Tạo access token mới
-                String newAccessToken = jwtService.generateAccessToken(
-                                user.getId(),
-                                user.getEmail(),
-                                user.getUserType().name(),
-                                user.getStatus());
+                // Refresh token cũng cần đưa adminRole vào nếu là ADMIN
+                String newAccessToken;
+                if (user.getUserType() == UserType.ADMIN) {
+                        String adminRole = authService.getAdminRoleByUserId(user.getId());
+                        newAccessToken = jwtService.generateAccessToken(
+                                        user.getId(),
+                                        user.getEmail(),
+                                        user.getUserType().name(),
+                                        user.getStatus(),
+                                        adminRole);
+                } else {
+                        newAccessToken = jwtService.generateAccessToken(
+                                        user.getId(),
+                                        user.getEmail(),
+                                        user.getUserType().name(),
+                                        user.getStatus());
+                }
 
                 // 4. Trả về access token mới
                 ResLoginDTO resLoginDTO = ResLoginDTO.builder()
