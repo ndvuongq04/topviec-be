@@ -35,4 +35,6 @@ public interface CompanyService {
         ResCompanyDTO adminUpdateCompany(Long companyId, Long adminId, ReqAdminUpdateCompanyDTO request);
 
         void deleteCompany(Long companyId, Long adminId);
+
+        Long getCompanyIdByUserId(Long userId);
 }
