@@ -274,7 +274,7 @@ public class JobPostingServiceImpl implements JobPostingService {
         }
         saveEditLog(jobPosting, updatedByUserId);
         jobPosting.setDeadline(request.getNewDeadline());
-        jobPosting.setStatus(JobPostStatus.RENEWED.getValue());
+        jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
         jobPosting.setUpdatedBy(updatedByUserId);
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
@@ -310,53 +310,56 @@ public class JobPostingServiceImpl implements JobPostingService {
                 && !JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())) {
             throw AppException.badRequest("Chỉ có thể duyệt tin khi đang ở trạng thái PENDING_APPROVAL hoặc DRAFT");
         }
-        
+
         jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
         jobPosting.setPublishedAt(java.time.LocalDateTime.now());
         jobPosting.setUpdatedBy(adminId);
-        
+
         // Reset rejection reasons if any
         jobPosting.setRejectionReason(null);
         jobPosting.setModerationNote(null);
-        
+
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
     }
 
     @Override
     @Transactional
-    public ResJobPostingDetail reject(Long id, Long adminId, com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request) {
+    public ResJobPostingDetail reject(Long id, Long adminId,
+            com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request) {
         JobPosting jobPosting = findByIdOrThrow(id);
         if (!JobPostStatus.PENDING_APPROVAL.getValue().equals(jobPosting.getStatus())) {
             throw AppException.badRequest("Chỉ có thể từ chối tin khi đang ở trạng thái PENDING_APPROVAL");
         }
-        
+
         jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
         jobPosting.setRejectionReason(request.getRejectionReason());
         jobPosting.setModerationNote(request.getModerationNote());
         jobPosting.setUpdatedBy(adminId);
-        
+
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
     }
 
     @Override
     @Transactional
-    public ResJobPostingDetail takedown(Long id, Long adminId, com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request) {
+    public ResJobPostingDetail takedown(Long id, Long adminId,
+            com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request) {
         JobPosting jobPosting = findByIdOrThrow(id);
         String status = jobPosting.getStatus();
-        
-        if (JobPostStatus.DRAFT.getValue().equals(status) || 
-            JobPostStatus.PENDING_APPROVAL.getValue().equals(status) || 
-            JobPostStatus.REJECTED.getValue().equals(status)) {
-            throw AppException.badRequest("Tin không nằm trong trạng thái có thể gỡ (chỉ gỡ tin đã đăng, tạm dừng, gia hạn...)");
+
+        if (JobPostStatus.DRAFT.getValue().equals(status) ||
+                JobPostStatus.PENDING_APPROVAL.getValue().equals(status) ||
+                JobPostStatus.REJECTED.getValue().equals(status)) {
+            throw AppException
+                    .badRequest("Tin không nằm trong trạng thái có thể gỡ (chỉ gỡ tin đã đăng, tạm dừng, gia hạn...)");
         }
-        
+
         jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
         jobPosting.setRejectionReason(request.getRejectionReason());
         jobPosting.setModerationNote(request.getModerationNote());
         jobPosting.setUpdatedBy(adminId);
-        
+
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
     }
