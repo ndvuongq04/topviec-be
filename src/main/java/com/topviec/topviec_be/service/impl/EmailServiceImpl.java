@@ -50,6 +50,27 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Đặt lại mật khẩu", htmlBody);
     }
 
+    @Override
+    public void sendMemberInviteNewUser(String toEmail, String tempPassword, String verifyToken) {
+        Context context = new Context();
+        context.setVariable("email", toEmail);
+        context.setVariable("tempPassword", tempPassword);
+        context.setVariable("verifyLink", verifyEmailPath + "?token=" + verifyToken);
+
+        String htmlBody = templateEngine.process("email/member-invite-new-user", context);
+        sendHtmlEmail(toEmail, "[Topviec] Bạn được mời tham gia công ty", htmlBody);
+    }
+
+    @Override
+    public void sendPermissionChangedEmail(String toEmail, String companyName, String newRoleName) {
+        Context context = new Context();
+        context.setVariable("companyName", companyName);
+        context.setVariable("newRoleName", newRoleName);
+
+        String htmlBody = templateEngine.process("email/member-permission-changed", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thay đổi phân quyền thành viên công ty", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

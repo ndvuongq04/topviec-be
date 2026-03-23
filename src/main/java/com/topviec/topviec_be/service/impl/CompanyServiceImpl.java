@@ -10,6 +10,8 @@ import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,7 @@ import java.time.LocalDateTime;
 public class CompanyServiceImpl implements CompanyService {
 
     private final CompanyRepository companyRepository;
+    private final CompanyMemberRepository companyMemberRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -273,8 +276,20 @@ public class CompanyServiceImpl implements CompanyService {
     }
 
     private Company findByCreatedByOrThrow(Long userId) {
-        return companyRepository.findByCreatedBy(userId)
-                .orElseThrow(() -> AppException.notFound("Bạn chưa có hồ sơ công ty"));
+        // 1. Kiểm tra xem user có phải người tạo công ty không
+        java.util.Optional<Company> companyOpt = companyRepository.findByCreatedBy(userId);
+        if (companyOpt.isPresent()) {
+            return companyOpt.get();
+        }
+
+        // 2. Nếu không, kiểm tra xem user có phải là thành viên active của công ty nào không
+        java.util.Optional<CompanyMember> memberOpt = companyMemberRepository.findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active");
+        if (memberOpt.isPresent()) {
+            return companyRepository.findById(memberOpt.get().getCompanyId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty của bạn"));
+        }
+
+        throw AppException.notFound("Bạn chưa có hồ sơ công ty");
     }
 
     // Dùng cho employer update — giữ nguyên ReqUpdateCompanyDTO

@@ -9,15 +9,21 @@ import org.springframework.transaction.annotation.Transactional;
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.entity.Company;
+import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.RoleDefault;
 import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.enums.companyMember.MemberRole;
 import com.topviec.topviec_be.enums.users.UserStatus;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
+import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.RoleDefaultRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.AuthService;
 import com.topviec.topviec_be.service.CandidateProfileService;
+import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.TokenService;
 
@@ -34,6 +40,9 @@ public class AuthServiceImpl implements AuthService {
     private final CandidateProfileService candidateProfileService;
     private final AdminUserRepository adminUserRepository;
     private final CompanyRepository companyRepository;
+    private final CompanyMemberRepository companyMemberRepository;
+    private final RoleDefaultRepository roleDefaultRepository;
+    private final CompanyMemberService companyMemberService;
 
     @Override
     @Transactional
@@ -94,9 +103,12 @@ public class AuthServiceImpl implements AuthService {
                 .createdBy(savedUser.getId())
                 .build();
 
-        companyRepository.save(company);
+        Company savedCompany = companyRepository.save(company);
 
-        // Bước 3: Gửi email xác thực
+        // Bước 3: Tạo CompanyMember với role OWNER
+        createOwnerMember(savedCompany.getId(), savedUser.getId());
+
+        // Bước 4: Gửi email xác thực
         String token = tokenService.generateVerifyEmailToken(request.getEmail());
         emailService.sendVerifyEmail(request.getEmail(), token);
     }
@@ -136,7 +148,10 @@ public class AuthServiceImpl implements AuthService {
                 .createdBy(adminId) // admin tạo giúp → createdBy = adminId, không phải userId
                 .build();
 
-        companyRepository.save(company);
+        Company savedCompany = companyRepository.save(company);
+
+        // Bước 3: Tạo CompanyMember với role OWNER
+        createOwnerMember(savedCompany.getId(), savedUser.getId());
     }
 
     @Override
@@ -154,6 +169,9 @@ public class AuthServiceImpl implements AuthService {
         user.setEmailVerifiedAt(LocalDateTime.now());
         user.setStatus(UserStatus.ACTIVE); // PENDING → ACTIVE
         userRepository.save(user);
+
+        // Kích hoạt các CompanyMember đang pending (nếu có)
+        companyMemberService.activatePendingMembers(user.getId());
     }
 
     @Override
@@ -209,5 +227,28 @@ public class AuthServiceImpl implements AuthService {
         return adminUserRepository.findActiveByUserId(userId)
                 .map(admin -> admin.getAdminRole())
                 .orElse(null);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Tạo CompanyMember với role OWNER sau khi đăng ký công ty.
+     * Lấy quyền mặc định từ RoleDefault, status = pending (chờ xác thực email).
+     */
+    private void createOwnerMember(Long companyId, Long userId) {
+        RoleDefault ownerDefault = roleDefaultRepository.findByRoleName(MemberRole.OWNER)
+                .orElse(null); // Nếu chưa có RoleDefault thì bỏ qua, không crash ứng dụng
+
+        CompanyMember ownerMember = CompanyMember.builder()
+                .companyId(companyId)
+                .userId(userId)
+                .roleDefault(ownerDefault)
+                .status("pending") // Chờ user xác thực email → sẽ chuyển active
+                .createdBy(userId)
+                .build();
+
+        companyMemberRepository.save(ownerMember);
     }
 }
