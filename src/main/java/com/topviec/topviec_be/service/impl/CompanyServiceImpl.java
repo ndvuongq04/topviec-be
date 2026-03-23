@@ -377,4 +377,12 @@ public class CompanyServiceImpl implements CompanyService {
                 .updatedAt(c.getUpdatedAt())
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long getCompanyIdByUserId(Long userId) {
+        return companyRepository.findByCreatedBy(userId)
+                .orElseThrow(() -> AppException.notFound("Bạn chưa có hồ sơ công ty"))
+                .getId();
+    }
 }
