@@ -1,0 +1,368 @@
+package com.topviec.topviec_be.service.impl;
+
+import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
+import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.PermissionChangeLog;
+import com.topviec.topviec_be.entity.RoleDefault;
+import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.enums.companyMember.MemberRole;
+import com.topviec.topviec_be.enums.companyMember.PermissionChangeType;
+import com.topviec.topviec_be.enums.users.UserStatus;
+import com.topviec.topviec_be.enums.users.UserType;
+import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.PermissionChangeLogRepository;
+import com.topviec.topviec_be.repository.RoleDefaultRepository;
+import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.service.CompanyMemberService;
+import com.topviec.topviec_be.service.EmailService;
+import com.topviec.topviec_be.service.TokenService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class CompanyMemberServiceImpl implements CompanyMemberService {
+
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final CompanyMemberRepository companyMemberRepository;
+    private final RoleDefaultRepository roleDefaultRepository;
+    private final PermissionChangeLogRepository permissionChangeLogRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
+    private final EmailService emailService;
+
+    // -------------------------------------------------------------------------
+    // Thêm thành viên — TH1: Email chưa có tài khoản
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResCompanyMemberDTO addMember(Long inviterUserId, Long companyId, ReqAddMemberDTO req) {
+        // 1. Kiểm tra công ty tồn tại
+        if (!companyRepository.existsById(companyId)) {
+            throw AppException.notFound("Công ty không tồn tại");
+        }
+
+        String email = req.getEmail().trim().toLowerCase();
+
+        // 2. Kiểm tra email đã tồn tại (TH1: chưa có TK)
+        if (userRepository.existsByEmail(email)) {
+            throw AppException.conflict(
+                    "Email này đã có tài khoản trong hệ thống. Vui lòng chọn chức năng thêm thành viên phù hợp.");
+        }
+
+        // 3. Lấy quyền mặc định của role từ RoleDefault
+        RoleDefault roleDefault = roleDefaultRepository.findById(req.getRoleId())
+                .orElseThrow(
+                        () -> AppException.notFound("Không tìm thấy cấu hình quyền cho role Id: " + req.getRoleId()));
+
+        // 4. Tạo User mới (status = pending)
+        User newUser = User.builder()
+                .email(email)
+                .password(passwordEncoder.encode(req.getTempPassword()))
+                .userType(UserType.EMPLOYER)
+                .status(UserStatus.PENDING)
+                .twoFactorEnabled(false)
+                .createdBy(inviterUserId)
+                .build();
+
+        User savedUser = userRepository.save(newUser);
+
+        // 5. Tạo CompanyMember (status = pending)
+        CompanyMember member = CompanyMember.builder()
+                .companyId(companyId)
+                .userId(savedUser.getId())
+                .roleDefault(roleDefault)
+                .status("pending")
+                .permissions(buildPermissionsMap(req.getCustomActions()))
+                .createdBy(inviterUserId)
+                .build();
+
+        CompanyMember savedMember = companyMemberRepository.save(member);
+
+        // 6. Gửi email mời kích hoạt kèm mật khẩu tạm
+        String verifyToken = tokenService.generateVerifyEmailToken(email);
+        emailService.sendMemberInviteNewUser(email, req.getTempPassword(), verifyToken);
+
+        log.info(">>>>>>>>: Đã thêm thành viên mới [{}] vào công ty [{}] với role Id [{}]", email, companyId,
+                req.getRoleId());
+
+        return toResponse(savedMember, email);
+    }
+
+    // -------------------------------------------------------------------------
+    // Kích hoạt CompanyMember pending sau khi user xác thực email
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void activatePendingMembers(Long userId) {
+        List<CompanyMember> pendingMembers = companyMemberRepository.findPendingMembersByUserId(userId);
+
+        if (pendingMembers.isEmpty()) {
+            return;
+        }
+
+        for (CompanyMember member : pendingMembers) {
+            member.setStatus("active");
+        }
+
+        companyMemberRepository.saveAll(pendingMembers);
+        log.info(">>>>>>>>: Đã kích hoạt {} CompanyMember pending của userId [{}]", pendingMembers.size(), userId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phân quyền (CN-NTT-019)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasPermission(Long companyId, Long userId, String action) {
+        CompanyMember member = companyMemberRepository.findByCompanyIdAndUserId(companyId, userId)
+                .orElse(null);
+
+        if (member == null || !"active".equals(member.getStatus())) {
+            return false;
+        }
+
+        // 1. Kiểm tra custom overrides TRƯỚC (ưu tiên cao nhất)
+        Map<String, List<String>> permissions = member.getPermissions();
+        if (permissions != null) {
+            List<String> grant = permissions.get("grant");
+            if (grant != null && grant.contains(action)) {
+                return true; // custom grant → cho phép, không cần check default
+            }
+
+            List<String> revoke = permissions.get("revoke");
+            if (revoke != null && revoke.contains(action)) {
+                return false; // custom revoke → từ chối, không cần check default
+            }
+        }
+
+        // 2. Fallback về default role permissions
+        RoleDefault roleDefault = member.getRoleDefault();
+        return roleDefault != null && roleDefault.getActions().getOrDefault(action, false);
+    }
+
+    @Override
+    @Transactional
+    public ResCompanyMemberDTO updateMemberPermission(Long inviterUserId, Long companyId, Long targetUserId,
+            ReqUpdatePermissionDTO req) {
+        // 1. Kiểm tra inviter có quyền thao tác phân quyền không
+        if (!hasPermission(companyId, inviterUserId, "member:permission")) {
+            throw AppException.forbidden("Bạn không có quyền thay đổi phân quyền thành viên");
+        }
+
+        // 2. Lấy thông tin member cần sửa
+        CompanyMember targetMember = companyMemberRepository.findByCompanyIdAndUserId(companyId, targetUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thành viên này trong công ty"));
+
+        MemberRole oldRole = targetMember.getMemberRole();
+        Map<String, List<String>> oldPermissions = targetMember.getPermissions();
+
+        // 3. Quy tắc: Không thể dùng API này để tước quyền owner hiện tại (phải qua API
+        // chuyển nhượng)
+        if (oldRole == MemberRole.OWNER && targetUserId.equals(inviterUserId)) {
+            // Owner không tự sửa quyền bản thân được
+            throw AppException
+                    .badRequest("Owner không thể tự xóa quyền của mình. Phải chuyển Owner cho cộng sự trước.");
+        }
+
+        // 4. Update role & custom permissions
+        Long newRoleId = req.getRoleId();
+        RoleDefault newRoleDefault = roleDefaultRepository.findById(newRoleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy role Id: " + newRoleId));
+        MemberRole newRole = newRoleDefault.getRoleName();
+        targetMember.setRoleDefault(newRoleDefault);
+
+        Map<String, List<String>> newPermissions = null;
+        if (req.getCustomActions() != null) {
+            newPermissions = buildPermissionsMap(req.getCustomActions());
+            targetMember.setPermissions(newPermissions);
+        } else {
+            // Nếu null -> reset custom permissions
+            targetMember.setPermissions(
+                    Map.of("grant", new java.util.ArrayList<>(), "revoke", new java.util.ArrayList<>()));
+        }
+
+        CompanyMember savedMember = companyMemberRepository.save(targetMember);
+
+        // 5. Ghi Log
+        PermissionChangeType changeType = (oldRole != newRole) ? PermissionChangeType.ROLE_CHANGE
+                : PermissionChangeType.PERMISSION_UPDATE;
+
+        PermissionChangeLog logEntry = PermissionChangeLog.builder()
+                .companyId(companyId)
+                .targetUserId(targetUserId)
+                .changedBy(inviterUserId)
+                .changeType(changeType)
+                .oldRole(oldRole)
+                .newRole(newRole)
+                .oldPermissions(oldPermissions)
+                .newPermissions(savedMember.getPermissions())
+                .reason(req.getReason())
+                .build();
+        permissionChangeLogRepository.save(logEntry);
+
+        // 6. Send email notify target user
+        String targetEmail = userRepository.findById(targetUserId)
+                .map(User::getEmail)
+                .orElse(null);
+        if (targetEmail != null) {
+            // String companyName = companyRepository.findById(companyId)
+            // .map(com.topviec.topviec_be.entity.Company::getName)
+            // .orElse("Công ty");
+            // emailService.sendPermissionChangedEmail(targetEmail, companyName,
+            // newRole.name());
+        }
+
+        return toResponse(savedMember, targetEmail);
+    }
+
+    @Override
+    public void checkPermission(Long companyId, Long userId, String action) {
+        if (!hasPermission(companyId, userId, action)) {
+            throw AppException.forbidden("Bạn không có quyền thực hiện hành động này: " + action);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMembers(Long companyId, String status, String role, String keyword,
+            Pageable pageable) {
+
+        MemberRole roleEnum = null;
+        if (role != null && !role.trim().isEmpty()) {
+            roleEnum = MemberRole.fromValue(role);
+        }
+
+        Page<CompanyMember> pageMember = companyMemberRepository.findByFilters(companyId, status, roleEnum, keyword,
+                pageable);
+
+        List<CompanyMember> list = pageMember.getContent();
+
+        // 1. Lấy danh sách user IDs
+        List<Long> userIds = list.stream().map(CompanyMember::getUserId).toList();
+
+        // 2. Fetch Users để lấy email
+        Map<Long, String> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+
+        // 3. Map to DTO
+        List<ResCompanyMemberDTO> res = list.stream()
+                .map(m -> toResponse(m, userMap.get(m.getUserId())))
+                .toList();
+
+        // 4. Build Result
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+
+        meta.setPage(pageMember.getNumber() + 1); // FE thường dùng page 1-based
+        meta.setPageSize(pageMember.getSize());
+        meta.setPages(pageMember.getTotalPages());
+        meta.setTotals(pageMember.getTotalElements());
+
+        result.setMeta(meta);
+        result.setResult(res);
+
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public void removeMember(Long inviterUserId, Long companyId, Long targetUserId) {
+        CompanyMember member = companyMemberRepository.findByCompanyIdAndUserId(companyId, targetUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thành viên này trong công ty"));
+
+        // Quy tắc: Owner không thể tự xóa chính mình bằng API này
+        if (targetUserId.equals(inviterUserId) && MemberRole.OWNER == member.getMemberRole()) {
+            throw AppException.badRequest("Owner không thể tự xóa khỏi công ty. Hãy chuyển quyền Owner trước.");
+        }
+
+        member.setDeletedAt(java.time.LocalDateTime.now());
+        member.setStatus("deactivated");
+        member.setUpdatedBy(inviterUserId);
+
+        companyMemberRepository.save(member);
+        log.info(">>>>>>>>: Đã xóa thành viên userId [{}] khỏi công ty [{}] bởi userId [{}]", targetUserId, companyId,
+                inviterUserId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Chuyển đổi customActions (Map<String, Boolean>) từ API thành Map<String,
+     * List<String>>
+     * phục vụ lưu trữ chuẩn theo thiết kế Entity: { "grant": [...], "revoke": [...]
+     * }
+     */
+    private Map<String, List<String>> buildPermissionsMap(Map<String, Boolean> customActions) {
+        List<String> grantList = new java.util.ArrayList<>();
+        List<String> revokeList = new java.util.ArrayList<>();
+
+        if (customActions != null) {
+            customActions.forEach((action, isGranted) -> {
+                if (Boolean.TRUE.equals(isGranted)) {
+                    grantList.add(action);
+                } else {
+                    revokeList.add(action);
+                }
+            });
+        }
+
+        return Map.of(
+                "grant", grantList,
+                "revoke", revokeList);
+    }
+
+    private ResCompanyMemberDTO toResponse(CompanyMember m, String email) {
+        // Build actions map từ custom permissions của member
+        Map<String, Boolean> actionsMap = new HashMap<>();
+        Map<String, List<String>> permissions = m.getPermissions();
+        if (permissions != null) {
+            List<String> grant = permissions.get("grant");
+            if (grant != null)
+                grant.forEach(a -> actionsMap.put(a, true));
+
+            List<String> revoke = permissions.get("revoke");
+            if (revoke != null)
+                revoke.forEach(a -> actionsMap.put(a, false));
+        }
+
+        // Lấy thông tin từ RoleDefault relationship
+        RoleDefault roleDefault = m.getRoleDefault();
+        Long roleId = roleDefault != null ? roleDefault.getId() : null;
+        MemberRole roleName = roleDefault != null ? roleDefault.getRoleName() : null;
+
+        return ResCompanyMemberDTO.builder()
+                .id(m.getId())
+                .companyId(m.getCompanyId())
+                .userId(m.getUserId())
+                .email(email)
+                .roleId(roleId)
+                .roleName(roleName)
+                .status(m.getStatus())
+                .actions(actionsMap)
+                .jobTitle(m.getJobTitle())
+                .createdAt(m.getCreatedAt())
+                .build();
+    }
+}
