@@ -10,6 +10,7 @@ import lombok.*;
 public class ResJobPostSkillDTO {
 
     private Long id;
+    private String skillName;
     private Long skillId;
     private Boolean isRequired;
     private Integer proficiencyMin;

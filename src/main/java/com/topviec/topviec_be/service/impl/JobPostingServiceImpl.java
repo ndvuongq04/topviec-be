@@ -17,6 +17,7 @@ import com.topviec.topviec_be.entity.JobPostLocation;
 import com.topviec.topviec_be.entity.JobPostSkill;
 import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.Level;
+import com.topviec.topviec_be.entity.Skill;
 import com.topviec.topviec_be.enums.jobs.EditType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
@@ -27,6 +28,7 @@ import com.topviec.topviec_be.repository.JobPostLocationRepository;
 import com.topviec.topviec_be.repository.JobPostSkillRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.LevelRepository;
+import com.topviec.topviec_be.repository.SkillRepository;
 import com.topviec.topviec_be.service.JobPostingService;
 import com.topviec.topviec_be.specification.JobPostingSpecification;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +57,7 @@ public class JobPostingServiceImpl implements JobPostingService {
     private final IndustryRepository industryRepository;
     private final LevelRepository levelRepository;
     private final ObjectMapper objectMapper;
+    private final SkillRepository skillRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Create
@@ -580,12 +583,16 @@ public class JobPostingServiceImpl implements JobPostingService {
         List<ResJobPostSkillDTO> skills = jobPostSkillRepository
                 .findByJobPostId(j.getId())
                 .stream()
-                .map(skill -> ResJobPostSkillDTO.builder()
-                        .id(skill.getId())
-                        .skillId(skill.getSkillId())
-                        .isRequired(skill.getIsRequired())
-                        .proficiencyMin(skill.getProficiencyMin())
-                        .build())
+                .map(skill -> {
+                    Skill skillEntity = skillRepository.findById(skill.getSkillId()).orElse(null);
+                    return ResJobPostSkillDTO.builder()
+                            .id(skill.getId())
+                            .skillName(skillEntity != null ? skillEntity.getName() : null)
+                            .skillId(skill.getSkillId())
+                            .isRequired(skill.getIsRequired())
+                            .proficiencyMin(skill.getProficiencyMin())
+                            .build();
+                })
                 .toList();
 
         Company company = companyRepository.findById(j.getCompanyId()).orElse(null);
