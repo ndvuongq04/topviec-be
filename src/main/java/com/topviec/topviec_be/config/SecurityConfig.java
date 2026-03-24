@@ -38,6 +38,7 @@ public class SecurityConfig {
                         "/v3/api-docs/**",
                         "/roles/**",
                         "/industries/**",
+                        "/skills/**"
         };
 
         @Bean
