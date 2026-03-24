@@ -39,7 +39,8 @@ public class SecurityConfig {
                         "/roles/**",
                         "/industries/**",
                         "/skills/**",
-                        "/locations/**"
+                        "/locations/**",
+                        "/levels/**",
         };
 
         @Bean
