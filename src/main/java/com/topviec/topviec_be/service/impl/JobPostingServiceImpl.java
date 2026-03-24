@@ -539,6 +539,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                         : ResJobPostingSummary.CompanyDTO.builder()
                                 .id(company.getId())
                                 .name(company.getName())
+                                .slug(company.getSlug())
                                 .logoUrl(company.getLogoUrl())
                                 .address(company.getAddress())
                                 .build())
@@ -610,6 +611,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                         : ResJobPostingDetail.CompanyDTO.builder()
                                 .id(company.getId())
                                 .name(company.getName())
+                                .slug(company.getSlug())
                                 .logoUrl(company.getLogoUrl())
                                 .build())
                 .industry(industry == null ? null

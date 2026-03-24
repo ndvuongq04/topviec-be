@@ -36,6 +36,7 @@ public class ResJobPostingSummary {
     public static class CompanyDTO {
         private Long id;
         private String name;
+        private String slug;
         private String logoUrl;
         private String address;
     }
