@@ -10,17 +10,23 @@ import com.topviec.topviec_be.dto.response.ResJobPostingSummary;
 import com.topviec.topviec_be.dto.response.ResJobPostLocationDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostSkillDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.Company;
+import com.topviec.topviec_be.entity.Industry;
 import com.topviec.topviec_be.entity.JobPostEditLog;
 import com.topviec.topviec_be.entity.JobPostLocation;
 import com.topviec.topviec_be.entity.JobPostSkill;
 import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.entity.Level;
 import com.topviec.topviec_be.enums.jobs.EditType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.IndustryRepository;
 import com.topviec.topviec_be.repository.JobPostEditLogRepository;
 import com.topviec.topviec_be.repository.JobPostLocationRepository;
 import com.topviec.topviec_be.repository.JobPostSkillRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.repository.LevelRepository;
 import com.topviec.topviec_be.service.JobPostingService;
 import com.topviec.topviec_be.specification.JobPostingSpecification;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +39,9 @@ import com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO;
 
 import java.text.Normalizer;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +51,9 @@ public class JobPostingServiceImpl implements JobPostingService {
     private final JobPostSkillRepository jobPostSkillRepository;
     private final JobPostLocationRepository jobPostLocationRepository;
     private final JobPostEditLogRepository jobPostEditLogRepository;
+    private final CompanyRepository companyRepository;
+    private final IndustryRepository industryRepository;
+    private final LevelRepository levelRepository;
     private final ObjectMapper objectMapper;
 
     // -------------------------------------------------------------------------
@@ -183,12 +194,10 @@ public class JobPostingServiceImpl implements JobPostingService {
         if (request.getIsUrgent() != null)
             jobPosting.setIsUrgent(request.getIsUrgent());
 
-        // Tăng editCount khi đang published (kiểm soát chỉ được sửa 1 lần sau khi đăng)
         if (JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())) {
             jobPosting.setEditCount(jobPosting.getEditCount() + 1);
         }
 
-        // Mỗi lần chỉnh sửa đều chuyển về DRAFT (cần duyệt lại)
         jobPosting.setStatus(JobPostStatus.DRAFT.getValue());
 
         JobPosting updated = jobPostingRepository.save(jobPosting);
@@ -314,8 +323,6 @@ public class JobPostingServiceImpl implements JobPostingService {
         jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
         jobPosting.setPublishedAt(java.time.LocalDateTime.now());
         jobPosting.setUpdatedBy(adminId);
-
-        // Reset rejection reasons if any
         jobPosting.setRejectionReason(null);
         jobPosting.setModerationNote(null);
 
@@ -364,6 +371,21 @@ public class JobPostingServiceImpl implements JobPostingService {
         return toDetailResponse(saved);
     }
 
+    @Override
+    public ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+        if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT");
+        }
+        jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
+        jobPosting.setUpdatedBy(updatedByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -376,14 +398,12 @@ public class JobPostingServiceImpl implements JobPostingService {
     private void validateEditable(JobPosting jobPosting) {
         String status = jobPosting.getStatus();
 
-        // DRAFT và REJECTED — sửa thoải mái không giới hạn
         if (JobPostStatus.DRAFT.getValue().equals(status)
                 || JobPostStatus.REJECTED.getValue().equals(status)
                 || JobPostStatus.RENEWED.getValue().equals(status)) {
             return;
         }
 
-        // PUBLISHED — chỉ được sửa 1 lần (editCount phải = 0)
         if (JobPostStatus.PUBLISHED.getValue().equals(status)) {
             if (jobPosting.getEditCount() >= 1) {
                 throw AppException.badRequest("Tin đã được chỉnh sửa 1 lần sau khi đăng, không thể chỉnh sửa thêm");
@@ -391,7 +411,6 @@ public class JobPostingServiceImpl implements JobPostingService {
             return;
         }
 
-        // Các trạng thái còn lại — không được sửa
         throw AppException.badRequest("Không thể chỉnh sửa tin ở trạng thái: " + status);
     }
 
@@ -469,9 +488,24 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .trim();
     }
 
-    // ── Mapper: dùng cho danh sách (gọn, không kèm locations/skills) ─────────
+    // ── Mapper: dùng cho danh sách (batch query tránh N+1) ───────────────────
 
     private ResultPaginationDTO toResultPagination(Page<JobPosting> page, Pageable pageable) {
+        List<JobPosting> jobs = page.getContent();
+
+        // Batch query 3 bảng — chỉ tốn 3 query dù có bao nhiêu job
+        Map<Long, Company> companyMap = companyRepository
+                .findAllById(jobs.stream().map(JobPosting::getCompanyId).distinct().toList())
+                .stream().collect(Collectors.toMap(Company::getId, c -> c));
+
+        Map<Long, Industry> industryMap = industryRepository
+                .findAllById(jobs.stream().map(JobPosting::getIndustryId).distinct().toList())
+                .stream().collect(Collectors.toMap(Industry::getId, i -> i));
+
+        Map<Long, Level> levelMap = levelRepository
+                .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
+                .stream().collect(Collectors.toMap(Level::getId, l -> l));
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -480,18 +514,41 @@ public class JobPostingServiceImpl implements JobPostingService {
 
         ResultPaginationDTO result = new ResultPaginationDTO();
         result.setMeta(meta);
-        result.setResult(page.getContent().stream().map(this::toSummaryResponse).toList());
+        result.setResult(jobs.stream()
+                .map(j -> toSummaryResponse(j, companyMap, industryMap, levelMap))
+                .toList());
         return result;
     }
 
-    private ResJobPostingSummary toSummaryResponse(JobPosting j) {
+    private ResJobPostingSummary toSummaryResponse(JobPosting j,
+            Map<Long, Company> companyMap,
+            Map<Long, Industry> industryMap,
+            Map<Long, Level> levelMap) {
+        Company company = companyMap.get(j.getCompanyId());
+        Industry industry = industryMap.get(j.getIndustryId());
+        Level level = levelMap.get(j.getLevelId());
+
         return ResJobPostingSummary.builder()
                 .id(j.getId())
                 .title(j.getTitle())
                 .slug(j.getSlug())
-                .companyId(j.getCompanyId())
-                .industryId(j.getIndustryId())
-                .levelId(j.getLevelId())
+                .company(company == null ? null
+                        : ResJobPostingSummary.CompanyDTO.builder()
+                                .id(company.getId())
+                                .name(company.getName())
+                                .logoUrl(company.getLogoUrl())
+                                .address(company.getAddress())
+                                .build())
+                .industry(industry == null ? null
+                        : ResJobPostingSummary.IndustryDTO.builder()
+                                .id(industry.getId())
+                                .name(industry.getName())
+                                .build())
+                .level(level == null ? null
+                        : ResJobPostingSummary.LevelDTO.builder()
+                                .id(level.getId())
+                                .name(level.getName())
+                                .build())
                 .workType(j.getWorkType())
                 .status(j.getStatus())
                 .salaryMin(j.getSalaryMin())
@@ -531,6 +588,10 @@ public class JobPostingServiceImpl implements JobPostingService {
                         .build())
                 .toList();
 
+        Company company = companyRepository.findById(j.getCompanyId()).orElse(null);
+        Industry industry = industryRepository.findById(j.getIndustryId()).orElse(null);
+        Level level = levelRepository.findById(j.getLevelId()).orElse(null);
+
         return ResJobPostingDetail.builder()
                 .id(j.getId())
                 .title(j.getTitle())
@@ -538,9 +599,22 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .description(j.getDescription())
                 .requirements(j.getRequirements())
                 .benefits(j.getBenefits())
-                .companyId(j.getCompanyId())
-                .industryId(j.getIndustryId())
-                .levelId(j.getLevelId())
+                .company(company == null ? null
+                        : ResJobPostingDetail.CompanyDTO.builder()
+                                .id(company.getId())
+                                .name(company.getName())
+                                .logoUrl(company.getLogoUrl())
+                                .build())
+                .industry(industry == null ? null
+                        : ResJobPostingDetail.IndustryDTO.builder()
+                                .id(industry.getId())
+                                .name(industry.getName())
+                                .build())
+                .level(level == null ? null
+                        : ResJobPostingDetail.LevelDTO.builder()
+                                .id(level.getId())
+                                .name(level.getName())
+                                .build())
                 .experienceYearsMin(j.getExperienceYearsMin())
                 .experienceYearsMax(j.getExperienceYearsMax())
                 .salaryMin(j.getSalaryMin())
@@ -560,20 +634,5 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .locations(locations)
                 .skills(skills)
                 .build();
-    }
-
-    @Override
-    public ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId) {
-        JobPosting jobPosting = findByIdOrThrow(id);
-        if (!jobPosting.getCompanyId().equals(companyId)) {
-            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
-        }
-        if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())) {
-            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT");
-        }
-        jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
-        jobPosting.setUpdatedBy(updatedByUserId);
-        JobPosting saved = jobPostingRepository.save(jobPosting);
-        return toDetailResponse(saved);
     }
 }

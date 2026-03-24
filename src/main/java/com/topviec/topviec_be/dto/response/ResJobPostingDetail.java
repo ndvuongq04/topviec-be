@@ -18,9 +18,9 @@ public class ResJobPostingDetail {
     private String requirements;
     private String benefits;
 
-    private Long companyId;
-    private Long industryId;
-    private Long levelId;
+    private CompanyDTO company;
+    private IndustryDTO industry;
+    private LevelDTO level;
 
     private Integer experienceYearsMin;
     private Integer experienceYearsMax;
@@ -46,4 +46,35 @@ public class ResJobPostingDetail {
 
     private List<ResJobPostLocationDTO> locations;
     private List<ResJobPostSkillDTO> skills;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CompanyDTO {
+        private Long id;
+        private String name;
+        private String logoUrl;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class IndustryDTO {
+        private Long id;
+        private String name;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LevelDTO {
+        private Long id;
+        private String name;
+    }
 }
