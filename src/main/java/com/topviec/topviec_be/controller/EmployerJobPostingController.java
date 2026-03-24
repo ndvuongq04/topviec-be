@@ -145,4 +145,15 @@ public class EmployerJobPostingController {
         Long companyId = companyService.getCompanyIdByUserId(userId);
         return ResponseEntity.ok(jobPostingService.refresh(id, companyId, userId));
     }
+
+    /**
+     * PATCH /employer/job-postings/{id}/pending-approval
+     * Gửi duyệt tin tuyển dụng.
+     */
+    @PatchMapping("/{id}/pending-approval")
+    public ResponseEntity<ResJobPostingDetail> pendingApproval(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.pendingApproval(id, companyId, userId));
+    }
 }
