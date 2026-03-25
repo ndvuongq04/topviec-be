@@ -24,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/applications")
 @RequiredArgsConstructor
-public class ApplicationController {
+public class PublicApplicationController {
 
     private final ApplicationService applicationService;
 

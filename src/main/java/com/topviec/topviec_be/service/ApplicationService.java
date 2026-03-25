@@ -3,7 +3,10 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
+import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
@@ -25,4 +28,16 @@ public interface ApplicationService {
 
     // CN-UV-015: Rút đơn
     ResApplicationDTO withdraw(Long candidateUserId, Long applicationId, ReqWithdrawApplicationDTO request);
+
+    // -------------------------------------------------------------------------
+    // API cho Employer
+    // -------------------------------------------------------------------------
+
+    ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable);
+
+    ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId);
+
+    ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request);
+
+    ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request);
 }

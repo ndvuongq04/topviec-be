@@ -4,12 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
+import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Application;
+import com.topviec.topviec_be.entity.CandidateProfile;
 import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.Cvs;
 import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.application.ApplicationStatus;
 import com.topviec.topviec_be.enums.application.ApplyMethod;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
@@ -18,6 +23,8 @@ import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.repository.CandidateProfileRepository;
+import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.ApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +47,8 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final CompanyRepository companyRepository;
     private final ObjectMapper objectMapper;
     private final CvsRepository cvsRepository;
+    private final CandidateProfileRepository candidateProfileRepository;
+    private final UserRepository userRepository;
 
     // -------------------------------------------------------------------------
     // CN-UV-010: Nộp đơn đầy đủ
@@ -279,5 +288,154 @@ public class ApplicationServiceImpl implements ApplicationService {
     // Dùng cho withdraw (relation đã được fetch)
     private ResApplicationDTO toResponse(Application a, Company company) {
         return toResponse(a, a.getJobPosting(), company);
+    }
+
+    // -------------------------------------------------------------------------
+    // API cho Employer
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable) {
+        JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+        
+        if (!job.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xem hồ sơ của tin tuyển dụng này");
+        }
+
+        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, pageable);
+        
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(applicationPage.getTotalPages());
+        meta.setTotals(applicationPage.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(applicationPage.getContent().stream()
+                .map(this::toEmployerResponse)
+                .toList());
+
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+        
+        JobPosting job = application.getJobPosting();
+        if (job == null || !job.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xem đơn ứng tuyển này");
+        }
+
+        // Chuyển status PENDING -> SEEN
+        if (ApplicationStatus.PENDING.getValue().equals(application.getStatus())) {
+            application.setStatus(ApplicationStatus.SEEN.getValue());
+            application.setViewedAt(LocalDateTime.now());
+            application = applicationRepository.save(application);
+        }
+
+        return toEmployerResponse(application);
+    }
+
+    @Override
+    @Transactional
+    public ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+        
+        JobPosting job = application.getJobPosting();
+        if (job == null || !job.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền sửa đơn ứng tuyển này");
+        }
+
+        ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
+        ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
+
+        if (!currentStatus.canTransitionTo(nextStatus)) {
+            throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+        }
+
+        application.setStatus(nextStatus.getValue());
+        if (request.getNote() != null) {
+            application.setRecruiterNote(request.getNote());
+        }
+
+        if (nextStatus == ApplicationStatus.REJECTED) {
+            application.setRejectedAt(LocalDateTime.now());
+        } else if (nextStatus == ApplicationStatus.HIRED) {
+            application.setHiredAt(LocalDateTime.now());
+        }
+
+        Application saved = applicationRepository.save(application);
+        return toEmployerResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+        
+        JobPosting job = application.getJobPosting();
+        if (job == null || !job.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền đánh giá đơn ứng tuyển này");
+        }
+
+        if (request.getRating() != null) {
+            application.setRecruiterRating(request.getRating());
+        }
+        if (request.getNote() != null) {
+            application.setRecruiterNote(request.getNote());
+        }
+        if (request.getTags() != null) {
+            application.setRecruiterTags(request.getTags());
+        }
+
+        Application saved = applicationRepository.save(application);
+        return toEmployerResponse(saved);
+    }
+
+    private ResEmployerApplicationDTO toEmployerResponse(Application a) {
+        User user = null;
+        CandidateProfile profile = null;
+        Cvs cv = null;
+
+        if (a.getCandidateUserId() != null) {
+            user = userRepository.findById(a.getCandidateUserId()).orElse(null);
+            profile = candidateProfileRepository.findByUserId(a.getCandidateUserId()).orElse(null);
+        }
+        
+        if (a.getCvId() != null) {
+            cv = cvsRepository.findById(a.getCvId()).orElse(null);
+        }
+
+        JobPosting job = a.getJobPosting();
+
+        return ResEmployerApplicationDTO.builder()
+                .id(a.getId())
+                .jobPostId(a.getJobPostId())
+                .jobTitle(job != null ? job.getTitle() : null)
+                .candidateUserId(a.getCandidateUserId())
+                .candidateName(profile != null ? profile.getFullName() : (user != null ? "User " + user.getId() : "Unknown"))
+                .candidateEmail(user != null ? user.getEmail() : null)
+                .candidatePhone(profile != null ? profile.getPhoneDisplay() : null)
+                .candidateAvatar(profile != null ? profile.getAvatarUrl() : null)
+                .cvId(a.getCvId())
+                .cvFileUrl(cv != null ? cv.getFileUrl() : null)
+                .cvPdfUrl(cv != null ? cv.getPdfUrl() : null)
+                .status(a.getStatus())
+                .applyMethod(a.getApplyMethod())
+                .recruiterRating(a.getRecruiterRating())
+                .recruiterNote(a.getRecruiterNote())
+                .recruiterTags(a.getRecruiterTags())
+                .viewedAt(a.getViewedAt())
+                .createdAt(a.getCreatedAt())
+                .updatedAt(a.getUpdatedAt())
+                .build();
     }
 }

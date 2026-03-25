@@ -8,6 +8,7 @@ public enum ApplicationStatus {
     PENDING("pending"), // Vừa nộp, NTD chưa xem
     INVITED("invited"), // NTD mời từ talent pool
     SEEN("seen"), // NTD đã mở xem CV
+    CONSIDERING("considering"), // NTD lưu để xem lại sau
     INTERVIEWING("interviewing"), // Đang phỏng vấn
     OFFERED("offered"), // NTD gửi offer
     HIRED("hired"), // UV chấp nhận offer
@@ -51,7 +52,8 @@ public enum ApplicationStatus {
         return switch (this) {
             case PENDING -> next == SEEN || next == WITHDRAWN || next == EXPIRED;
             case INVITED -> next == PENDING || next == EXPIRED;
-            case SEEN -> next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
+            case SEEN -> next == CONSIDERING || next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
+            case CONSIDERING -> next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
             case INTERVIEWING -> next == OFFERED || next == REJECTED;
             case OFFERED -> next == HIRED || next == REJECTED;
             default -> false; // terminal states
