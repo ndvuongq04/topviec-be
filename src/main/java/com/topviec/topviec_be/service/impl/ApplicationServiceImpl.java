@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
 import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
@@ -185,6 +186,38 @@ public class ApplicationServiceImpl implements ApplicationService {
         Application saved = applicationRepository.save(application);
 
         // Dùng relation trực tiếp thay vì query lại
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
+    // -------------------------------------------------------------------------
+    // Cập nhật CV cho đơn ứng tuyển (chỉ áp dụng khi PENDING)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResApplicationDTO updateApplicationCv(Long candidateUserId, Long applicationId,
+            ReqUpdateApplicationCvDTO request) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        if (!ApplicationStatus.PENDING.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Chỉ được phép thay đổi CV khi đơn ứng tuyển ở trạng thái chờ xử lý (PENDING)");
+        }
+
+        Cvs cv = cvsRepository.findById(request.getCvId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
+        if (!cv.getUserId().equals(candidateUserId)) {
+            throw AppException.forbidden("CV này không thuộc về bạn");
+        }
+
+        application.setCvId(request.getCvId());
+        Application saved = applicationRepository.save(application);
+
         Company company = saved.getJobPosting() != null
                 ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
                 : null;

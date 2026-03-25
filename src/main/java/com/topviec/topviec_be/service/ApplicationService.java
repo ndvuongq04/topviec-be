@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
 import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -28,6 +29,8 @@ public interface ApplicationService {
 
     // CN-UV-015: Rút đơn
     ResApplicationDTO withdraw(Long candidateUserId, Long applicationId, ReqWithdrawApplicationDTO request);
+
+    ResApplicationDTO updateApplicationCv(Long candidateUserId, Long applicationId, ReqUpdateApplicationCvDTO request);
 
     // -------------------------------------------------------------------------
     // API cho Employer

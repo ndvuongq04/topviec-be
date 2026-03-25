@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -100,6 +102,19 @@ public class PublicApplicationController {
 
         return ResponseEntity.ok(
                 applicationService.withdraw(extractUserId(jwt), applicationId, request));
+    }
+
+    /**
+     * PATCH /applications/{applicationId}/cv
+     * Cập nhật CV cho đơn ứng tuyển (chỉ khi đang pending)
+     */
+    @PatchMapping("/{applicationId}/cv")
+    public ResponseEntity<ResApplicationDTO> updateApplicationCv(
+            @PathVariable Long applicationId,
+            @Valid @RequestBody ReqUpdateApplicationCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                applicationService.updateApplicationCv(extractUserId(jwt), applicationId, request));
     }
 
     // -------------------------------------------------------------------------
