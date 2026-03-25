@@ -1,0 +1,283 @@
+package com.topviec.topviec_be.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
+import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
+import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
+import com.topviec.topviec_be.dto.response.ResApplicationDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.Application;
+import com.topviec.topviec_be.entity.Company;
+import com.topviec.topviec_be.entity.Cvs;
+import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.enums.application.ApplicationStatus;
+import com.topviec.topviec_be.enums.application.ApplyMethod;
+import com.topviec.topviec_be.enums.jobs.JobPostStatus;
+import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.ApplicationRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.CvsRepository;
+import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.service.ApplicationService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ApplicationServiceImpl implements ApplicationService {
+
+    private final ApplicationRepository applicationRepository;
+    private final JobPostingRepository jobPostingRepository;
+    private final CompanyRepository companyRepository;
+    private final ObjectMapper objectMapper;
+    private final CvsRepository cvsRepository;
+
+    // -------------------------------------------------------------------------
+    // CN-UV-010: Nộp đơn đầy đủ
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResApplicationDTO apply(Long candidateUserId, Long jobPostId, ReqApplyJobDTO request) {
+        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        validateNotApplied(jobPostId, candidateUserId);
+
+        Application application = buildApplication(
+                candidateUserId, jobPostId, request.getCvId(),
+                ApplyMethod.NORMAL.getValue(), job);
+
+        return toResponse(applicationRepository.save(application), job,
+                companyRepository.findById(job.getCompanyId()).orElse(null));
+    }
+
+    // -------------------------------------------------------------------------
+    // CN-UV-011: Ứng tuyển nhanh
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResApplicationDTO quickApply(Long candidateUserId, Long jobPostId) {
+        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        validateNotApplied(jobPostId, candidateUserId);
+
+        // Lấy CV mặc định
+        Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId)
+                .orElseThrow(() -> AppException.badRequest(
+                        "Bạn chưa có CV mặc định. Vui lòng đặt một CV làm mặc định trước khi ứng tuyển nhanh"));
+
+        Application application = buildApplication(
+                candidateUserId, jobPostId, defaultCv.getId(),
+                ApplyMethod.QUICK.getValue(), job);
+
+        return toResponse(applicationRepository.save(application), job,
+                companyRepository.findById(job.getCompanyId()).orElse(null));
+    }
+
+    // -------------------------------------------------------------------------
+    // CN-UV-012: Ứng tuyển hàng loạt (tối đa 10)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public List<ResApplicationDTO> bulkApply(Long candidateUserId, ReqBulkApplyDTO request) {
+        if (request.getJobPostIds() == null || request.getJobPostIds().isEmpty()) {
+            throw AppException.badRequest("Danh sách tin tuyển dụng không được trống");
+        }
+        if (request.getJobPostIds().size() > 10) {
+            throw AppException.badRequest("Chỉ được ứng tuyển tối đa 10 tin cùng lúc");
+        }
+
+        List<ResApplicationDTO> results = new ArrayList<>();
+
+        for (Long jobPostId : request.getJobPostIds()) {
+            try {
+                JobPosting job = findPublishedJobOrThrow(jobPostId);
+                validateNotApplied(jobPostId, candidateUserId);
+
+                Application application = buildApplication(
+                        candidateUserId, jobPostId, request.getCvId(),
+                        ApplyMethod.BULK.getValue(), job);
+
+                Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
+                results.add(toResponse(applicationRepository.save(application), job, company));
+            } catch (Exception e) {
+                // Bỏ qua tin lỗi, tiếp tục xử lý các tin còn lại
+            }
+        }
+
+        return results;
+    }
+
+    // -------------------------------------------------------------------------
+    // CN-UV-013: Theo dõi trạng thái đơn
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMyApplications(Long candidateUserId, String status, Pageable pageable) {
+        Page<Application> applicationPage = applicationRepository
+                .findByCandidate(candidateUserId, status, pageable);
+
+        List<Application> applications = applicationPage.getContent();
+
+        // Batch query companies từ jobPosting (vẫn cần vì JobPosting chưa có relation
+        // Company)
+        Map<Long, Company> companyMap = companyRepository
+                .findAllById(applications.stream()
+                        .map(a -> a.getJobPosting().getCompanyId())
+                        .distinct().toList())
+                .stream().collect(Collectors.toMap(Company::getId, c -> c));
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(applicationPage.getTotalPages());
+        meta.setTotals(applicationPage.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(applications.stream()
+                .map(a -> toResponse(a, companyMap))
+                .toList());
+
+        return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // CN-UV-015: Rút đơn
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResApplicationDTO withdraw(Long candidateUserId, Long applicationId,
+            ReqWithdrawApplicationDTO request) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        ApplicationStatus current = ApplicationStatus.fromValue(application.getStatus());
+
+        if (!current.isWithdrawable()) {
+            throw AppException.badRequest(
+                    "Không thể rút đơn ở trạng thái: " + current.getValue()
+                            + ". Chỉ có thể rút khi đang ở trạng thái pending hoặc seen");
+        }
+
+        application.setStatus(ApplicationStatus.WITHDRAWN.getValue());
+        application.setWithdrawnAt(LocalDateTime.now());
+        application.setWithdrawalReason(request.getWithdrawalReason());
+
+        Application saved = applicationRepository.save(application);
+
+        // Dùng relation trực tiếp thay vì query lại
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private JobPosting findPublishedJobOrThrow(Long jobPostId) {
+        JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!JobPostStatus.PUBLISHED.getValue().equals(job.getStatus())) {
+            throw AppException.badRequest("Tin tuyển dụng không còn nhận hồ sơ");
+        }
+
+        if (job.getDeadline() != null && job.getDeadline().isBefore(LocalDateTime.now())) {
+            throw AppException.badRequest("Tin tuyển dụng đã hết hạn nộp hồ sơ");
+        }
+
+        return job;
+    }
+
+    private void validateNotApplied(Long jobPostId, Long candidateUserId) {
+        if (applicationRepository.existsByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(
+                jobPostId, candidateUserId)) {
+            throw AppException.badRequest("Bạn đã ứng tuyển vào tin tuyển dụng này rồi");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private Application buildApplication(Long candidateUserId, Long jobPostId,
+            Long cvId, String applyMethod, JobPosting job) {
+        String cvSnapshot = null;
+        try {
+            cvSnapshot = objectMapper.writeValueAsString(job);
+        } catch (Exception e) {
+            cvSnapshot = "{}";
+        }
+
+        return Application.builder()
+                .candidateUserId(candidateUserId)
+                .jobPostId(jobPostId)
+                .cvId(cvId)
+                .cvSnapshot(cvSnapshot)
+                .status(ApplicationStatus.PENDING.getValue())
+                .applyMethod(applyMethod)
+                .build();
+    }
+
+    private ResApplicationDTO toResponse(Application a, JobPosting job, Company company) {
+        return ResApplicationDTO.builder()
+                .id(a.getId())
+                .jobPostId(a.getJobPostId())
+                .candidateUserId(a.getCandidateUserId())
+                .cvId(a.getCvId())
+                .status(a.getStatus())
+                .applyMethod(a.getApplyMethod())
+                .withdrawalReason(a.getWithdrawalReason())
+                .withdrawnAt(a.getWithdrawnAt())
+                .rejectedAt(a.getRejectedAt())
+                .rejectionReason(a.getRejectionReason())
+                .expiredAt(a.getExpiredAt())
+                .hiredAt(a.getHiredAt())
+                .viewedAt(a.getViewedAt())
+                .createdAt(a.getCreatedAt())
+                .updatedAt(a.getUpdatedAt())
+                .jobPosting(job == null ? null
+                        : ResApplicationDTO.JobInfo.builder()
+                                .id(job.getId())
+                                .title(job.getTitle())
+                                .slug(job.getSlug())
+                                .status(job.getStatus())
+                                .deadline(job.getDeadline())
+                                .company(company == null ? null
+                                        : ResApplicationDTO.CompanyInfo.builder()
+                                                .id(company.getId())
+                                                .name(company.getName())
+                                                .logoUrl(company.getLogoUrl())
+                                                .build())
+                                .build())
+                .build();
+    }
+
+    // Dùng cho getMyApplications (từ map)
+    private ResApplicationDTO toResponse(Application a, Map<Long, Company> companyMap) {
+        JobPosting job = a.getJobPosting();
+        Company company = job != null ? companyMap.get(job.getCompanyId()) : null;
+        return toResponse(a, job, company);
+    }
+
+    // Dùng cho withdraw (relation đã được fetch)
+    private ResApplicationDTO toResponse(Application a, Company company) {
+        return toResponse(a, a.getJobPosting(), company);
+    }
+}
