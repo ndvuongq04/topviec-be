@@ -3,6 +3,8 @@ package com.topviec.topviec_be.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "job_postings")
@@ -133,10 +135,8 @@ public class JobPosting {
     // @JdbcTypeCode(SqlTypes.VECTOR)
     // private float[] embedding;
 
-    // Relationships
-    // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
-    // = true, fetch = FetchType.LAZY)
-    // private List<JobPostSkill> skills = new ArrayList<>();
+    @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<JobPostSkill> skills = new ArrayList();
 
     // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
     // = true, fetch = FetchType.LAZY)

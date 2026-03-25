@@ -13,9 +13,9 @@ public class ResJobPostingSummary {
     private Long id;
     private String title;
     private String slug;
-    private Long companyId;
-    private Long industryId;
-    private Long levelId;
+    private CompanyDTO company;
+    private IndustryDTO industry;
+    private LevelDTO level;
     private String workType;
     private String status;
     private Long salaryMin;
@@ -27,4 +27,37 @@ public class ResJobPostingSummary {
     private LocalDateTime deadline;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CompanyDTO {
+        private Long id;
+        private String name;
+        private String slug;
+        private String logoUrl;
+        private String address;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class IndustryDTO {
+        private Long id;
+        private String name;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LevelDTO {
+        private Long id;
+        private String name;
+    }
 }
