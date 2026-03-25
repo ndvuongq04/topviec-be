@@ -100,25 +100,24 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (request.getJobPostIds() == null || request.getJobPostIds().isEmpty()) {
             throw AppException.badRequest("Danh sách tin tuyển dụng không được trống");
         }
-        if (request.getJobPostIds().size() > 10) {
+        
+        List<Long> distinctJobIds = request.getJobPostIds().stream().distinct().toList();
+        
+        if (distinctJobIds.size() > 10) {
             throw AppException.badRequest("Chỉ được ứng tuyển tối đa 10 tin cùng lúc");
         }
 
         List<ResApplicationDTO> results = new ArrayList<>();
 
-        for (Long jobPostId : request.getJobPostIds()) {
-            try {
-                JobPosting job = findPublishedJobOrThrow(jobPostId);
+        for (Long jobPostId : distinctJobIds) {
+            JobPosting job = findPublishedJobOrThrow(jobPostId);
 
-                Application application = getOrInitializeApplication(
-                        candidateUserId, jobPostId, request.getCvId(),
-                        ApplyMethod.BULK.getValue(), job);
+            Application application = getOrInitializeApplication(
+                    candidateUserId, jobPostId, request.getCvId(),
+                    ApplyMethod.BULK.getValue(), job);
 
-                Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
-                results.add(toResponse(applicationRepository.save(application), job, company));
-            } catch (Exception e) {
-                // Bỏ qua tin lỗi, tiếp tục xử lý các tin còn lại
-            }
+            Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
+            results.add(toResponse(applicationRepository.save(application), job, company));
         }
 
         return results;
