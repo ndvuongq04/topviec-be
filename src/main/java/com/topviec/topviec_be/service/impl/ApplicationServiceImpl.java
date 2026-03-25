@@ -58,9 +58,8 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Transactional
     public ResApplicationDTO apply(Long candidateUserId, Long jobPostId, ReqApplyJobDTO request) {
         JobPosting job = findPublishedJobOrThrow(jobPostId);
-        validateNotApplied(jobPostId, candidateUserId);
 
-        Application application = buildApplication(
+        Application application = getOrInitializeApplication(
                 candidateUserId, jobPostId, request.getCvId(),
                 ApplyMethod.NORMAL.getValue(), job);
 
@@ -76,14 +75,13 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Transactional
     public ResApplicationDTO quickApply(Long candidateUserId, Long jobPostId) {
         JobPosting job = findPublishedJobOrThrow(jobPostId);
-        validateNotApplied(jobPostId, candidateUserId);
 
         // Lấy CV mặc định
         Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId)
                 .orElseThrow(() -> AppException.badRequest(
                         "Bạn chưa có CV mặc định. Vui lòng đặt một CV làm mặc định trước khi ứng tuyển nhanh"));
 
-        Application application = buildApplication(
+        Application application = getOrInitializeApplication(
                 candidateUserId, jobPostId, defaultCv.getId(),
                 ApplyMethod.QUICK.getValue(), job);
 
@@ -110,9 +108,8 @@ public class ApplicationServiceImpl implements ApplicationService {
         for (Long jobPostId : request.getJobPostIds()) {
             try {
                 JobPosting job = findPublishedJobOrThrow(jobPostId);
-                validateNotApplied(jobPostId, candidateUserId);
 
-                Application application = buildApplication(
+                Application application = getOrInitializeApplication(
                         candidateUserId, jobPostId, request.getCvId(),
                         ApplyMethod.BULK.getValue(), job);
 
@@ -214,19 +211,32 @@ public class ApplicationServiceImpl implements ApplicationService {
         return job;
     }
 
-    private void validateNotApplied(Long jobPostId, Long candidateUserId) {
-        if (applicationRepository.existsByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(
-                jobPostId, candidateUserId)) {
-            throw AppException.badRequest("Bạn đã ứng tuyển vào tin tuyển dụng này rồi");
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private Application buildApplication(Long candidateUserId, Long jobPostId,
+    private Application getOrInitializeApplication(Long candidateUserId, Long jobPostId,
             Long cvId, String applyMethod, JobPosting job) {
+        
+        java.util.Optional<Application> existingOpt = applicationRepository.findByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(jobPostId, candidateUserId);
+
+        if (existingOpt.isPresent()) {
+            Application existing = existingOpt.get();
+            if (!ApplicationStatus.WITHDRAWN.getValue().equals(existing.getStatus())) {
+                throw AppException.badRequest("Bạn đã ứng tuyển vào tin tuyển dụng này rồi");
+            }
+
+            // Cho phép ứng tuyển lại nếu trước đó đã rút đơn
+            existing.setCvId(cvId);
+            existing.setApplyMethod(applyMethod);
+            existing.setStatus(ApplicationStatus.PENDING.getValue());
+            try {
+                existing.setCvSnapshot(objectMapper.writeValueAsString(job));
+            } catch (Exception e) {
+                existing.setCvSnapshot("{}");
+            }
+            existing.setWithdrawnAt(null);
+            existing.setWithdrawalReason(null);
+            
+            return existing;
+        }
+
         String cvSnapshot = null;
         try {
             cvSnapshot = objectMapper.writeValueAsString(job);

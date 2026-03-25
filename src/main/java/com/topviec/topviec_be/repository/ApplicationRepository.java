@@ -16,6 +16,8 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
 
         boolean existsByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(Long jobPostId, Long candidateUserId);
 
+        Optional<Application> findByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(Long jobPostId, Long candidateUserId);
+
         List<Application> findByJobPostIdAndDeletedAtIsNull(Long jobPostId);
 
         @Query("""
