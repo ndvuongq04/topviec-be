@@ -10,7 +10,9 @@ public enum ApplicationStatus {
     SEEN("seen"), // NTD đã mở xem CV
     CONSIDERING("considering"), // NTD lưu để xem lại
     CV_PASSED("cv_passed"), // Pass vòng CV, chờ setup lịch PV
-    INTERVIEWING("interviewing"), // Đang phỏng vấn (auto khi NTT bắt đầu PV)
+    INTERVIEWING("interviewing"), // Đang phỏng vấn
+    SCHEDULE_PENDING("schedule_pending"), // Đã gửi email slot, chờ UV chọn lịch
+    OVERDUE("overdue"), // UV không phản hồi chọn lịch sau deadline
     OFFERED("offered"), // NTD gửi offer
     HIRED("hired"), // UV chấp nhận offer
     REJECTED("rejected"), // NTD từ chối
@@ -56,9 +58,19 @@ public enum ApplicationStatus {
                     || next == EXPIRED || next == WITHDRAWN;
             case CV_PASSED -> next == INTERVIEWING || next == REJECTED
                     || next == WITHDRAWN || next == EXPIRED;
-            case INTERVIEWING -> next == OFFERED || next == REJECTED;
+
+            // INTERVIEWING: khi gửi slot cho UV chọn lịch vòng tiếp → SCHEDULE_PENDING
+            case INTERVIEWING -> next == SCHEDULE_PENDING || next == OFFERED || next == REJECTED;
+
+            // SCHEDULE_PENDING: UV chọn lịch → về INTERVIEWING | quá hạn → OVERDUE
+            case SCHEDULE_PENDING -> next == INTERVIEWING || next == OVERDUE;
+
+            // OVERDUE: NTT gia hạn → SCHEDULE_PENDING | NTT đặt lịch hộ → INTERVIEWING |
+            // NTT từ chối → REJECTED
+            case OVERDUE -> next == SCHEDULE_PENDING || next == INTERVIEWING || next == REJECTED;
+
             case OFFERED -> next == HIRED || next == REJECTED;
-            default -> false;
+            default -> false; // terminal states
         };
     }
 }
