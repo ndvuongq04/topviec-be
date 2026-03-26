@@ -8,8 +8,9 @@ public enum ApplicationStatus {
     PENDING("pending"), // Vừa nộp, NTD chưa xem
     INVITED("invited"), // NTD mời từ talent pool
     SEEN("seen"), // NTD đã mở xem CV
-    CONSIDERING("considering"), // NTD lưu để xem lại sau
-    INTERVIEWING("interviewing"), // Đang phỏng vấn
+    CONSIDERING("considering"), // NTD lưu để xem lại
+    CV_PASSED("cv_passed"), // Pass vòng CV, chờ setup lịch PV
+    INTERVIEWING("interviewing"), // Đang phỏng vấn (auto khi NTT bắt đầu PV)
     OFFERED("offered"), // NTD gửi offer
     HIRED("hired"), // UV chấp nhận offer
     REJECTED("rejected"), // NTD từ chối
@@ -37,26 +38,27 @@ public enum ApplicationStatus {
         throw new IllegalArgumentException("Unknown ApplicationStatus: " + value);
     }
 
-    // Kiểm tra trạng thái kết thúc (terminal state)
     public boolean isTerminal() {
         return this == HIRED || this == REJECTED || this == WITHDRAWN || this == EXPIRED;
     }
 
-    // Kiểm tra UV có thể rút đơn không
     public boolean isWithdrawable() {
-        return this == PENDING || this == SEEN;
+        return this == PENDING || this == SEEN || this == CV_PASSED;
     }
 
-    // Kiểm tra chuyển trạng thái hợp lệ
     public boolean canTransitionTo(ApplicationStatus next) {
         return switch (this) {
             case PENDING -> next == SEEN || next == WITHDRAWN || next == EXPIRED;
             case INVITED -> next == PENDING || next == EXPIRED;
-            case SEEN -> next == CONSIDERING || next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
-            case CONSIDERING -> next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
+            case SEEN -> next == CONSIDERING || next == CV_PASSED
+                    || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
+            case CONSIDERING -> next == CV_PASSED || next == REJECTED
+                    || next == EXPIRED || next == WITHDRAWN;
+            case CV_PASSED -> next == INTERVIEWING || next == REJECTED
+                    || next == WITHDRAWN || next == EXPIRED;
             case INTERVIEWING -> next == OFFERED || next == REJECTED;
             case OFFERED -> next == HIRED || next == REJECTED;
-            default -> false; // terminal states
+            default -> false;
         };
     }
 }
