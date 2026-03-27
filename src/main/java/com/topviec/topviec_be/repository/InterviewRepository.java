@@ -1,0 +1,44 @@
+package com.topviec.topviec_be.repository;
+
+import com.topviec.topviec_be.entity.Interview;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface InterviewRepository extends JpaRepository<Interview, Long> {
+
+        Optional<Interview> findByApplicationIdAndRoundIdAndDeletedAtIsNull(Long applicationId, Long roundId);
+
+        Optional<Interview> findByIdAndDeletedAtIsNull(Long id);
+
+        List<Interview> findByApplicationIdAndDeletedAtIsNullOrderByRoundId(Long applicationId);
+
+        /**
+         * Lấy danh sách lịch PV theo job post, lọc theo round và status.
+         */
+        @Query("""
+                        SELECT i FROM Interview i
+                        JOIN i.application a
+                        WHERE a.jobPostId = :jobPostId
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        AND (:roundId IS NULL OR i.roundId = :roundId)
+                        AND (:status IS NULL OR i.status = :status)
+                        ORDER BY i.scheduledAt ASC
+                        """)
+        List<Interview> findByJobPostId(
+                        @Param("jobPostId") Long jobPostId,
+                        @Param("roundId") Long roundId,
+                        @Param("status") String status);
+
+
+
+        boolean existsByApplicationIdAndRoundId(Long applicationId, Long roundId);
+
+        boolean existsByApplicationIdAndRoundIdAndDeletedAtIsNull(Long applicationId, Long roundId);
+}

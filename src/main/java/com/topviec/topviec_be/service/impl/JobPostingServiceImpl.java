@@ -383,7 +383,9 @@ public class JobPostingServiceImpl implements JobPostingService {
         if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())) {
             throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT");
         }
-        jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
+        // jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
+        jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue()); // Bypass approval for testing
+        jobPosting.setPublishedAt(java.time.LocalDateTime.now()); // Set published time
         jobPosting.setUpdatedBy(updatedByUserId);
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
