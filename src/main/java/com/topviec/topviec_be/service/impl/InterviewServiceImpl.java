@@ -718,10 +718,6 @@ public class InterviewServiceImpl implements InterviewService {
     public void startInterviewing(Long jobPostId, Long userId, Long companyId) {
         JobPosting job = findJobAndValidateOwnership(jobPostId, companyId);
 
-        if (roundRepository.countByJobPostIdActive(jobPostId) == 0) {
-            throw AppException.badRequest("Cần tạo ít nhất 1 vòng phỏng vấn trước khi bắt đầu");
-        }
-
         List<Application> cvPassedApps = applicationRepository
                 .findByJobPostIdAndStatusAndDeletedAtIsNull(jobPostId, ApplicationStatus.CV_PASSED.getValue());
         if (cvPassedApps.isEmpty()) {
