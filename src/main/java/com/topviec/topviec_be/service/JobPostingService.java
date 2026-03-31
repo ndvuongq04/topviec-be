@@ -21,6 +21,18 @@ public interface JobPostingService {
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
 
+        /**
+         * Lấy danh sách tin tuyển dụng dành riêng cho Employer:
+         * - Bao gồm cả tin đã xóa mềm (deletedAt IS NOT NULL)
+         * - Kèm theo số lượng hồ sơ apply vào mỗi tin (applicationCount)
+         */
+        ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
+                        Long levelId, String workType, String status,
+                        Boolean isFeatured, Boolean isUrgent,
+                        Long salaryMin, Long salaryMax,
+                        Integer experienceYearsMin, Integer experienceYearsMax,
+                        Pageable pageable);
+
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType,
@@ -66,6 +78,16 @@ public interface JobPostingService {
         ResJobPostingDetail takedown(Long id, Long adminId,
                         com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request);
 
-        /** Admin gỡ tin tuyển dụng vi phạm. */
+        /** Employer gửi tin đang DRAFT/REJECTED lên chờ admin duyệt. */
         ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId);
+
+        // -------------------------------------------------------------------------
+        // Employer — Soft Delete / Restore
+        // -------------------------------------------------------------------------
+
+        /** Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở PUBLISHED). */
+        void softDelete(Long id, Long companyId, Long deletedByUserId);
+
+        /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */
+        ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId);
 }

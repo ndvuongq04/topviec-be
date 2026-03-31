@@ -24,9 +24,11 @@ public class ResJobPostingSummary {
     private Boolean isFeatured;
     private Boolean isUrgent;
     private Integer viewCount;
+    private Integer applicationCount;  // Tổng số hồ sơ đã nộp vào tin
     private LocalDateTime deadline;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
+    private LocalDateTime deletedAt;   // null = đang hoạt động, non-null = đã xóa mềm
 
     @Getter
     @Setter

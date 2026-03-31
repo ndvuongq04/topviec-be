@@ -116,6 +116,29 @@ public class JobPostingSpecification {
                 .and(experienceAtMost(experienceYearsMax));
     }
 
+    // ── Bộ lọc Employer (bao gồm tin đã xóa mềm) ──────────────────────────
+
+    public static Specification<JobPosting> withEmployerFilter(
+            String keyword, Long companyId, Long industryId, Long levelId,
+            String workType, String status, Boolean isFeatured, Boolean isUrgent,
+            Long salaryMin, Long salaryMax,
+            Integer experienceYearsMin, Integer experienceYearsMax) {
+
+        // Không dùng notDeleted() → lấy tất cả kể cả đã xóa mềm
+        return Specification.where(hasKeyword(keyword))
+                .and(hasCompany(companyId))
+                .and(hasIndustry(industryId))
+                .and(hasLevel(levelId))
+                .and(hasWorkType(workType))
+                .and(hasStatus(status))
+                .and(isFeatured(isFeatured))
+                .and(isUrgent(isUrgent))
+                .and(salaryAtLeast(salaryMin))
+                .and(salaryAtMost(salaryMax))
+                .and(experienceAtLeast(experienceYearsMin))
+                .and(experienceAtMost(experienceYearsMax));
+    }
+
     // ── Bộ lọc public (chỉ published, không có filter status) ─────────────
 
     public static Specification<JobPosting> withPublicFilter(

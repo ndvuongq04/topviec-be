@@ -68,7 +68,7 @@ public class EmployerJobPostingController {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
-        return ResponseEntity.ok(jobPostingService.getList(
+        return ResponseEntity.ok(jobPostingService.getEmployerList(
                 keyword, companyId, industryId, levelId, workType, status,
                 isFeatured, isUrgent, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
@@ -155,5 +155,28 @@ public class EmployerJobPostingController {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
         return ResponseEntity.ok(jobPostingService.pendingApproval(id, companyId, userId));
+    }
+
+    /**
+     * DELETE /employer/job-postings/{id}
+     * Xóa mềm tin tuyển dụng (chỉ được phép khi tin KHÔNG ở trạng thái PUBLISHED).
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> softDelete(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        jobPostingService.softDelete(id, companyId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * PATCH /employer/job-postings/{id}/restore
+     * Khôi phục tin đã xóa mềm về trạng thái DRAFT.
+     */
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ResJobPostingDetail> restore(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.restore(id, companyId, userId));
     }
 }
