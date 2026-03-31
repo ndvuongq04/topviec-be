@@ -186,8 +186,8 @@ public class InterviewServiceImpl implements InterviewService {
 
         // Xóa dữ liệu liên quan theo thứ tự để tránh vi phạm FK
         interviewerRepository.deleteByRoundId(roundId); // xóa danh sách interviewer
-        slotRepository.deleteByRoundId(roundId);        // xóa các slot đề xuất
-        roundRepository.delete(round);                  // xóa thật vòng phỏng vấn
+        slotRepository.deleteByRoundId(roundId); // xóa các slot đề xuất
+        roundRepository.delete(round); // xóa thật vòng phỏng vấn
     }
 
     // =========================================================================
@@ -717,10 +717,6 @@ public class InterviewServiceImpl implements InterviewService {
     @Transactional
     public void startInterviewing(Long jobPostId, Long userId, Long companyId) {
         JobPosting job = findJobAndValidateOwnership(jobPostId, companyId);
-
-        if (!JobPostStatus.CLOSED.getValue().equals(job.getStatus())) {
-            throw AppException.badRequest("Tin tuyển dụng phải được đóng trước khi bắt đầu phỏng vấn");
-        }
 
         if (roundRepository.countByJobPostIdActive(jobPostId) == 0) {
             throw AppException.badRequest("Cần tạo ít nhất 1 vòng phỏng vấn trước khi bắt đầu");
