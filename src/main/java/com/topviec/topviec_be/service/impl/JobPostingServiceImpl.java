@@ -730,4 +730,49 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .skills(skills)
                 .build();
     }
+
+    // -------------------------------------------------------------------------
+    // Employer — Soft Delete / Restore
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void softDelete(Long id, Long companyId, Long deletedByUserId) {
+        JobPosting jobPosting = jobPostingRepository.findById(id)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+
+        if (JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Không thể xóa tin tuyển dụng đang hiển thị (PUBLISHED)");
+        }
+
+        jobPosting.setStatus(JobPostStatus.DELETED.getValue());
+        jobPosting.setDeletedAt(java.time.LocalDateTime.now());
+        jobPosting.setUpdatedBy(deletedByUserId);
+        jobPostingRepository.save(jobPosting);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId) {
+        JobPosting jobPosting = jobPostingRepository.findById(id)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
+        }
+
+        if (!JobPostStatus.DELETED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể khôi phục tin ở trạng thái DELETED");
+        }
+
+        jobPosting.setStatus(JobPostStatus.DRAFT.getValue());
+        jobPosting.setDeletedAt(null);
+        jobPosting.setUpdatedBy(restoredByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
 }
