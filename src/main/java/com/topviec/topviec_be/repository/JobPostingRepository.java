@@ -16,6 +16,9 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
 
     Optional<JobPosting> findByIdAndDeletedAtIsNull(Long id);
 
+    /** Dùng cho restore: tìm tin kể cả đã bị xóa mềm. */
+    Optional<JobPosting> findById(Long id);
+
     boolean existsBySlugAndDeletedAtIsNull(String slug);
 
     boolean existsBySlugAndIdNotAndDeletedAtIsNull(String slug, Long id);

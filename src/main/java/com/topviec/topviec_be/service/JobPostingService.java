@@ -66,6 +66,16 @@ public interface JobPostingService {
         ResJobPostingDetail takedown(Long id, Long adminId,
                         com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO request);
 
-        /** Admin gỡ tin tuyển dụng vi phạm. */
+        /** Employer gửi tin đang DRAFT/REJECTED lên chờ admin duyệt. */
         ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId);
+
+        // -------------------------------------------------------------------------
+        // Employer — Soft Delete / Restore
+        // -------------------------------------------------------------------------
+
+        /** Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở PUBLISHED). */
+        void softDelete(Long id, Long companyId, Long deletedByUserId);
+
+        /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */
+        ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId);
 }

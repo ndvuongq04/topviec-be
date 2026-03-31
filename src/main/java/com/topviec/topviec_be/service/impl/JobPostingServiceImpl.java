@@ -393,6 +393,43 @@ public class JobPostingServiceImpl implements JobPostingService {
     }
 
     // -------------------------------------------------------------------------
+    // Employer — Soft Delete / Restore
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void softDelete(Long id, Long companyId, Long deletedByUserId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xóa tin tuyển dụng của công ty khác");
+        }
+        if (JobPostStatus.PUBLISHED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Không thể xóa tin đang ở trạng thái PUBLISHED. Hãy đóng tin trước khi xóa.");
+        }
+        jobPosting.setDeletedAt(java.time.LocalDateTime.now());
+        jobPosting.setUpdatedBy(deletedByUserId);
+        jobPostingRepository.save(jobPosting);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId) {
+        JobPosting jobPosting = jobPostingRepository.findById(id)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền khôi phục tin tuyển dụng của công ty khác");
+        }
+        if (jobPosting.getDeletedAt() == null) {
+            throw AppException.badRequest("Tin tuyển dụng này chưa bị xóa, không cần khôi phục");
+        }
+        jobPosting.setDeletedAt(null);
+        jobPosting.setStatus(JobPostStatus.DRAFT.getValue());
+        jobPosting.setUpdatedBy(restoredByUserId);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+        return toDetailResponse(saved);
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
