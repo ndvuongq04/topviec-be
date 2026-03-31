@@ -18,6 +18,8 @@ public class ReqCreateInterviewRoundDTO {
 
     private String description;
 
+    private Integer expectedDuration;
+
     private Boolean isFinal;
 
     @Valid

@@ -16,6 +16,7 @@ public class ResInterviewRoundDTO {
     private Integer roundNumber;
     private String roundName;
     private String description;
+    private Integer expectedDuration;
     private Boolean isFinal;
     private List<InterviewerInfo> interviewers;
     private Long candidateCount; // số UV đang ở vòng này

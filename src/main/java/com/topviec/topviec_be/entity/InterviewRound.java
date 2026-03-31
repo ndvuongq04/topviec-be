@@ -32,6 +32,9 @@ public class InterviewRound {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "expected_duration_minutes")
+    private Integer expectedDuration;
+
     @Column(name = "is_final", nullable = false)
     private Boolean isFinal;
 

@@ -77,6 +77,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .roundNumber(nextRoundNumber)
                 .roundName(request.getRoundName())
                 .description(request.getDescription())
+                .expectedDuration(request.getExpectedDuration())
                 .isFinal(request.getIsFinal() != null ? request.getIsFinal() : false)
                 .createdBy(userId)
                 .build();
@@ -134,6 +135,9 @@ public class InterviewServiceImpl implements InterviewService {
         if (request.getDescription() != null) {
             round.setDescription(request.getDescription());
         }
+        if (request.getExpectedDuration() != null) {
+            round.setExpectedDuration(request.getExpectedDuration());
+        }
         if (request.getIsFinal() != null) {
             if (Boolean.TRUE.equals(request.getIsFinal())) {
                 List<InterviewRound> existingRounds = roundRepository
@@ -188,6 +192,16 @@ public class InterviewServiceImpl implements InterviewService {
         interviewerRepository.deleteByRoundId(roundId); // xóa danh sách interviewer
         slotRepository.deleteByRoundId(roundId); // xóa các slot đề xuất
         roundRepository.delete(round); // xóa thật vòng phỏng vấn
+        roundRepository.flush(); // Đẩy database state ngay lập tức
+
+        // Sắp xếp lại thứ tự vòng phỏng vấn
+        List<InterviewRound> remainingRounds = roundRepository
+                .findByJobPostIdAndDeletedAtIsNullOrderByRoundNumberAsc(round.getJobPostId());
+        int newNumber = 1;
+        for (InterviewRound r : remainingRounds) {
+            r.setRoundNumber(newNumber++);
+            roundRepository.save(r);
+        }
     }
 
     // =========================================================================
@@ -867,6 +881,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .roundNumber(round.getRoundNumber())
                 .roundName(round.getRoundName())
                 .description(round.getDescription())
+                .expectedDuration(round.getExpectedDuration())
                 .isFinal(round.getIsFinal())
                 .interviewers(interviewers.stream()
                         .map(i -> ResInterviewRoundDTO.InterviewerInfo.builder()
