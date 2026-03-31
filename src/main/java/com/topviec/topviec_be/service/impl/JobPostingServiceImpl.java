@@ -375,17 +375,18 @@ public class JobPostingServiceImpl implements JobPostingService {
     }
 
     @Override
+    @Transactional
     public ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId) {
         JobPosting jobPosting = findByIdOrThrow(id);
         if (!jobPosting.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
         }
-        if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())) {
-            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT");
+        if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())
+                && !JobPostStatus.REJECTED.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT hoặc REJECTED");
         }
-        // jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
-        jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue()); // Bypass approval for testing
-        jobPosting.setPublishedAt(java.time.LocalDateTime.now()); // Set published time
+        saveEditLog(jobPosting, updatedByUserId);
+        jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
         jobPosting.setUpdatedBy(updatedByUserId);
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
