@@ -36,7 +36,7 @@ public interface ApplicationService {
     // API cho Employer
     // -------------------------------------------------------------------------
 
-    ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable);
+    ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, String search, Pageable pageable);
 
     ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId);
 

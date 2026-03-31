@@ -52,18 +52,28 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
         /**
          * Lấy danh sách đơn theo job post — dành cho recruiter
          * - status null → lấy tất cả
-         * - keyword null → không lọc theo tên
+         * - search null → không lọc theo tên/email
          */
         @Query("""
                         SELECT a FROM Application a
+                        JOIN a.candidate u
                         WHERE a.jobPostId = :jobPostId
                         AND a.deletedAt IS NULL
                         AND (:status IS NULL OR a.status = :status)
+                        AND (:search IS NULL
+                            OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
+                            OR EXISTS (
+                                SELECT cp FROM CandidateProfile cp
+                                WHERE cp.userId = a.candidateUserId
+                                AND cp.deletedAt IS NULL
+                                AND LOWER(cp.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
+                            ))
                         ORDER BY a.createdAt DESC
                         """)
         Page<Application> findByJobPost(
                         @Param("jobPostId") Long jobPostId,
                         @Param("status") String status,
+                        @Param("search") String search,
                         Pageable pageable);
 
         // ── Interview support ─────────────────────────────────────────────────────
