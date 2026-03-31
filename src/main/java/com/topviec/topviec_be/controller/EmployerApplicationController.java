@@ -35,13 +35,14 @@ public class EmployerApplicationController {
     public ResponseEntity<ResultPaginationDTO> getApplicationsByJobPost(
             @PathVariable Long jobPostId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
         return ResponseEntity.ok(
-                applicationService.getApplicationsByJobPost(userId, companyId, jobPostId, status, pageable));
+                applicationService.getApplicationsByJobPost(userId, companyId, jobPostId, status, search, pageable));
     }
 
     /**

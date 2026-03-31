@@ -338,15 +338,16 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable) {
+    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, String search, Pageable pageable) {
         JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
-        
+
         if (!job.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền xem hồ sơ của tin tuyển dụng này");
         }
 
-        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, pageable);
+        String searchTrim = (search != null && !search.isBlank()) ? search.trim() : null;
+        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, searchTrim, pageable);
         
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
