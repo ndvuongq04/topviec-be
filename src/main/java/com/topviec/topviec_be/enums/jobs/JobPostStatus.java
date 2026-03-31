@@ -14,7 +14,8 @@ public enum JobPostStatus {
     EXPIRED("expired"),
     RENEWED("renewed"),
     INTERVIEWING("interviewing"),
-    COMPLETED("completed");
+    COMPLETED("completed"),
+    DELETED("deleted");
 
     private final String value;
 
