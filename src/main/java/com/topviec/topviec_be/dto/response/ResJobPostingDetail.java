@@ -39,6 +39,7 @@ public class ResJobPostingDetail {
 
     private Integer viewCount;
     private Integer editCount;
+    private Integer applicationCount;   // Tổng số hồ sơ đã nộp vào tin
 
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;

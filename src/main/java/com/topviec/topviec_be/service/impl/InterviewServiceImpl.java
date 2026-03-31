@@ -184,9 +184,10 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Không thể xóa vòng phỏng vấn đã có ứng viên tham gia");
         }
 
-        round.setDeletedAt(LocalDateTime.now());
-        round.setUpdatedBy(userId);
-        roundRepository.save(round);
+        // Xóa dữ liệu liên quan theo thứ tự để tránh vi phạm FK
+        interviewerRepository.deleteByRoundId(roundId); // xóa danh sách interviewer
+        slotRepository.deleteByRoundId(roundId);        // xóa các slot đề xuất
+        roundRepository.delete(round);                  // xóa thật vòng phỏng vấn
     }
 
     // =========================================================================

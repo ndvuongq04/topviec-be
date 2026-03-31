@@ -682,6 +682,9 @@ public class JobPostingServiceImpl implements JobPostingService {
         Industry industry = industryRepository.findById(j.getIndustryId()).orElse(null);
         Level level = levelRepository.findById(j.getLevelId()).orElse(null);
 
+        int applicationCount = (int) applicationRepository
+                .countByJobPostIdAndDeletedAtIsNull(j.getId());
+
         return ResJobPostingDetail.builder()
                 .id(j.getId())
                 .title(j.getTitle())
@@ -719,6 +722,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .isUrgent(j.getIsUrgent())
                 .viewCount(j.getViewCount())
                 .editCount(j.getEditCount())
+                .applicationCount(applicationCount)
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())
                 .updatedAt(j.getUpdatedAt())
