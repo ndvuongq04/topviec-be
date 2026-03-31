@@ -25,6 +25,7 @@ public class ResJobPostingSummary {
     private Boolean isUrgent;
     private Integer viewCount;
     private Integer applicationCount;  // Tổng số hồ sơ đã nộp vào tin
+    private Integer interviewRoundsCount; // Tổng số vòng phỏng vấn của tin
     private LocalDateTime deadline;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
