@@ -16,6 +16,8 @@ public class ReqUpdateInterviewRoundDTO {
 
     private String description;
 
+    private Integer expectedDuration;
+
     private Boolean isFinal;
 
     @Valid
