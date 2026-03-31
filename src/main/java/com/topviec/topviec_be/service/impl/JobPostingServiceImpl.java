@@ -21,6 +21,7 @@ import com.topviec.topviec_be.entity.Skill;
 import com.topviec.topviec_be.enums.jobs.EditType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
 import com.topviec.topviec_be.repository.JobPostEditLogRepository;
@@ -58,6 +59,7 @@ public class JobPostingServiceImpl implements JobPostingService {
     private final LevelRepository levelRepository;
     private final ObjectMapper objectMapper;
     private final SkillRepository skillRepository;
+    private final ApplicationRepository applicationRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Create
@@ -120,7 +122,29 @@ public class JobPostingServiceImpl implements JobPostingService {
                 isFeatured, isUrgent, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
-        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable);
+        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, false);
+    }
+
+    // -------------------------------------------------------------------------
+    // Employer — Read (list kèm tin đã xóa + applicationCount)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
+            Long levelId, String workType, String status,
+            Boolean isFeatured, Boolean isUrgent,
+            Long salaryMin, Long salaryMax,
+            Integer experienceYearsMin, Integer experienceYearsMax,
+            Pageable pageable) {
+
+        // Specification không có notDeleted() — lấy hết cả tin đã xóa mềm
+        Specification<JobPosting> spec = JobPostingSpecification.withEmployerFilter(
+                keyword, companyId, industryId, levelId, workType, status,
+                isFeatured, isUrgent, salaryMin, salaryMax,
+                experienceYearsMin, experienceYearsMax);
+
+        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, true);
     }
 
     // -------------------------------------------------------------------------
@@ -141,7 +165,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 isFeatured, isUrgent, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
-        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable);
+        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, false);
     }
 
     // -------------------------------------------------------------------------
@@ -533,7 +557,8 @@ public class JobPostingServiceImpl implements JobPostingService {
 
     // ── Mapper: dùng cho danh sách (batch query tránh N+1) ───────────────────
 
-    private ResultPaginationDTO toResultPagination(Page<JobPosting> page, Pageable pageable) {
+    private ResultPaginationDTO toResultPagination(Page<JobPosting> page, Pageable pageable,
+            boolean includeApplicationCount) {
         List<JobPosting> jobs = page.getContent();
 
         // Batch query 3 bảng — chỉ tốn 3 query dù có bao nhiêu job
@@ -549,6 +574,17 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
+        // Batch query applicationCount nếu cần (chỉ dùng cho Employer)
+        Map<Long, Integer> appCountMap = new java.util.HashMap<>();
+        if (includeApplicationCount && !jobs.isEmpty()) {
+            List<Long> jobIds = jobs.stream().map(JobPosting::getId).toList();
+            applicationRepository.countByJobPostIds(jobIds).forEach(row -> {
+                Long jobId = (Long) row[0];
+                Long count = (Long) row[1];
+                appCountMap.put(jobId, count.intValue());
+            });
+        }
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -558,7 +594,9 @@ public class JobPostingServiceImpl implements JobPostingService {
         ResultPaginationDTO result = new ResultPaginationDTO();
         result.setMeta(meta);
         result.setResult(jobs.stream()
-                .map(j -> toSummaryResponse(j, companyMap, industryMap, levelMap))
+                .map(j -> toSummaryResponse(j, companyMap, industryMap, levelMap,
+                        includeApplicationCount ? appCountMap.getOrDefault(j.getId(), 0) : null,
+                        includeApplicationCount))
                 .toList());
         return result;
     }
@@ -566,7 +604,9 @@ public class JobPostingServiceImpl implements JobPostingService {
     private ResJobPostingSummary toSummaryResponse(JobPosting j,
             Map<Long, Company> companyMap,
             Map<Long, Industry> industryMap,
-            Map<Long, Level> levelMap) {
+            Map<Long, Level> levelMap,
+            Integer applicationCount,
+            boolean includeDeletedAt) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
         Level level = levelMap.get(j.getLevelId());
@@ -601,9 +641,11 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .isFeatured(j.getIsFeatured())
                 .isUrgent(j.getIsUrgent())
                 .viewCount(j.getViewCount())
+                .applicationCount(applicationCount)
                 .deadline(j.getDeadline())
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())
+                .deletedAt(includeDeletedAt ? j.getDeletedAt() : null)
                 .build();
     }
 

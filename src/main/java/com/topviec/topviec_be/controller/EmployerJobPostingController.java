@@ -68,7 +68,7 @@ public class EmployerJobPostingController {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
-        return ResponseEntity.ok(jobPostingService.getList(
+        return ResponseEntity.ok(jobPostingService.getEmployerList(
                 keyword, companyId, industryId, levelId, workType, status,
                 isFeatured, isUrgent, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));

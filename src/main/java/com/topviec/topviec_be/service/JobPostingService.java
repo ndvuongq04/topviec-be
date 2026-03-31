@@ -21,6 +21,18 @@ public interface JobPostingService {
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
 
+        /**
+         * Lấy danh sách tin tuyển dụng dành riêng cho Employer:
+         * - Bao gồm cả tin đã xóa mềm (deletedAt IS NOT NULL)
+         * - Kèm theo số lượng hồ sơ apply vào mỗi tin (applicationCount)
+         */
+        ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
+                        Long levelId, String workType, String status,
+                        Boolean isFeatured, Boolean isUrgent,
+                        Long salaryMin, Long salaryMax,
+                        Integer experienceYearsMin, Integer experienceYearsMax,
+                        Pageable pageable);
+
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType,

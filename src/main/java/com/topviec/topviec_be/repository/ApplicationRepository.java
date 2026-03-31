@@ -103,4 +103,20 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
         int bulkRejectExcluding(
                         @Param("jobPostId") Long jobPostId,
                         @Param("excludeIds") List<Long> excludeIds);
+
+        /** Đếm số hồ sơ (chưa xóa) theo job post id. */
+        long countByJobPostIdAndDeletedAtIsNull(Long jobPostId);
+
+        /**
+         * Batch đếm số hồ sơ theo nhiều job — tránh N+1 khi hiển thị danh sách.
+         * Trả về List<Object[]> gồm [jobPostId, count].
+         */
+        @Query("""
+                        SELECT a.jobPostId, COUNT(a)
+                        FROM Application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND a.deletedAt IS NULL
+                        GROUP BY a.jobPostId
+                        """)
+        List<Object[]> countByJobPostIds(@Param("jobPostIds") List<Long> jobPostIds);
 }
