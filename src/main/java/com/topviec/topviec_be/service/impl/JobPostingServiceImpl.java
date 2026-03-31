@@ -24,6 +24,7 @@ import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
+import com.topviec.topviec_be.repository.InterviewRoundRepository;
 import com.topviec.topviec_be.repository.JobPostEditLogRepository;
 import com.topviec.topviec_be.repository.JobPostLocationRepository;
 import com.topviec.topviec_be.repository.JobPostSkillRepository;
@@ -60,6 +61,7 @@ public class JobPostingServiceImpl implements JobPostingService {
     private final ObjectMapper objectMapper;
     private final SkillRepository skillRepository;
     private final ApplicationRepository applicationRepository;
+    private final InterviewRoundRepository interviewRoundRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Create
@@ -539,14 +541,20 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
-        // Batch query applicationCount nếu cần (chỉ dùng cho Employer)
+        // Batch query applicationCount và interviewRoundsCount nếu cần (chỉ dùng cho Employer)
         Map<Long, Integer> appCountMap = new java.util.HashMap<>();
+        Map<Long, Integer> interviewRoundsCountMap = new java.util.HashMap<>();
         if (includeApplicationCount && !jobs.isEmpty()) {
             List<Long> jobIds = jobs.stream().map(JobPosting::getId).toList();
             applicationRepository.countByJobPostIds(jobIds).forEach(row -> {
                 Long jobId = (Long) row[0];
                 Long count = (Long) row[1];
                 appCountMap.put(jobId, count.intValue());
+            });
+            interviewRoundRepository.countByJobPostIdsActive(jobIds).forEach(row -> {
+                Long jobId = (Long) row[0];
+                Long count = (Long) row[1];
+                interviewRoundsCountMap.put(jobId, count.intValue());
             });
         }
 
@@ -561,6 +569,7 @@ public class JobPostingServiceImpl implements JobPostingService {
         result.setResult(jobs.stream()
                 .map(j -> toSummaryResponse(j, companyMap, industryMap, levelMap,
                         includeApplicationCount ? appCountMap.getOrDefault(j.getId(), 0) : null,
+                        includeApplicationCount ? interviewRoundsCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount))
                 .toList());
         return result;
@@ -571,6 +580,7 @@ public class JobPostingServiceImpl implements JobPostingService {
             Map<Long, Industry> industryMap,
             Map<Long, Level> levelMap,
             Integer applicationCount,
+            Integer interviewRoundsCount,
             boolean includeDeletedAt) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
@@ -607,6 +617,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .isUrgent(j.getIsUrgent())
                 .viewCount(j.getViewCount())
                 .applicationCount(applicationCount)
+                .interviewRoundsCount(interviewRoundsCount)
                 .deadline(j.getDeadline())
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())

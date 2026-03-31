@@ -17,6 +17,9 @@ public interface InterviewRoundRepository extends JpaRepository<InterviewRound, 
     @Query("SELECT COUNT(r) FROM InterviewRound r WHERE r.jobPostId = :jobPostId AND r.deletedAt IS NULL")
     long countByJobPostIdActive(@Param("jobPostId") Long jobPostId);
 
+    @Query("SELECT r.jobPostId, COUNT(r) FROM InterviewRound r WHERE r.jobPostId IN :jobPostIds AND r.deletedAt IS NULL GROUP BY r.jobPostId")
+    List<Object[]> countByJobPostIdsActive(@Param("jobPostIds") List<Long> jobPostIds);
+
     boolean existsByJobPostIdAndIsFinalTrueAndDeletedAtIsNull(Long jobPostId);
 
     Optional<InterviewRound> findByJobPostIdAndRoundNumberAndDeletedAtIsNull(Long jobPostId, Integer roundNumber);
