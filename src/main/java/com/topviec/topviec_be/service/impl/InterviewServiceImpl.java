@@ -376,16 +376,26 @@ public class InterviewServiceImpl implements InterviewService {
     @Override
     @Transactional(readOnly = true)
     public List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
-            Long roundId, String status) {
+            Long roundId, String status, String search) {
         findJobAndValidateOwnership(jobPostId, companyId);
 
         List<Interview> interviews = interviewRepository.findByJobPostId(jobPostId, roundId, status);
 
-        return interviews.stream().map(i -> {
+        List<ResInterviewScheduleDTO> result = interviews.stream().map(i -> {
             InterviewRound round = i.getRound();
             Application application = i.getApplication();
             return toScheduleResponse(i, round, application);
         }).toList();
+
+        if (search != null && !search.isBlank()) {
+            String keyword = search.toLowerCase().trim();
+            result = result.stream()
+                    .filter(dto -> dto.getCandidateName() != null
+                            && dto.getCandidateName().toLowerCase().contains(keyword))
+                    .toList();
+        }
+
+        return result;
     }
 
     @Override
