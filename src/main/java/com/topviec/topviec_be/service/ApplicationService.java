@@ -3,8 +3,7 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
-import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
-import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
@@ -40,7 +39,5 @@ public interface ApplicationService {
 
     ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId);
 
-    ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request);
-
-    ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request);
+    ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request);
 }
