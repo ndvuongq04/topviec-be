@@ -12,6 +12,8 @@ public class ReqUpdateInterviewScheduleDTO {
 
     private LocalDateTime scheduledAt;
 
+    private String interviewType;
+
     private String location;
 
     private String meetingLink;

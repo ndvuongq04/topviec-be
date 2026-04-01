@@ -416,6 +416,9 @@ public class InterviewServiceImpl implements InterviewService {
         if (request.getScheduledAt() != null) {
             interview.setScheduledAt(request.getScheduledAt());
         }
+        if (request.getInterviewType() != null) {
+            interview.setInterviewType(request.getInterviewType());
+        }
         if (request.getLocation() != null) {
             interview.setLocation(request.getLocation());
         }

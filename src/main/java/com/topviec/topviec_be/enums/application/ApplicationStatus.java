@@ -56,8 +56,8 @@ public enum ApplicationStatus {
                     || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
             case CONSIDERING -> next == CV_PASSED || next == REJECTED
                     || next == EXPIRED || next == WITHDRAWN;
-            case CV_PASSED -> next == INTERVIEWING || next == REJECTED
-                    || next == WITHDRAWN || next == EXPIRED;
+            case CV_PASSED -> next == INTERVIEWING || next == CONSIDERING
+                    || next == REJECTED || next == WITHDRAWN || next == EXPIRED;
 
             // INTERVIEWING: khi gửi slot cho UV chọn lịch vòng tiếp → SCHEDULE_PENDING
             case INTERVIEWING -> next == SCHEDULE_PENDING || next == OFFERED || next == REJECTED;
