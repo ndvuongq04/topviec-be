@@ -26,13 +26,13 @@ public class Interview {
     @Column(name = "slot_id")
     private Long slotId;
 
-    @Column(name = "scheduled_at", nullable = false)
+    @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
 
-    @Column(name = "interview_type", nullable = false, length = 20)
+    @Column(name = "interview_type", length = 20)
     private String interviewType;
 
     @Column(name = "location", columnDefinition = "TEXT")
