@@ -34,6 +34,7 @@ public class InterviewServiceImpl implements InterviewService {
     private final JobPostingRepository jobPostingRepository;
     private final UserRepository userRepository;
     private final CandidateProfileRepository candidateProfileRepository;
+    private final CvsRepository cvsRepository;
     private final TokenService tokenService;
 
     // =========================================================================
@@ -573,10 +574,15 @@ public class InterviewServiceImpl implements InterviewService {
 
         String candidateName = getCandidateName(application.getCandidateUserId());
 
+        String cvUrl = cvsRepository.findById(application.getCvId())
+                .map(cv -> cv.getFileUrl() != null ? cv.getFileUrl() : cv.getPdfUrl())
+                .orElse(null);
+
         return ResInterviewHistoryDTO.builder()
                 .applicationId(applicationId)
                 .candidateName(candidateName)
                 .currentStatus(application.getStatus())
+                .cvUrl(cvUrl)
                 .rounds(roundHistories)
                 .build();
     }

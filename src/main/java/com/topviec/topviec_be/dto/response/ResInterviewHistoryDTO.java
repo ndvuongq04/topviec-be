@@ -14,6 +14,7 @@ public class ResInterviewHistoryDTO {
     private Long applicationId;
     private String candidateName;
     private String currentStatus;
+    private String cvUrl;
     private List<RoundHistory> rounds;
 
     @Getter
