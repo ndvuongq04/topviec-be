@@ -31,6 +31,9 @@ public class ResInterviewScheduleDTO {
     private Boolean confirmedByCandidate;
     private String interviewerNote;
 
+    // Trạng thái đơn ứng tuyển (dùng để FE kiểm tra ứng viên đã OFFERED chưa)
+    private String applicationStatus;
+
     // Audit
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

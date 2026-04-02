@@ -451,7 +451,9 @@ public class InterviewServiceImpl implements InterviewService {
         }
 
         interview.setStatus(InterviewStatus.CANCELLED.getValue());
-        interview.setDeletedAt(LocalDateTime.now());
+        // Không set deletedAt khi hủy lịch — chỉ đổi status để lịch vẫn hiển thị trong
+        // danh sách
+        // deletedAt chỉ dùng khi xóa hẳn khỏi hệ thống
         interview.setUpdatedBy(userId);
         interviewRepository.save(interview);
 
@@ -501,7 +503,8 @@ public class InterviewServiceImpl implements InterviewService {
 
         Application application = applicationRepository.findById(interview.getApplicationId()).orElse(null);
         if (application != null) {
-            handlePostResult(application, round, resultStatus, Boolean.TRUE.equals(request.getNotifyCandidate()));
+            handlePostResult(application, round, resultStatus, Boolean.TRUE.equals(request.getNotifyCandidate()),
+                    userId);
         }
 
         return toResultResponse(result);
@@ -702,12 +705,12 @@ public class InterviewServiceImpl implements InterviewService {
 
         findJobAndValidateOwnership(application.getJobPostId(), companyId);
 
-        if (!ApplicationStatus.OFFERED.getValue().equals(application.getStatus())) {
-            throw AppException.badRequest("Ứng viên không ở trạng thái OFFERED");
-        }
+        // if (!ApplicationStatus.OFFERED.getValue().equals(application.getStatus())) {
+        // throw AppException.badRequest("Ứng viên không ở trạng thái OFFERED");
+        // }
 
         if (request.getResult() == OfferResult.ACCEPTED) {
-            // Giữ OFFERED, chờ bước hoàn thành tuyển dụng
+            application.setStatus(ApplicationStatus.OFFERED.getValue());
         } else if (request.getResult() == OfferResult.DECLINED) {
             application.setStatus(ApplicationStatus.REJECTED.getValue());
             application.setRejectedAt(LocalDateTime.now());
@@ -860,7 +863,7 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private void handlePostResult(Application application, InterviewRound round,
-            InterviewResultStatus resultStatus, boolean notifyCandidate) {
+            InterviewResultStatus resultStatus, boolean notifyCandidate, long userId) {
 
         if (resultStatus == InterviewResultStatus.FAIL) {
             application.setStatus(ApplicationStatus.REJECTED.getValue());
@@ -871,14 +874,33 @@ public class InterviewServiceImpl implements InterviewService {
             }
         } else if (resultStatus == InterviewResultStatus.PASS) {
             if (Boolean.TRUE.equals(round.getIsFinal())) {
-                application.setStatus(ApplicationStatus.OFFERED.getValue());
-                applicationRepository.save(application);
+                // application.setStatus(ApplicationStatus.OFFERED.getValue());
+                // applicationRepository.save(application);
                 log.info("🎉 Application {} pass vòng cuối, chuyển OFFERED", application.getId());
             } else {
                 roundRepository.findNextRound(round.getJobPostId(), round.getRoundNumber())
                         .ifPresent(nextRound -> {
                             log.info("➡️ Application {} pass vòng {}, tiếp tục vòng {}",
                                     application.getId(), round.getRoundNumber(), nextRound.getRoundNumber());
+
+                            // Tạo Interview PENDING cho vòng tiếp theo
+                            boolean alreadyExists = interviewRepository
+                                    .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(
+                                            application.getId(), nextRound.getId());
+                            if (!alreadyExists) {
+                                Interview interview = Interview.builder()
+                                        .applicationId(application.getId())
+                                        .roundId(nextRound.getId())
+                                        .status(InterviewStatus.PENDING.getValue())
+                                        .scheduledBy(userId) // hệ thống tự tạo, không có user cụ thể
+                                        .build();
+                                interviewRepository.save(interview);
+                            }
+
+                            // Chuyển status application sang INTERVIEWING
+                            application.setStatus(ApplicationStatus.INTERVIEWING.getValue());
+                            applicationRepository.save(application);
+
                             if (notifyCandidate) {
                                 log.info("📧 [TODO] Gửi email thông báo PASS + slot vòng tiếp cho application={}",
                                         application.getId());
@@ -965,6 +987,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .status(interview.getStatus())
                 .confirmedByCandidate(interview.getConfirmedByCandidate())
                 .interviewerNote(interview.getInterviewerNote())
+                .applicationStatus(application.getStatus())
                 .createdAt(interview.getCreatedAt())
                 .updatedAt(interview.getUpdatedAt())
                 .build();
