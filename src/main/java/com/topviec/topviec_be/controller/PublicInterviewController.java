@@ -71,4 +71,15 @@ public class PublicInterviewController {
             @PathVariable Long roundId) {
         return ResponseEntity.ok(interviewService.getRoundDetail(roundId));
     }
+
+    /**
+     * GET /interview-schedules/confirm-update?token=xxx
+     * UV click link từ email để xác nhận lịch PV NĐT vừa cập nhật (Public, không cần Auth).
+     */
+    @GetMapping("/confirm-update")
+    public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
+            @RequestParam String token) {
+        String message = interviewService.confirmUpdatedSchedule(token);
+        return ResponseEntity.ok(Map.of("message", message));
+    }
 }

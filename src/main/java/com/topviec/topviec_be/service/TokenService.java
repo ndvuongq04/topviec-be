@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 
 import com.topviec.topviec_be.dto.response.ReminderInfo;
-import com.topviec.topviec_be.service.impl.TokenServiceImpl;
 
 public interface TokenService {
     // Verify email
@@ -25,6 +24,12 @@ public interface TokenService {
     String verifyInterviewSlotToken(String token);
 
     void invalidateInterviewSlotToken(String token);
+
+    String generateInterviewUpdateToken(Long scheduleId, java.time.Duration ttl);
+
+    String verifyInterviewUpdateToken(String token);
+
+    void invalidateInterviewUpdateToken(String token);
 
     void storeReminderInfo(Long applicationId, Long roundId, LocalDateTime deadline, Duration ttl);
 

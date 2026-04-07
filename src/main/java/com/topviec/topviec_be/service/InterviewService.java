@@ -35,6 +35,9 @@ public interface InterviewService {
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
 
+        /** UV xác nhận lịch (public thông qua link email) */
+        String confirmUpdatedSchedule(String token);
+
         /** Danh sách lịch PV của 1 tin */
         List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
                         Long roundId, String status, String search);
