@@ -57,6 +57,9 @@ public interface InterviewService {
 
         ResInterviewHistoryDTO getInterviewHistory(Long applicationId, Long companyId);
 
+        /** Lấy lịch sử PV của UV (dành cho candidate) */
+        ResInterviewHistoryDTO getMyInterviewHistory(Long userId, Long applicationId);
+
         // ── Overdue ──────────────────────────────────────────────────────────────
 
         List<ResOverdueApplicationDTO> getOverdueApplications(Long jobPostId, Long companyId);

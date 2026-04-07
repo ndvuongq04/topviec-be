@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.service.InterviewService;
+import com.topviec.topviec_be.dto.response.ResInterviewHistoryDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewScheduleDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -46,5 +47,17 @@ public class PublicInterviewController {
             @AuthenticationPrincipal Jwt jwt) {
         Long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(interviewService.getMyInterviews(userId, applicationId));
+    }
+
+    /**
+     * GET /interview-schedules/applications/{applicationId}/history
+     * Lấy lịch sử phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     */
+    @GetMapping("/applications/{applicationId}/history")
+    public ResponseEntity<ResInterviewHistoryDTO> getMyInterviewHistory(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(interviewService.getMyInterviewHistory(userId, applicationId));
     }
 }
