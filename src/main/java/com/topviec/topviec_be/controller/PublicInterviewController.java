@@ -71,4 +71,17 @@ public class PublicInterviewController {
             @PathVariable Long roundId) {
         return ResponseEntity.ok(interviewService.getRoundDetail(roundId));
     }
+
+    /**
+     * PUT /interview-schedules/{scheduleId}/confirm
+     * UV xác nhận lịch PV (yêu cầu đăng nhập) - dùng khi lịch bị NĐT cập nhật hoặc cài đặt thủ công.
+     */
+    @PutMapping("/{scheduleId}/confirm")
+    public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        String message = interviewService.confirmUpdatedSchedule(scheduleId, userId);
+        return ResponseEntity.ok(Map.of("message", message));
+    }
 }

@@ -123,7 +123,7 @@ public class InterviewServiceImpl implements InterviewService {
     public ResInterviewRoundDTO getRoundDetail(Long roundId) {
         InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
-                
+
         return toRoundResponse(round);
     }
 
@@ -383,6 +383,28 @@ public class InterviewServiceImpl implements InterviewService {
         return "Xác nhận lịch phỏng vấn thành công!";
     }
 
+    @Override
+    @Transactional
+    public String confirmUpdatedSchedule(Long scheduleId, Long userId) {
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        Application application = interview.getApplication();
+        if (!application.getCandidateUserId().equals(userId)) {
+            throw AppException.forbidden("Bạn không có quyền xác nhận lịch phỏng vấn này");
+        }
+
+        if (!InterviewStatus.SCHEDULED.getValue().equals(interview.getStatus())) {
+            throw AppException.badRequest("Lịch phỏng vấn đang không ở trạng thái chờ xác nhận");
+        }
+
+        interview.setStatus(InterviewStatus.CONFIRMED.getValue());
+        interview.setConfirmedByCandidate(true);
+        interviewRepository.save(interview);
+
+        return "Xác nhận lịch phỏng vấn thành công!";
+    }
+
     // =========================================================================
     // Danh sách lịch PV
     // =========================================================================
@@ -418,7 +440,8 @@ public class InterviewServiceImpl implements InterviewService {
         Application application = applicationRepository.findByIdAndCandidateUserId(applicationId, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển của bạn"));
 
-        List<Interview> interviews = interviewRepository.findByApplicationIdAndDeletedAtIsNullOrderByRoundId(application.getId());
+        List<Interview> interviews = interviewRepository
+                .findByApplicationIdAndDeletedAtIsNullOrderByRoundId(application.getId());
 
         return interviews.stream().map(i -> {
             InterviewRound round = i.getRound();
@@ -459,7 +482,8 @@ public class InterviewServiceImpl implements InterviewService {
             interview.setInterviewerNote(request.getInterviewerNote());
         }
 
-        // Khi lên lịch mới (từ PENDING) hoặc đổi lịch đã có (SCHEDULED/CONFIRMED) → chuyển về SCHEDULED
+        // Khi lên lịch mới (từ PENDING) hoặc đổi lịch đã có (SCHEDULED/CONFIRMED) →
+        // chuyển về SCHEDULED
         // để UV xác nhận lại
         String currentStatus = interview.getStatus();
         if (InterviewStatus.PENDING.getValue().equals(currentStatus)
@@ -497,7 +521,9 @@ public class InterviewServiceImpl implements InterviewService {
                 String oldScheduleStr = oldScheduledAt != null ? oldScheduledAt.format(oldFormatter) : "";
 
                 DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
-                String newScheduleTimeStr = interview.getScheduledAt() != null ? interview.getScheduledAt().format(timeFormatter) : "";
+                String newScheduleTimeStr = interview.getScheduledAt() != null
+                        ? interview.getScheduledAt().format(timeFormatter)
+                        : "";
 
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 String dow = "";
@@ -505,26 +531,32 @@ public class InterviewServiceImpl implements InterviewService {
                     int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
                     dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
                 }
-                String newScheduleDateStr = dow + ", " + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+                String newScheduleDateStr = dow + ", "
+                        + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
 
                 String interviewTypeStr = "Phỏng vấn";
                 if (interview.getInterviewType() != null) {
                     try {
-                        interviewTypeStr = InterviewType.fromValue(interview.getInterviewType()).name(); // or predefined mapping
-                    } catch (Exception ignored) {}
+                        interviewTypeStr = InterviewType.fromValue(interview.getInterviewType()).name(); // or
+                                                                                                         // predefined
+                                                                                                         // mapping
+                    } catch (Exception ignored) {
+                    }
                 }
-                
-                String interviewLocation = interviewTypeStr + (interview.getLocation() != null ? " - " + interview.getLocation() : "");
+
+                String interviewLocation = interviewTypeStr
+                        + (interview.getLocation() != null ? " - " + interview.getLocation() : "");
 
                 String interviewerName = interview.getInterviewerNote();
                 if (interviewerName == null || interviewerName.isBlank()) {
                     interviewerName = "Ban Tuyển Dụng";
                 }
 
-                String confirmLink = "#"; 
+                String confirmLink = "#";
 
                 emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
-                        oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName, confirmLink);
+                        oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,
+                        confirmLink);
             }
         } catch (Exception e) {
             log.error("Lỗi khi gửi email thông báo cập nhật lịch PV cho schedule={}", scheduleId, e);
