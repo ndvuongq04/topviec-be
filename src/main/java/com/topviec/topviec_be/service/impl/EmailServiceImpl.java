@@ -71,6 +71,25 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Thay đổi phân quyền thành viên công ty", htmlBody);
     }
 
+    @Override
+    public void sendUpdateScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                        String oldSchedule, String newScheduleTime, String newScheduleDate,
+                                        String interviewLocation, String interviewerName, String confirmLink) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("oldSchedule", oldSchedule);
+        context.setVariable("newScheduleTime", newScheduleTime);
+        context.setVariable("newScheduleDate", newScheduleDate);
+        context.setVariable("interviewLocation", interviewLocation);
+        context.setVariable("interviewerName", interviewerName);
+        context.setVariable("confirmLink", confirmLink);
+
+        String htmlBody = templateEngine.process("email/update-schedule", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo thay đổi lịch phỏng vấn", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

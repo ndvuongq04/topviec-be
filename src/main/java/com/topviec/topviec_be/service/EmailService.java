@@ -15,4 +15,11 @@ public interface EmailService {
      * Thông báo thay đổi quyền (CN-NTT-019).
      */
     void sendPermissionChangedEmail(String toEmail, String companyName, String newRoleName);
+
+    /**
+     * Thông báo thay đổi lịch phỏng vấn (updateSchedule).
+     */
+    void sendUpdateScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                 String oldSchedule, String newScheduleTime, String newScheduleDate,
+                                 String interviewLocation, String interviewerName, String confirmLink);
 }

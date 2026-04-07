@@ -8,6 +8,7 @@ import com.topviec.topviec_be.enums.interview.*;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.*;
+import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +38,8 @@ public class InterviewServiceImpl implements InterviewService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final CvsRepository cvsRepository;
     private final TokenService tokenService;
+    private final EmailService emailService;
+    private final CompanyRepository companyRepository;
 
     // =========================================================================
     // Vòng phỏng vấn
@@ -437,6 +441,8 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Buổi phỏng vấn đã diễn ra, không thể sửa");
         }
 
+        LocalDateTime oldScheduledAt = interview.getScheduledAt();
+
         if (request.getScheduledAt() != null) {
             interview.setScheduledAt(request.getScheduledAt());
         }
@@ -466,7 +472,63 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setUpdatedBy(userId);
         interview = interviewRepository.save(interview);
 
-        log.info("📧 [TODO] Gửi email thông báo thay đổi lịch PV schedule={}", scheduleId);
+        log.info("📧 Gửi email thông báo thay đổi lịch PV schedule={}", scheduleId);
+
+        try {
+            Application application = interview.getApplication();
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+
+                String companyName = "Nhà tuyển dụng";
+                if (jobPosting != null) {
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null) {
+                        companyName = company.getName();
+                    }
+                }
+
+                DateTimeFormatter oldFormatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy");
+                String oldScheduleStr = oldScheduledAt != null ? oldScheduledAt.format(oldFormatter) : "";
+
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                String newScheduleTimeStr = interview.getScheduledAt() != null ? interview.getScheduledAt().format(timeFormatter) : "";
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dow = "";
+                if (interview.getScheduledAt() != null) {
+                    int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
+                    dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
+                }
+                String newScheduleDateStr = dow + ", " + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+
+                String interviewTypeStr = "Phỏng vấn";
+                if (interview.getInterviewType() != null) {
+                    try {
+                        interviewTypeStr = InterviewType.fromValue(interview.getInterviewType()).name(); // or predefined mapping
+                    } catch (Exception ignored) {}
+                }
+                
+                String interviewLocation = interviewTypeStr + (interview.getLocation() != null ? " - " + interview.getLocation() : "");
+
+                String interviewerName = interview.getInterviewerNote();
+                if (interviewerName == null || interviewerName.isBlank()) {
+                    interviewerName = "Ban Tuyển Dụng";
+                }
+
+                String confirmLink = "#"; 
+
+                emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
+                        oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName, confirmLink);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email thông báo cập nhật lịch PV cho schedule={}", scheduleId, e);
+        }
 
         return toScheduleResponse(interview, round, interview.getApplication());
     }
