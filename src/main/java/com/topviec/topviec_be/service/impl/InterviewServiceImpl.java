@@ -453,6 +453,16 @@ public class InterviewServiceImpl implements InterviewService {
             interview.setInterviewerNote(request.getInterviewerNote());
         }
 
+        // Khi lên lịch mới (từ PENDING) hoặc đổi lịch đã có (SCHEDULED/CONFIRMED) → chuyển về SCHEDULED
+        // để UV xác nhận lại
+        String currentStatus = interview.getStatus();
+        if (InterviewStatus.PENDING.getValue().equals(currentStatus)
+                || InterviewStatus.SCHEDULED.getValue().equals(currentStatus)
+                || InterviewStatus.CONFIRMED.getValue().equals(currentStatus)) {
+            interview.setStatus(InterviewStatus.SCHEDULED.getValue());
+            interview.setConfirmedByCandidate(false);
+        }
+
         interview.setUpdatedBy(userId);
         interview = interviewRepository.save(interview);
 
