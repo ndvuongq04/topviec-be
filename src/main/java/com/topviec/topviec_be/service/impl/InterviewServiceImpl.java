@@ -115,6 +115,15 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ResInterviewRoundDTO getRoundDetail(Long roundId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+                
+        return toRoundResponse(round);
+    }
+
+    @Override
     @Transactional
     public ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
             ReqUpdateInterviewRoundDTO request) {
@@ -400,6 +409,20 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ResInterviewScheduleDTO> getMyInterviews(Long userId, Long applicationId) {
+        Application application = applicationRepository.findByIdAndCandidateUserId(applicationId, userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển của bạn"));
+
+        List<Interview> interviews = interviewRepository.findByApplicationIdAndDeletedAtIsNullOrderByRoundId(application.getId());
+
+        return interviews.stream().map(i -> {
+            InterviewRound round = i.getRound();
+            return toScheduleResponse(i, round, application);
+        }).toList();
+    }
+
+    @Override
     @Transactional
     public ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
             ReqUpdateInterviewScheduleDTO request) {
@@ -536,6 +559,62 @@ public class InterviewServiceImpl implements InterviewService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
 
         findJobAndValidateOwnership(application.getJobPostId(), companyId);
+
+        List<InterviewRound> rounds = roundRepository
+                .findByJobPostIdAndDeletedAtIsNullOrderByRoundNumberAsc(application.getJobPostId());
+
+        List<Interview> interviews = interviewRepository
+                .findByApplicationIdAndDeletedAtIsNullOrderByRoundId(applicationId);
+
+        List<ResInterviewHistoryDTO.RoundHistory> roundHistories = new ArrayList<>();
+        for (InterviewRound round : rounds) {
+            ResInterviewHistoryDTO.RoundHistory.RoundHistoryBuilder builder = ResInterviewHistoryDTO.RoundHistory
+                    .builder()
+                    .roundNumber(round.getRoundNumber())
+                    .roundName(round.getRoundName())
+                    .isFinal(round.getIsFinal());
+
+            Interview interview = interviews.stream()
+                    .filter(i -> i.getRoundId().equals(round.getId()))
+                    .findFirst().orElse(null);
+
+            if (interview != null) {
+                builder.scheduleId(interview.getId())
+                        .scheduledAt(interview.getScheduledAt())
+                        .interviewType(interview.getInterviewType())
+                        .scheduleStatus(interview.getStatus());
+
+                resultRepository.findByInterviewId(interview.getId()).ifPresent(result -> {
+                    builder.result(result.getResult())
+                            .rating(result.getRating())
+                            .note(result.getNote())
+                            .evaluatedAt(result.getEvaluatedAt());
+                });
+            }
+
+            roundHistories.add(builder.build());
+        }
+
+        String candidateName = getCandidateName(application.getCandidateUserId());
+
+        String cvUrl = cvsRepository.findById(application.getCvId())
+                .map(cv -> cv.getFileUrl() != null ? cv.getFileUrl() : cv.getPdfUrl())
+                .orElse(null);
+
+        return ResInterviewHistoryDTO.builder()
+                .applicationId(applicationId)
+                .candidateName(candidateName)
+                .currentStatus(application.getStatus())
+                .cvUrl(cvUrl)
+                .rounds(roundHistories)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResInterviewHistoryDTO getMyInterviewHistory(Long userId, Long applicationId) {
+        Application application = applicationRepository.findByIdAndCandidateUserId(applicationId, userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển của bạn"));
 
         List<InterviewRound> rounds = roundRepository
                 .findByJobPostIdAndDeletedAtIsNullOrderByRoundNumberAsc(application.getJobPostId());

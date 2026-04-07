@@ -14,6 +14,9 @@ public interface InterviewService {
 
         List<ResInterviewRoundDTO> getRounds(Long jobPostId, Long companyId);
 
+        /** Lấy chi tiết 1 vòng PV (dành cho candidate / public) */
+        ResInterviewRoundDTO getRoundDetail(Long roundId);
+
         ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
                         ReqUpdateInterviewRoundDTO request);
 
@@ -36,6 +39,9 @@ public interface InterviewService {
         List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
                         Long roundId, String status, String search);
 
+        /** Lấy lịch PV của 1 đơn ứng tuyển (dành cho candidate) */
+        List<ResInterviewScheduleDTO> getMyInterviews(Long userId, Long applicationId);
+
         /** Sửa lịch PV */
         ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
                         ReqUpdateInterviewScheduleDTO request);
@@ -53,6 +59,9 @@ public interface InterviewService {
         // ── Lịch sử PV ──────────────────────────────────────────────────────────
 
         ResInterviewHistoryDTO getInterviewHistory(Long applicationId, Long companyId);
+
+        /** Lấy lịch sử PV của UV (dành cho candidate) */
+        ResInterviewHistoryDTO getMyInterviewHistory(Long userId, Long applicationId);
 
         // ── Overdue ──────────────────────────────────────────────────────────────
 
