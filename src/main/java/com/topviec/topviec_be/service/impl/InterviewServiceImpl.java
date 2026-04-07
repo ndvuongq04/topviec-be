@@ -400,6 +400,20 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ResInterviewScheduleDTO> getMyInterviews(Long userId, Long applicationId) {
+        Application application = applicationRepository.findByIdAndCandidateUserId(applicationId, userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển của bạn"));
+
+        List<Interview> interviews = interviewRepository.findByApplicationIdAndDeletedAtIsNullOrderByRoundId(application.getId());
+
+        return interviews.stream().map(i -> {
+            InterviewRound round = i.getRound();
+            return toScheduleResponse(i, round, application);
+        }).toList();
+    }
+
+    @Override
     @Transactional
     public ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
             ReqUpdateInterviewScheduleDTO request) {

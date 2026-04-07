@@ -36,6 +36,9 @@ public interface InterviewService {
         List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
                         Long roundId, String status, String search);
 
+        /** Lấy lịch PV của 1 đơn ứng tuyển (dành cho candidate) */
+        List<ResInterviewScheduleDTO> getMyInterviews(Long userId, Long applicationId);
+
         /** Sửa lịch PV */
         ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
                         ReqUpdateInterviewScheduleDTO request);

@@ -1,9 +1,14 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.service.InterviewService;
+import com.topviec.topviec_be.dto.response.ResInterviewScheduleDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 import java.util.Map;
 
@@ -29,5 +34,17 @@ public class PublicInterviewController {
 
         String message = interviewService.confirmSlot(token, slotId);
         return ResponseEntity.ok(Map.of("message", message));
+    }
+
+    /**
+     * GET /interview-schedules/applications/{applicationId}
+     * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     */
+    @GetMapping("/applications/{applicationId}")
+    public ResponseEntity<List<ResInterviewScheduleDTO>> getMyInterviews(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(interviewService.getMyInterviews(userId, applicationId));
     }
 }
