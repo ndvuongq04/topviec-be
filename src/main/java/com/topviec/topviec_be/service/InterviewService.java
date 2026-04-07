@@ -7,73 +7,73 @@ import java.util.List;
 
 public interface InterviewService {
 
-    // ── Vòng phỏng vấn ────────────────────────────────────────────────────────
+        // ── Vòng phỏng vấn ────────────────────────────────────────────────────────
 
-    ResInterviewRoundDTO createRound(Long jobPostId, Long userId, Long companyId,
-            ReqCreateInterviewRoundDTO request);
+        ResInterviewRoundDTO createRound(Long jobPostId, Long userId, Long companyId,
+                        ReqCreateInterviewRoundDTO request);
 
-    List<ResInterviewRoundDTO> getRounds(Long jobPostId, Long companyId);
+        List<ResInterviewRoundDTO> getRounds(Long jobPostId, Long companyId);
 
-    ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
-            ReqUpdateInterviewRoundDTO request);
+        ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
+                        ReqUpdateInterviewRoundDTO request);
 
-    void deleteRound(Long roundId, Long userId, Long companyId);
+        void deleteRound(Long roundId, Long userId, Long companyId);
 
-    // ── Lịch phỏng vấn ───────────────────────────────────────────────────────
+        // ── Lịch phỏng vấn ───────────────────────────────────────────────────────
 
-    /** Cách 1: NTT đặt lịch thủ công */
-    ResInterviewScheduleDTO createSchedule(Long roundId, Long userId, Long companyId,
-            ReqCreateInterviewScheduleDTO request);
+        /** Cách 1: NTT đặt lịch thủ công */
+        ResInterviewScheduleDTO createSchedule(Long roundId, Long userId, Long companyId,
+                        ReqCreateInterviewScheduleDTO request);
 
-    /** Cách 2: Tạo slot để UV chọn */
-    void createSlots(Long roundId, Long userId, Long companyId,
-            ReqCreateInterviewSlotsDTO request);
+        /** Cách 2: Tạo slot để UV chọn */
+        void createSlots(Long roundId, Long userId, Long companyId,
+                        ReqCreateInterviewSlotsDTO request);
 
-    /** UV xác nhận chọn slot (public, không cần auth) */
-    String confirmSlot(String token, Long slotId);
+        /** UV xác nhận chọn slot (public, không cần auth) */
+        String confirmSlot(String token, Long slotId);
 
-    /** Danh sách lịch PV của 1 tin */
-    List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
-            Long roundId, String status);
+        /** Danh sách lịch PV của 1 tin */
+        List<ResInterviewScheduleDTO> getSchedules(Long jobPostId, Long companyId,
+                        Long roundId, String status, String search);
 
-    /** Sửa lịch PV */
-    ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
-            ReqUpdateInterviewScheduleDTO request);
+        /** Sửa lịch PV */
+        ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
+                        ReqUpdateInterviewScheduleDTO request);
 
-    /** Hủy lịch PV */
-    void deleteSchedule(Long scheduleId, Long userId, Long companyId);
+        /** Hủy lịch PV */
+        void deleteSchedule(Long scheduleId, Long userId, Long companyId);
 
-    // ── Kết quả phỏng vấn ────────────────────────────────────────────────────
+        // ── Kết quả phỏng vấn ────────────────────────────────────────────────────
 
-    ResInterviewResultDTO createResult(Long scheduleId, Long userId, Long companyId,
-            ReqInterviewResultDTO request);
+        ResInterviewResultDTO createResult(Long scheduleId, Long userId, Long companyId,
+                        ReqInterviewResultDTO request);
 
-    ResInterviewResultDTO getResult(Long scheduleId, Long companyId);
+        ResInterviewResultDTO getResult(Long scheduleId, Long companyId);
 
-    // ── Lịch sử PV ──────────────────────────────────────────────────────────
+        // ── Lịch sử PV ──────────────────────────────────────────────────────────
 
-    ResInterviewHistoryDTO getInterviewHistory(Long applicationId, Long companyId);
+        ResInterviewHistoryDTO getInterviewHistory(Long applicationId, Long companyId);
 
-    // ── Overdue ──────────────────────────────────────────────────────────────
+        // ── Overdue ──────────────────────────────────────────────────────────────
 
-    List<ResOverdueApplicationDTO> getOverdueApplications(Long jobPostId, Long companyId);
+        List<ResOverdueApplicationDTO> getOverdueApplications(Long jobPostId, Long companyId);
 
-    void extendDeadline(Long applicationId, Long userId, Long companyId, ReqExtendDeadlineDTO request);
+        void extendDeadline(Long applicationId, Long userId, Long companyId, ReqExtendDeadlineDTO request);
 
-    ResInterviewScheduleDTO forceSchedule(Long applicationId, Long userId, Long companyId,
-            ReqForceScheduleDTO request);
+        ResInterviewScheduleDTO forceSchedule(Long applicationId, Long userId, Long companyId,
+                        ReqForceScheduleDTO request);
 
-    // ── Offer ────────────────────────────────────────────────────────────────
+        // ── Offer ────────────────────────────────────────────────────────────────
 
-    ResEmployerApplicationDTO updateOffer(Long applicationId, Long userId, Long companyId,
-            ReqOfferResultDTO request);
+        ResEmployerApplicationDTO updateOffer(Long applicationId, Long userId, Long companyId,
+                        ReqOfferResultDTO request);
 
-    // ── Job Posting interview phase ──────────────────────────────────────────
+        // ── Job Posting interview phase ──────────────────────────────────────────
 
-    ResInterviewReadinessDTO checkReadiness(Long jobPostId, Long companyId);
+        ResInterviewReadinessDTO checkReadiness(Long jobPostId, Long companyId);
 
-    void startInterviewing(Long jobPostId, Long userId, Long companyId);
+        void startInterviewing(Long jobPostId, Long userId, Long companyId);
 
-    void completeRecruitment(Long jobPostId, Long userId, Long companyId,
-            ReqCompleteRecruitmentDTO request);
+        void completeRecruitment(Long jobPostId, Long userId, Long companyId,
+                        ReqCompleteRecruitmentDTO request);
 }

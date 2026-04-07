@@ -4,9 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
-import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
-import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -387,53 +386,37 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional
-    public ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request) {
+    public ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request) {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
-        
+
         JobPosting job = application.getJobPosting();
         if (job == null || !job.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền sửa đơn ứng tuyển này");
         }
 
-        ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
-        ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
+            ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
 
-        if (!currentStatus.canTransitionTo(nextStatus)) {
-            throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+            if (!currentStatus.canTransitionTo(nextStatus)) {
+                throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+            }
+
+            application.setStatus(nextStatus.getValue());
+
+            if (nextStatus == ApplicationStatus.REJECTED) {
+                application.setRejectedAt(LocalDateTime.now());
+            } else if (nextStatus == ApplicationStatus.HIRED) {
+                application.setHiredAt(LocalDateTime.now());
+            }
         }
 
-        application.setStatus(nextStatus.getValue());
         if (request.getNote() != null) {
             application.setRecruiterNote(request.getNote());
         }
-
-        if (nextStatus == ApplicationStatus.REJECTED) {
-            application.setRejectedAt(LocalDateTime.now());
-        } else if (nextStatus == ApplicationStatus.HIRED) {
-            application.setHiredAt(LocalDateTime.now());
-        }
-
-        Application saved = applicationRepository.save(application);
-        return toEmployerResponse(saved);
-    }
-
-    @Override
-    @Transactional
-    public ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request) {
-        Application application = applicationRepository.findById(applicationId)
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
-        
-        JobPosting job = application.getJobPosting();
-        if (job == null || !job.getCompanyId().equals(companyId)) {
-            throw AppException.forbidden("Bạn không có quyền đánh giá đơn ứng tuyển này");
-        }
-
         if (request.getRating() != null) {
             application.setRecruiterRating(request.getRating());
-        }
-        if (request.getNote() != null) {
-            application.setRecruiterNote(request.getNote());
         }
         if (request.getTags() != null) {
             application.setRecruiterTags(request.getTags());

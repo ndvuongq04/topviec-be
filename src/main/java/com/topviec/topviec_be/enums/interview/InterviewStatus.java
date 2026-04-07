@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum InterviewStatus {
 
+    PENDING("pending"),
     SCHEDULED("scheduled"),
     CONFIRMED("confirmed"),
     COMPLETED("completed"),

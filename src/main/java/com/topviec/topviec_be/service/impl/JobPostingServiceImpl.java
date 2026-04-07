@@ -541,9 +541,10 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
-        // Batch query applicationCount và interviewRoundsCount nếu cần (chỉ dùng cho Employer)
+        // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ dùng cho Employer)
         Map<Long, Integer> appCountMap = new java.util.HashMap<>();
         Map<Long, Integer> interviewRoundsCountMap = new java.util.HashMap<>();
+        Map<Long, Integer> hiredCountMap = new java.util.HashMap<>();
         if (includeApplicationCount && !jobs.isEmpty()) {
             List<Long> jobIds = jobs.stream().map(JobPosting::getId).toList();
             applicationRepository.countByJobPostIds(jobIds).forEach(row -> {
@@ -555,6 +556,11 @@ public class JobPostingServiceImpl implements JobPostingService {
                 Long jobId = (Long) row[0];
                 Long count = (Long) row[1];
                 interviewRoundsCountMap.put(jobId, count.intValue());
+            });
+            applicationRepository.countHiredByJobPostIds(jobIds).forEach(row -> {
+                Long jobId = (Long) row[0];
+                Long count = (Long) row[1];
+                hiredCountMap.put(jobId, count.intValue());
             });
         }
 
@@ -570,6 +576,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .map(j -> toSummaryResponse(j, companyMap, industryMap, levelMap,
                         includeApplicationCount ? appCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? interviewRoundsCountMap.getOrDefault(j.getId(), 0) : null,
+                        includeApplicationCount ? hiredCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount))
                 .toList());
         return result;
@@ -581,6 +588,7 @@ public class JobPostingServiceImpl implements JobPostingService {
             Map<Long, Level> levelMap,
             Integer applicationCount,
             Integer interviewRoundsCount,
+            Integer hiredCount,
             boolean includeDeletedAt) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
@@ -618,6 +626,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .viewCount(j.getViewCount())
                 .applicationCount(applicationCount)
                 .interviewRoundsCount(interviewRoundsCount)
+                .headcount(j.getHeadcount())
+                .hiredCount(hiredCount)
                 .deadline(j.getDeadline())
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())

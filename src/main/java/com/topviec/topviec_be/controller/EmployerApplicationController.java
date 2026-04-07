@@ -1,7 +1,6 @@
 package com.topviec.topviec_be.controller;
 
-import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
-import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.ApplicationService;
@@ -60,32 +59,17 @@ public class EmployerApplicationController {
     }
 
     /**
-     * NTD cập nhật trạng thái CV ứng tuyển (ví dụ: interviewing, rejected, hired...).
+     * NTD cập nhật trạng thái và/hoặc đánh giá (cho điểm, ghi chú, gán tag) CV ứng tuyển.
      */
-    @PatchMapping("/{applicationId}/status")
-    public ResponseEntity<ResEmployerApplicationDTO> updateApplicationStatus(
+    @PatchMapping("/{applicationId}")
+    public ResponseEntity<ResEmployerApplicationDTO> updateApplication(
             @PathVariable Long applicationId,
-            @Valid @RequestBody ReqUpdateApplicationStatusDTO request) {
+            @Valid @RequestBody ReqUpdateApplicationDTO request) {
 
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
         return ResponseEntity.ok(
-                applicationService.changeApplicationStatus(userId, companyId, applicationId, request));
-    }
-
-    /**
-     * NTD đánh giá (cho điểm, ghi chú, gán tag) CV.
-     */
-    @PatchMapping("/{applicationId}/evaluate")
-    public ResponseEntity<ResEmployerApplicationDTO> evaluateApplication(
-            @PathVariable Long applicationId,
-            @Valid @RequestBody ReqEvaluateApplicationDTO request) {
-
-        Long userId = SecurityUtil.getCurrentUserId();
-        Long companyId = companyService.getCompanyIdByUserId(userId);
-
-        return ResponseEntity.ok(
-                applicationService.evaluateApplication(userId, companyId, applicationId, request));
+                applicationService.updateApplication(userId, companyId, applicationId, request));
     }
 }

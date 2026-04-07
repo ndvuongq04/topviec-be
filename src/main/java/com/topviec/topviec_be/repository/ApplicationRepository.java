@@ -129,4 +129,18 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
                         GROUP BY a.jobPostId
                         """)
         List<Object[]> countByJobPostIds(@Param("jobPostIds") List<Long> jobPostIds);
+
+        /**
+         * Batch đếm số offer thành công (status = 'hired') theo nhiều job.
+         * Trả về List<Object[]> gồm [jobPostId, count].
+         */
+        @Query("""
+                        SELECT a.jobPostId, COUNT(a)
+                        FROM Application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND a.status = 'hired'
+                        AND a.deletedAt IS NULL
+                        GROUP BY a.jobPostId
+                        """)
+        List<Object[]> countHiredByJobPostIds(@Param("jobPostIds") List<Long> jobPostIds);
 }

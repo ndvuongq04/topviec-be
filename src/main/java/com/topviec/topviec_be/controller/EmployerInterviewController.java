@@ -103,12 +103,13 @@ public class EmployerInterviewController {
     public ResponseEntity<List<ResInterviewScheduleDTO>> getSchedules(
             @PathVariable Long jobPostId,
             @RequestParam(required = false) Long roundId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
 
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
-        return ResponseEntity.ok(interviewService.getSchedules(jobPostId, companyId, roundId, status));
+        return ResponseEntity.ok(interviewService.getSchedules(jobPostId, companyId, roundId, status, search));
     }
 
     @PutMapping("/interview-schedules/{scheduleId}")
