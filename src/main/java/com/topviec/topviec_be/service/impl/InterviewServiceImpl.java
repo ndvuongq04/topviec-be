@@ -115,6 +115,15 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ResInterviewRoundDTO getRoundDetail(Long roundId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+                
+        return toRoundResponse(round);
+    }
+
+    @Override
     @Transactional
     public ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
             ReqUpdateInterviewRoundDTO request) {

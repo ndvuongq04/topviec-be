@@ -14,6 +14,9 @@ public interface InterviewService {
 
         List<ResInterviewRoundDTO> getRounds(Long jobPostId, Long companyId);
 
+        /** Lấy chi tiết 1 vòng PV (dành cho candidate / public) */
+        ResInterviewRoundDTO getRoundDetail(Long roundId);
+
         ResInterviewRoundDTO updateRound(Long roundId, Long userId, Long companyId,
                         ReqUpdateInterviewRoundDTO request);
 
