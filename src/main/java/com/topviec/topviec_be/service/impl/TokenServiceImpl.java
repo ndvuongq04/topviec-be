@@ -125,6 +125,33 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
+    public String generateInterviewUpdateToken(Long scheduleId, Duration ttl) {
+        String token = UUID.randomUUID().toString();
+        String key = "interview-update:" + token;
+        
+        redisTemplate.opsForValue().set(key, scheduleId.toString(), ttl);
+        return token;
+    }
+
+    @Override
+    public String verifyInterviewUpdateToken(String token) {
+        String key = "interview-update:" + token;
+        String payload = redisTemplate.opsForValue().get(key);
+
+        if (payload == null) {
+            throw AppException.badRequest("Link xác nhận đã hết hạn hoặc không hợp lệ");
+        }
+
+        return payload; // which is scheduleId
+    }
+
+    @Override
+    public void invalidateInterviewUpdateToken(String token) {
+        String key = "interview-update:" + token;
+        redisTemplate.delete(key);
+    }
+
+    @Override
     public void storeReminderInfo(Long applicationId, Long roundId, LocalDateTime deadline, Duration ttl) {
         String key = INTERVIEW_REMINDER_PREFIX + applicationId + ":" + roundId;
         // format: reminderCount:lastRemindedAt:deadline

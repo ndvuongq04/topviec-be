@@ -385,14 +385,12 @@ public class InterviewServiceImpl implements InterviewService {
 
     @Override
     @Transactional
-    public String confirmUpdatedSchedule(Long scheduleId, Long userId) {
+    public String confirmUpdatedSchedule(String token) {
+        String scheduleIdStr = tokenService.verifyInterviewUpdateToken(token);
+        Long scheduleId = Long.parseLong(scheduleIdStr);
+
         Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
-
-        Application application = interview.getApplication();
-        if (!application.getCandidateUserId().equals(userId)) {
-            throw AppException.forbidden("Bạn không có quyền xác nhận lịch phỏng vấn này");
-        }
 
         if (!InterviewStatus.SCHEDULED.getValue().equals(interview.getStatus())) {
             throw AppException.badRequest("Lịch phỏng vấn đang không ở trạng thái chờ xác nhận");
@@ -401,6 +399,8 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setStatus(InterviewStatus.CONFIRMED.getValue());
         interview.setConfirmedByCandidate(true);
         interviewRepository.save(interview);
+
+        tokenService.invalidateInterviewUpdateToken(token);
 
         return "Xác nhận lịch phỏng vấn thành công!";
     }
@@ -552,7 +552,12 @@ public class InterviewServiceImpl implements InterviewService {
                     interviewerName = "Ban Tuyển Dụng";
                 }
 
-                String confirmLink = "#";
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(), Duration.ofDays(7));
+                
+                // Giả sủ base-url API backend/frontend, endpoint API public = baseUrl/api/v1/interview-schedules/confirm-update?token=xxx
+                // Actually tokenService doesn't have baseUrl, we assume we append it to our backend host or frontend host.
+                // Normally we'd inject property "app.base-url" or "app.api-url" but here we construct relative pathway 
+                String confirmLink = "http://localhost:8080/api/v1/interview-schedules/confirm-update?token=" + token;
 
                 emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
                         oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,

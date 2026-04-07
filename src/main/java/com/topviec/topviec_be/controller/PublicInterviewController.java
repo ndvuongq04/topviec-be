@@ -73,15 +73,13 @@ public class PublicInterviewController {
     }
 
     /**
-     * PUT /interview-schedules/{scheduleId}/confirm
-     * UV xác nhận lịch PV (yêu cầu đăng nhập) - dùng khi lịch bị NĐT cập nhật hoặc cài đặt thủ công.
+     * GET /interview-schedules/confirm-update?token=xxx
+     * UV click link từ email để xác nhận lịch PV NĐT vừa cập nhật (Public, không cần Auth).
      */
-    @PutMapping("/{scheduleId}/confirm")
+    @GetMapping("/confirm-update")
     public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
-            @PathVariable Long scheduleId,
-            @AuthenticationPrincipal Jwt jwt) {
-        Long userId = Long.parseLong(jwt.getSubject());
-        String message = interviewService.confirmUpdatedSchedule(scheduleId, userId);
+            @RequestParam String token) {
+        String message = interviewService.confirmUpdatedSchedule(token);
         return ResponseEntity.ok(Map.of("message", message));
     }
 }
