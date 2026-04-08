@@ -61,9 +61,11 @@ app:
     verify-email-prefix: ${VERIFY_EMAIL_PREFIX:verify-email}
     reset-password-prefix: ${RESET_PASSWORD_PREFIX:reset-password}
     interview-reminder-prefix: ${INTERVIEW_REMINDER_PREFIX:interview:reminder:}
+    interview-update-ttl: ${INTERVIEW_UPDATE_TTL:7} # ngày
   base-url: ${APP_BASE_URL:http://localhost:5173}
   verify-email-url: ${APP_VERIFY_EMAIL_URL:http://localhost:5173/verify-email}
   reset-password-url: ${APP_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
+  confirm-interview-url: ${APP_CONFIRM_INTERVIEW_URL:http://localhost:5173/interview-confirm-update}
 
   # config cho Cloudinary
   cloudinary:

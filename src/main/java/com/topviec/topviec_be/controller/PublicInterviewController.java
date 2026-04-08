@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.service.InterviewService;
+import com.topviec.topviec_be.dto.response.ResConfirmUpdateInfoDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewHistoryDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewRoundDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewScheduleDTO;
@@ -73,10 +74,20 @@ public class PublicInterviewController {
     }
 
     /**
-     * GET /interview-schedules/confirm-update?token=xxx
-     * UV click link từ email để xác nhận lịch PV NĐT vừa cập nhật (Public, không cần Auth).
+     * GET /interview-schedules/confirm-update/info?token=xxx
+     * Lấy thông tin lịch PV để FE hiển thị trước khi UV xác nhận (Public, không cần Auth).
      */
-    @GetMapping("/confirm-update")
+    @GetMapping("/confirm-update/info")
+    public ResponseEntity<ResConfirmUpdateInfoDTO> getConfirmUpdateInfo(
+            @RequestParam String token) {
+        return ResponseEntity.ok(interviewService.getConfirmUpdateInfo(token));
+    }
+
+    /**
+     * PATCH /interview-schedules/confirm-update?token=xxx
+     * UV xác nhận lịch PV NTT vừa cập nhật (Public, không cần Auth).
+     */
+    @PatchMapping("/confirm-update")
     public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
             @RequestParam String token) {
         String message = interviewService.confirmUpdatedSchedule(token);

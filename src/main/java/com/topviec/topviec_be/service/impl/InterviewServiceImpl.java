@@ -13,6 +13,7 @@ import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,15 @@ public class InterviewServiceImpl implements InterviewService {
     private final TokenService tokenService;
     private final EmailService emailService;
     private final CompanyRepository companyRepository;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
+
+    @Value("${app.confirm-interview-url}")
+    private String confirmInterviewUrl;
+
+    @Value("${app.token.interview-update-ttl}")
+    private long interviewUpdateTtlDays;
 
     // =========================================================================
     // Vòng phỏng vấn
@@ -384,6 +394,46 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token) {
+        String scheduleIdStr = tokenService.verifyInterviewUpdateToken(token);
+        Long scheduleId = Long.parseLong(scheduleIdStr);
+
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        InterviewRound round = interview.getRound();
+
+        String jobTitle = "Vị trí ứng tuyển";
+        String companyName = "Nhà tuyển dụng";
+        if (round != null) {
+            JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+            if (jobPosting != null) {
+                jobTitle = jobPosting.getTitle();
+                Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                if (company != null) {
+                    companyName = company.getName();
+                }
+            }
+        }
+
+        return ResConfirmUpdateInfoDTO.builder()
+                .scheduleId(interview.getId())
+                .companyName(companyName)
+                .jobTitle(jobTitle)
+                .roundNumber(round != null ? round.getRoundNumber() : null)
+                .roundName(round != null ? round.getRoundName() : null)
+                .scheduledAt(interview.getScheduledAt())
+                .durationMinutes(interview.getDurationMinutes())
+                .interviewType(interview.getInterviewType())
+                .location(interview.getLocation())
+                .meetingLink(interview.getMeetingLink())
+                .status(interview.getStatus())
+                .confirmedByCandidate(interview.getConfirmedByCandidate())
+                .build();
+    }
+
+    @Override
     @Transactional
     public String confirmUpdatedSchedule(String token) {
         String scheduleIdStr = tokenService.verifyInterviewUpdateToken(token);
@@ -552,12 +602,9 @@ public class InterviewServiceImpl implements InterviewService {
                     interviewerName = "Ban Tuyển Dụng";
                 }
 
-                String token = tokenService.generateInterviewUpdateToken(interview.getId(), Duration.ofDays(7));
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(), Duration.ofDays(interviewUpdateTtlDays));
                 
-                // Giả sủ base-url API backend/frontend, endpoint API public = baseUrl/api/v1/interview-schedules/confirm-update?token=xxx
-                // Actually tokenService doesn't have baseUrl, we assume we append it to our backend host or frontend host.
-                // Normally we'd inject property "app.base-url" or "app.api-url" but here we construct relative pathway 
-                String confirmLink = "http://localhost:8080/api/v1/interview-schedules/confirm-update?token=" + token;
+                String confirmLink = confirmInterviewUrl + "?token=" + token;
 
                 emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
                         oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,

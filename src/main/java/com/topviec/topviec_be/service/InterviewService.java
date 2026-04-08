@@ -35,6 +35,9 @@ public interface InterviewService {
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
 
+        /** Lấy thông tin lịch PV qua token để FE hiển thị trước khi UV xác nhận */
+        ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token);
+
         /** UV xác nhận lịch (public thông qua link email) */
         String confirmUpdatedSchedule(String token);
 
