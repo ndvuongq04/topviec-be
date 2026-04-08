@@ -253,7 +253,6 @@ public class InterviewServiceImpl implements InterviewService {
 
         softDeleteExistingInterview(application.getId(), roundId, userId);
 
-        // Bỏ reminderCount — đã xóa khỏi entity Interview
         Interview interview = Interview.builder()
                 .applicationId(application.getId())
                 .roundId(roundId)
@@ -622,8 +621,9 @@ public class InterviewServiceImpl implements InterviewService {
                     interviewerName = "Ban Tuyển Dụng";
                 }
 
-                String token = tokenService.generateInterviewUpdateToken(interview.getId(), Duration.ofDays(interviewUpdateTtlDays));
-                
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(),
+                        Duration.ofDays(interviewUpdateTtlDays));
+
                 String confirmLink = confirmInterviewUrl + "?token=" + token;
 
                 emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
@@ -673,12 +673,14 @@ public class InterviewServiceImpl implements InterviewService {
                 String companyName = "Nhà tuyển dụng";
                 if (jobPosting != null) {
                     Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
-                    if (company != null) companyName = company.getName();
+                    if (company != null)
+                        companyName = company.getName();
                 }
 
                 DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
                 String scheduledTime = interview.getScheduledAt() != null
-                        ? interview.getScheduledAt().format(timeFormatter) : "";
+                        ? interview.getScheduledAt().format(timeFormatter)
+                        : "";
 
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 String dow = "";
@@ -690,7 +692,8 @@ public class InterviewServiceImpl implements InterviewService {
                         + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
 
                 String roundName = round != null
-                        ? "Vòng " + round.getRoundNumber() + (round.getRoundName() != null ? " - " + round.getRoundName() : "")
+                        ? "Vòng " + round.getRoundNumber()
+                                + (round.getRoundName() != null ? " - " + round.getRoundName() : "")
                         : "Vòng phỏng vấn";
 
                 emailService.sendCancelScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
@@ -1168,33 +1171,38 @@ public class InterviewServiceImpl implements InterviewService {
             InterviewResultStatus resultStatus, boolean notifyCandidate, long userId,
             Integer rating, String note) {
 
-        if (resultStatus == InterviewResultStatus.FAIL) {
+        boolean passed = resultStatus == InterviewResultStatus.PASS;
+        String roundName = "Vòng " + round.getRoundNumber()
+                + (round.getRoundName() != null ? " - " + round.getRoundName() : "");
+
+        // Gửi email kết quả nếu NTT chọn thông báo UV
+        if (notifyCandidate) {
+            log.info("📧 Gửi email kết quả PV ({}) cho application={}", passed ? "PASS" : "FAIL", application.getId());
+            try {
+                User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+                if (candidateUser != null) {
+                    String candidateName = getCandidateName(application.getCandidateUserId());
+                    JobPosting jobPosting = jobPostingRepository.findById(application.getJobPostId()).orElse(null);
+                    String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+                    String companyName = "Nhà tuyển dụng";
+                    if (jobPosting != null) {
+                        Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                        if (company != null)
+                            companyName = company.getName();
+                    }
+                    emailService.sendInterviewResultEmail(candidateUser.getEmail(), candidateName,
+                            companyName, jobTitle, roundName, passed, rating, note);
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi email kết quả PV cho application={}", application.getId(), e);
+            }
+        }
+
+        if (!passed) {
             application.setStatus(ApplicationStatus.REJECTED.getValue());
             application.setRejectedAt(LocalDateTime.now());
             applicationRepository.save(application);
-            if (notifyCandidate) {
-                log.info("📧 Gửi email thông báo FAIL cho application={}", application.getId());
-                try {
-                    User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
-                    if (candidateUser != null) {
-                        String candidateName = getCandidateName(application.getCandidateUserId());
-                        JobPosting jobPosting = jobPostingRepository.findById(application.getJobPostId()).orElse(null);
-                        String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
-                        String companyName = "Nhà tuyển dụng";
-                        if (jobPosting != null) {
-                            Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
-                            if (company != null) companyName = company.getName();
-                        }
-                        String roundName = "Vòng " + round.getRoundNumber()
-                                + (round.getRoundName() != null ? " - " + round.getRoundName() : "");
-                        emailService.sendFailInterviewEmail(candidateUser.getEmail(), candidateName,
-                                companyName, jobTitle, roundName, rating, note);
-                    }
-                } catch (Exception e) {
-                    log.error("Lỗi khi gửi email thông báo FAIL cho application={}", application.getId(), e);
-                }
-            }
-        } else if (resultStatus == InterviewResultStatus.PASS) {
+        } else {
             if (Boolean.TRUE.equals(round.getIsFinal())) {
                 // application.setStatus(ApplicationStatus.OFFERED.getValue());
                 // applicationRepository.save(application);
@@ -1205,7 +1213,6 @@ public class InterviewServiceImpl implements InterviewService {
                             log.info("➡️ Application {} pass vòng {}, tiếp tục vòng {}",
                                     application.getId(), round.getRoundNumber(), nextRound.getRoundNumber());
 
-                            // Tạo Interview PENDING cho vòng tiếp theo
                             boolean alreadyExists = interviewRepository
                                     .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(
                                             application.getId(), nextRound.getId());
@@ -1214,19 +1221,13 @@ public class InterviewServiceImpl implements InterviewService {
                                         .applicationId(application.getId())
                                         .roundId(nextRound.getId())
                                         .status(InterviewStatus.PENDING.getValue())
-                                        .scheduledBy(userId) // hệ thống tự tạo, không có user cụ thể
+                                        .scheduledBy(userId)
                                         .build();
                                 interviewRepository.save(interview);
                             }
 
-                            // Chuyển status application sang INTERVIEWING
                             application.setStatus(ApplicationStatus.INTERVIEWING.getValue());
                             applicationRepository.save(application);
-
-                            if (notifyCandidate) {
-                                log.info("📧 [TODO] Gửi email thông báo PASS + slot vòng tiếp cho application={}",
-                                        application.getId());
-                            }
                         });
             }
         }

@@ -30,8 +30,8 @@ public interface EmailService {
                                  String scheduledTime, String scheduledDate, String roundName);
 
     /**
-     * Thông báo UV không đạt (createResult - FAIL).
+     * Thông báo kết quả phỏng vấn cho UV (PASS hoặc FAIL).
      */
-    void sendFailInterviewEmail(String toEmail, String candidateName, String companyName, String jobTitle,
-                                String roundName, Integer rating, String note);
+    void sendInterviewResultEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                  String roundName, boolean passed, Integer rating, String note);
 }

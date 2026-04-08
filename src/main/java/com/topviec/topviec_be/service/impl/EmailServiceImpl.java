@@ -106,17 +106,18 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendFailInterviewEmail(String toEmail, String candidateName, String companyName, String jobTitle,
-                                       String roundName, Integer rating, String note) {
+    public void sendInterviewResultEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                         String roundName, boolean passed, Integer rating, String note) {
         Context context = new Context();
         context.setVariable("candidateName", candidateName);
         context.setVariable("companyName", companyName);
         context.setVariable("jobTitle", jobTitle);
         context.setVariable("roundName", roundName);
+        context.setVariable("passed", passed);
         context.setVariable("rating", rating);
         context.setVariable("note", note);
 
-        String htmlBody = templateEngine.process("email/fail-interview", context);
+        String htmlBody = templateEngine.process("email/interview-result", context);
         sendHtmlEmail(toEmail, "[Topviec] Thông báo kết quả phỏng vấn", htmlBody);
     }
 
