@@ -41,7 +41,8 @@ public class PublicInterviewController {
 
     /**
      * GET /interview-schedules/applications/{applicationId}
-     * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu
+     * đăng nhập)
      */
     @GetMapping("/applications/{applicationId}")
     public ResponseEntity<List<ResInterviewScheduleDTO>> getMyInterviews(
@@ -53,7 +54,8 @@ public class PublicInterviewController {
 
     /**
      * GET /interview-schedules/applications/{applicationId}/history
-     * Lấy lịch sử phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     * Lấy lịch sử phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng
+     * nhập)
      */
     @GetMapping("/applications/{applicationId}/history")
     public ResponseEntity<ResInterviewHistoryDTO> getMyInterviewHistory(
@@ -74,8 +76,22 @@ public class PublicInterviewController {
     }
 
     /**
+     * PATCH /interview-schedules/{scheduleId}/confirm
+     * UV đã đăng nhập xác nhận lịch PV trực tiếp trên hệ thống (yêu cầu đăng nhập).
+     */
+    @PatchMapping("/{scheduleId}/confirm")
+    public ResponseEntity<Map<String, String>> confirmScheduleByCandidate(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        String message = interviewService.confirmScheduleByCandidate(scheduleId, userId);
+        return ResponseEntity.ok(Map.of("message", message));
+    }
+
+    /**
      * GET /interview-schedules/confirm-update/info?token=xxx
-     * Lấy thông tin lịch PV để FE hiển thị trước khi UV xác nhận (Public, không cần Auth).
+     * Lấy thông tin lịch PV để FE hiển thị trước khi UV xác nhận (Public, không cần
+     * Auth).
      */
     @GetMapping("/confirm-update/info")
     public ResponseEntity<ResConfirmUpdateInfoDTO> getConfirmUpdateInfo(

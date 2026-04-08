@@ -394,6 +394,26 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     @Override
+    @Transactional
+    public String confirmScheduleByCandidate(Long scheduleId, Long userId) {
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        applicationRepository.findByIdAndCandidateUserId(interview.getApplicationId(), userId)
+                .orElseThrow(() -> AppException.forbidden("Bạn không có quyền xác nhận lịch phỏng vấn này"));
+
+        if (!InterviewStatus.SCHEDULED.getValue().equals(interview.getStatus())) {
+            throw AppException.badRequest("Lịch phỏng vấn đang không ở trạng thái chờ xác nhận");
+        }
+
+        interview.setStatus(InterviewStatus.CONFIRMED.getValue());
+        interview.setConfirmedByCandidate(true);
+        interviewRepository.save(interview);
+
+        return "Xác nhận lịch phỏng vấn thành công!";
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token) {
         String scheduleIdStr = tokenService.verifyInterviewUpdateToken(token);

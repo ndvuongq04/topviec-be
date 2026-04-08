@@ -38,6 +38,9 @@ public interface InterviewService {
         /** Lấy thông tin lịch PV qua token để FE hiển thị trước khi UV xác nhận */
         ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token);
 
+        /** UV đã đăng nhập xác nhận lịch trực tiếp trên hệ thống */
+        String confirmScheduleByCandidate(Long scheduleId, Long userId);
+
         /** UV xác nhận lịch (public thông qua link email) */
         String confirmUpdatedSchedule(String token);
 
