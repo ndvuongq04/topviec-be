@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +26,7 @@ public class ReqCreateInterviewSlotsDTO {
 
     @Valid
     @NotEmpty(message = "Cần ít nhất 1 slot thời gian")
-    @Size(min = 3, max = 5, message = "Số lượng slot phải từ 3 đến 5")
+    @Size(min = 2, message = "Cần ít nhất 2 slot thời gian")
     private List<SlotDTO> slots;
 
     @Getter
@@ -34,8 +35,15 @@ public class ReqCreateInterviewSlotsDTO {
     @AllArgsConstructor
     @Builder
     public static class SlotDTO {
-        @NotNull(message = "Thời gian slot không được trống")
-        private LocalDateTime proposedAt;
+        @NotNull(message = "Giờ bắt đầu không được trống")
+        private LocalDateTime startTime;
+
+        @NotNull(message = "Giờ kết thúc không được trống")
+        private LocalDateTime endTime;
+
+        @NotNull(message = "Số ứng viên tối đa không được trống")
+        @Min(value = 1, message = "Số ứng viên tối đa phải ít nhất là 1")
+        private Integer maxCandidates;
 
         @NotBlank(message = "Loại phỏng vấn không được trống")
         private String interviewType;
@@ -43,5 +51,7 @@ public class ReqCreateInterviewSlotsDTO {
         private String location;
 
         private String meetingLink;
+
+        private String interviewerName;
     }
 }

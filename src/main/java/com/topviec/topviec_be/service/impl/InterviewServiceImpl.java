@@ -292,20 +292,21 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Deadline phải là thời gian trong tương lai");
         }
 
-        // Check duplicate: slot đã tồn tại cho round này chưa
-        boolean alreadyHasSlots = slotRepository.existsByRoundId(roundId);
-        if (alreadyHasSlots) {
-            throw AppException.badRequest("Vòng phỏng vấn này đã có slot rồi");
-        }
-
         // Tạo slots 1 lần cho round — không còn loop theo UV
         for (ReqCreateInterviewSlotsDTO.SlotDTO slotDto : request.getSlots()) {
+            if (slotDto.getEndTime().isBefore(slotDto.getStartTime()) ||
+                    slotDto.getEndTime().isEqual(slotDto.getStartTime())) {
+                throw AppException.badRequest("Giờ kết thúc phải sau giờ bắt đầu");
+            }
             InterviewSlot slot = InterviewSlot.builder()
                     .roundId(roundId)
-                    .proposedAt(slotDto.getProposedAt())
+                    .startTime(slotDto.getStartTime())
+                    .endTime(slotDto.getEndTime())
                     .interviewType(slotDto.getInterviewType())
                     .location(slotDto.getLocation())
                     .meetingLink(slotDto.getMeetingLink())
+                    .maxCandidates(slotDto.getMaxCandidates())
+                    .interviewerName(slotDto.getInterviewerName())
                     .build();
             slotRepository.save(slot);
         }
@@ -330,6 +331,34 @@ public class InterviewServiceImpl implements InterviewService {
 
             log.info("📧 [TODO] Gửi email slot cho application={}, round={}, token={}", applicationId, roundId, token);
         }
+    }
+
+    // =========================================================================
+    // Lấy danh sách slot của 1 vòng PV
+    // =========================================================================
+
+    @Override
+    public List<ResInterviewSlotDTO> getSlots(Long roundId, Long companyId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        findJobAndValidateOwnership(round.getJobPostId(), companyId);
+
+        return slotRepository.findByRoundIdOrderByStartTimeAsc(roundId).stream()
+                .map(slot -> ResInterviewSlotDTO.builder()
+                        .id(slot.getId())
+                        .roundId(slot.getRoundId())
+                        .startTime(slot.getStartTime())
+                        .endTime(slot.getEndTime())
+                        .interviewType(slot.getInterviewType())
+                        .location(slot.getLocation())
+                        .meetingLink(slot.getMeetingLink())
+                        .interviewerName(slot.getInterviewerName())
+                        .maxCandidates(slot.getMaxCandidates())
+                        .registeredCount(slot.getRegisteredCount())
+                        .createdAt(slot.getCreatedAt())
+                        .build())
+                .toList();
     }
 
     // =========================================================================
@@ -360,13 +389,18 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
         }
 
+        // Kiểm tra slot còn chỗ không
+        if (slot.getRegisteredCount() >= slot.getMaxCandidates()) {
+            throw AppException.badRequest("Ca phỏng vấn này đã đủ số lượng ứng viên");
+        }
+
         // Tạo Interview record — bỏ reminderCount, không còn update isSelected trên
         // slot
         Interview interview = Interview.builder()
                 .applicationId(tokenApplicationId)
                 .roundId(tokenRoundId)
                 .slotId(slot.getId())
-                .scheduledAt(slot.getProposedAt())
+                .scheduledAt(slot.getStartTime())
                 .interviewType(slot.getInterviewType())
                 .location(slot.getLocation())
                 .meetingLink(slot.getMeetingLink())
@@ -376,6 +410,10 @@ public class InterviewServiceImpl implements InterviewService {
                 .build();
 
         interviewRepository.save(interview);
+
+        // Tăng registeredCount của slot
+        slot.setRegisteredCount(slot.getRegisteredCount() + 1);
+        slotRepository.save(slot);
 
         Application application = applicationRepository.findById(tokenApplicationId).orElse(null);
         if (application != null) {

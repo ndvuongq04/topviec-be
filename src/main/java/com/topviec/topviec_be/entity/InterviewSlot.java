@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "interview_slots", uniqueConstraints = @UniqueConstraint(columnNames = { "round_id", "proposed_at" }))
+@Table(name = "interview_slots", uniqueConstraints = @UniqueConstraint(columnNames = { "round_id", "start_time" }))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,8 +20,11 @@ public class InterviewSlot {
     @Column(name = "round_id", nullable = false)
     private Long roundId;
 
-    @Column(name = "proposed_at", nullable = false)
-    private LocalDateTime proposedAt;
+    @Column(name = "start_time", nullable = false)
+    private LocalDateTime startTime;
+
+    @Column(name = "end_time", nullable = false)
+    private LocalDateTime endTime;
 
     @Column(name = "interview_type", nullable = false, length = 20)
     private String interviewType;
@@ -31,6 +34,16 @@ public class InterviewSlot {
 
     @Column(name = "meeting_link", columnDefinition = "TEXT")
     private String meetingLink;
+
+    @Column(name = "max_candidates", nullable = false)
+    private Integer maxCandidates;
+
+    @Column(name = "interviewer_name", length = 100)
+    private String interviewerName;
+
+    @Builder.Default
+    @Column(name = "registered_count", nullable = false)
+    private Integer registeredCount = 0;
 
     // ── Relations ─────────────────────────────────────────────────────────────
 

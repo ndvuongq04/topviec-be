@@ -32,6 +32,9 @@ public interface InterviewService {
         void createSlots(Long roundId, Long userId, Long companyId,
                         ReqCreateInterviewSlotsDTO request);
 
+        /** Lấy danh sách slot của 1 vòng PV */
+        List<ResInterviewSlotDTO> getSlots(Long roundId, Long companyId);
+
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
 

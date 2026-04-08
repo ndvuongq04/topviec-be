@@ -87,6 +87,16 @@ public class EmployerInterviewController {
                 .body(interviewService.createSchedule(roundId, userId, companyId, request));
     }
 
+    @GetMapping("/interview-rounds/{roundId}/schedule-slots")
+    public ResponseEntity<List<ResInterviewSlotDTO>> getSlots(
+            @PathVariable Long roundId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(interviewService.getSlots(roundId, companyId));
+    }
+
     @PostMapping("/interview-rounds/{roundId}/schedule-slots")
     public ResponseEntity<Void> createSlots(
             @PathVariable Long roundId,

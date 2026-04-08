@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface InterviewSlotRepository extends JpaRepository<InterviewSlot, Long> {
 
 
+    List<InterviewSlot> findByRoundIdOrderByStartTimeAsc(Long roundId);
+
     boolean existsByRoundId(Long id);
 
     @Modifying
