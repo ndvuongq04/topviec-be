@@ -28,4 +28,10 @@ public interface EmailService {
      */
     void sendCancelScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
                                  String scheduledTime, String scheduledDate, String roundName);
+
+    /**
+     * Thông báo UV không đạt (createResult - FAIL).
+     */
+    void sendFailInterviewEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                String roundName, Integer rating, String note);
 }

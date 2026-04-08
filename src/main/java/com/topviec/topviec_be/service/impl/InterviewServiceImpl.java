@@ -745,7 +745,7 @@ public class InterviewServiceImpl implements InterviewService {
         Application application = applicationRepository.findById(interview.getApplicationId()).orElse(null);
         if (application != null) {
             handlePostResult(application, round, resultStatus, Boolean.TRUE.equals(request.getNotifyCandidate()),
-                    userId);
+                    userId, request.getRating(), request.getNote());
         }
 
         return toResultResponse(result);
@@ -1165,14 +1165,34 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private void handlePostResult(Application application, InterviewRound round,
-            InterviewResultStatus resultStatus, boolean notifyCandidate, long userId) {
+            InterviewResultStatus resultStatus, boolean notifyCandidate, long userId,
+            Integer rating, String note) {
 
         if (resultStatus == InterviewResultStatus.FAIL) {
             application.setStatus(ApplicationStatus.REJECTED.getValue());
             application.setRejectedAt(LocalDateTime.now());
             applicationRepository.save(application);
             if (notifyCandidate) {
-                log.info("📧 [TODO] Gửi email thông báo FAIL cho application={}", application.getId());
+                log.info("📧 Gửi email thông báo FAIL cho application={}", application.getId());
+                try {
+                    User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+                    if (candidateUser != null) {
+                        String candidateName = getCandidateName(application.getCandidateUserId());
+                        JobPosting jobPosting = jobPostingRepository.findById(application.getJobPostId()).orElse(null);
+                        String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+                        String companyName = "Nhà tuyển dụng";
+                        if (jobPosting != null) {
+                            Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                            if (company != null) companyName = company.getName();
+                        }
+                        String roundName = "Vòng " + round.getRoundNumber()
+                                + (round.getRoundName() != null ? " - " + round.getRoundName() : "");
+                        emailService.sendFailInterviewEmail(candidateUser.getEmail(), candidateName,
+                                companyName, jobTitle, roundName, rating, note);
+                    }
+                } catch (Exception e) {
+                    log.error("Lỗi khi gửi email thông báo FAIL cho application={}", application.getId(), e);
+                }
             }
         } else if (resultStatus == InterviewResultStatus.PASS) {
             if (Boolean.TRUE.equals(round.getIsFinal())) {

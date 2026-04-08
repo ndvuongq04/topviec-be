@@ -105,6 +105,21 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Thông báo hủy lịch phỏng vấn", htmlBody);
     }
 
+    @Override
+    public void sendFailInterviewEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                       String roundName, Integer rating, String note) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("roundName", roundName);
+        context.setVariable("rating", rating);
+        context.setVariable("note", note);
+
+        String htmlBody = templateEngine.process("email/fail-interview", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo kết quả phỏng vấn", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {
