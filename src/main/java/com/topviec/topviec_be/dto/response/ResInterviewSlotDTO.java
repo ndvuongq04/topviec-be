@@ -12,6 +12,7 @@ public class ResInterviewSlotDTO {
 
     private Long id;
     private Long roundId;
+    private LocalDateTime slotDeadline;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String interviewType;

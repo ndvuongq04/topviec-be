@@ -38,6 +38,9 @@ public class InterviewRound {
     @Column(name = "is_final", nullable = false)
     private Boolean isFinal;
 
+    @Column(name = "slot_deadline")
+    private LocalDateTime slotDeadline;
+
     // ── Relations ─────────────────────────────────────────────────────────────
 
     @ManyToOne(fetch = FetchType.LAZY)

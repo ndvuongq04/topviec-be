@@ -292,6 +292,10 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Deadline phải là thời gian trong tương lai");
         }
 
+        // Lưu hạn chót vào round
+        round.setSlotDeadline(request.getDeadline());
+        roundRepository.save(round);
+
         // Tạo slots 1 lần cho round — không còn loop theo UV
         for (ReqCreateInterviewSlotsDTO.SlotDTO slotDto : request.getSlots()) {
             if (slotDto.getEndTime().isBefore(slotDto.getStartTime()) ||
@@ -348,6 +352,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .map(slot -> ResInterviewSlotDTO.builder()
                         .id(slot.getId())
                         .roundId(slot.getRoundId())
+                        .slotDeadline(round.getSlotDeadline())
                         .startTime(slot.getStartTime())
                         .endTime(slot.getEndTime())
                         .interviewType(slot.getInterviewType())
@@ -1312,6 +1317,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .description(round.getDescription())
                 .expectedDuration(round.getExpectedDuration())
                 .isFinal(round.getIsFinal())
+                .slotDeadline(round.getSlotDeadline())
                 .interviewers(interviewers.stream()
                         .map(i -> ResInterviewRoundDTO.InterviewerInfo.builder()
                                 .id(i.getId())
