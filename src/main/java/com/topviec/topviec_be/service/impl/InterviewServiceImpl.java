@@ -657,7 +657,48 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setUpdatedBy(userId);
         interviewRepository.save(interview);
 
-        log.info("📧 [TODO] Gửi email thông báo hủy lịch PV schedule={}", scheduleId);
+        log.info("📧 Gửi email thông báo hủy lịch PV schedule={}", scheduleId);
+
+        try {
+            Application application = interview.getApplication();
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+
+                String companyName = "Nhà tuyển dụng";
+                if (jobPosting != null) {
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null) companyName = company.getName();
+                }
+
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                String scheduledTime = interview.getScheduledAt() != null
+                        ? interview.getScheduledAt().format(timeFormatter) : "";
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dow = "";
+                if (interview.getScheduledAt() != null) {
+                    int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
+                    dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
+                }
+                String scheduledDate = dow + ", "
+                        + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+
+                String roundName = round != null
+                        ? "Vòng " + round.getRoundNumber() + (round.getRoundName() != null ? " - " + round.getRoundName() : "")
+                        : "Vòng phỏng vấn";
+
+                emailService.sendCancelScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
+                        scheduledTime, scheduledDate, roundName);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email thông báo hủy lịch PV cho schedule={}", scheduleId, e);
+        }
     }
 
     // =========================================================================

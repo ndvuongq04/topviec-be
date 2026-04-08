@@ -90,6 +90,21 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Thông báo thay đổi lịch phỏng vấn", htmlBody);
     }
 
+    @Override
+    public void sendCancelScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                        String scheduledTime, String scheduledDate, String roundName) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("scheduledTime", scheduledTime);
+        context.setVariable("scheduledDate", scheduledDate);
+        context.setVariable("roundName", roundName);
+
+        String htmlBody = templateEngine.process("email/cancel-schedule", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo hủy lịch phỏng vấn", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

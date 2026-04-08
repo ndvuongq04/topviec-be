@@ -22,4 +22,10 @@ public interface EmailService {
     void sendUpdateScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
                                  String oldSchedule, String newScheduleTime, String newScheduleDate,
                                  String interviewLocation, String interviewerName, String confirmLink);
+
+    /**
+     * Thông báo hủy lịch phỏng vấn (deleteSchedule).
+     */
+    void sendCancelScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                 String scheduledTime, String scheduledDate, String roundName);
 }
