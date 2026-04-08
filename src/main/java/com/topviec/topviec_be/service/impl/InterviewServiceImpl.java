@@ -48,6 +48,9 @@ public class InterviewServiceImpl implements InterviewService {
     @Value("${app.confirm-interview-url}")
     private String confirmInterviewUrl;
 
+    @Value("${app.slot-selection-url}")
+    private String slotSelectionUrl;
+
     @Value("${app.token.interview-update-ttl}")
     private long interviewUpdateTtlDays;
 
@@ -333,7 +336,33 @@ public class InterviewServiceImpl implements InterviewService {
             application.setStatus(ApplicationStatus.SCHEDULE_PENDING.getValue());
             applicationRepository.save(application);
 
-            log.info("📧 [TODO] Gửi email slot cho application={}, round={}, token={}", applicationId, roundId, token);
+            try {
+                User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+                if (candidateUser != null) {
+                    String candidateName = getCandidateName(application.getCandidateUserId());
+                    String candidateEmail = candidateUser.getEmail();
+
+                    String jobTitle = "Vị trí ứng tuyển";
+                    String companyName = "Nhà tuyển dụng";
+                    JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                    if (jobPosting != null) {
+                        jobTitle = jobPosting.getTitle();
+                        Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                        if (company != null) companyName = company.getName();
+                    }
+
+                    String roundName = "Vòng " + round.getRoundNumber() + " - " + round.getRoundName();
+                    String deadlineStr = request.getDeadline()
+                            .format(DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy"));
+                    String selectSlotLink = slotSelectionUrl + "?token=" + token;
+
+                    emailService.sendSlotSelectionEmail(candidateEmail, candidateName, companyName,
+                            jobTitle, roundName, deadlineStr, selectSlotLink);
+                    log.info("📧 Đã gửi email chọn slot cho application={}, round={}", applicationId, roundId);
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi email slot cho application={}, round={}", applicationId, roundId, e);
+            }
         }
     }
 
@@ -364,6 +393,65 @@ public class InterviewServiceImpl implements InterviewService {
                         .createdAt(slot.getCreatedAt())
                         .build())
                 .toList();
+    }
+
+    // =========================================================================
+    // Lấy danh sách slot còn chỗ theo token (trang chọn slot của UV)
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResSlotSelectionPageDTO getSlotsByToken(String token) {
+        String payload = tokenService.verifyInterviewSlotToken(token);
+        String[] parts = payload.split(":");
+        Long applicationId = Long.parseLong(parts[0]);
+        Long roundId = Long.parseLong(parts[1]);
+
+        boolean alreadySelected = interviewRepository
+                .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(applicationId, roundId);
+        if (alreadySelected) {
+            throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
+        }
+
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        String jobTitle = "Vị trí ứng tuyển";
+        String companyName = "Nhà tuyển dụng";
+        JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+        if (jobPosting != null) {
+            jobTitle = jobPosting.getTitle();
+            Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+            if (company != null) companyName = company.getName();
+        }
+
+        List<ResInterviewSlotDTO> availableSlots = slotRepository
+                .findByRoundIdOrderByStartTimeAsc(roundId).stream()
+                .filter(slot -> slot.getRegisteredCount() < slot.getMaxCandidates())
+                .map(slot -> ResInterviewSlotDTO.builder()
+                        .id(slot.getId())
+                        .roundId(slot.getRoundId())
+                        .slotDeadline(round.getSlotDeadline())
+                        .startTime(slot.getStartTime())
+                        .endTime(slot.getEndTime())
+                        .interviewType(slot.getInterviewType())
+                        .location(slot.getLocation())
+                        .meetingLink(slot.getMeetingLink())
+                        .interviewerName(slot.getInterviewerName())
+                        .maxCandidates(slot.getMaxCandidates())
+                        .registeredCount(slot.getRegisteredCount())
+                        .createdAt(slot.getCreatedAt())
+                        .build())
+                .toList();
+
+        return ResSlotSelectionPageDTO.builder()
+                .companyName(companyName)
+                .jobTitle(jobTitle)
+                .roundName("Vòng " + round.getRoundNumber() + " - " + round.getRoundName())
+                .roundNumber(round.getRoundNumber())
+                .deadline(round.getSlotDeadline())
+                .slots(availableSlots)
+                .build();
     }
 
     // =========================================================================

@@ -38,6 +38,9 @@ public interface InterviewService {
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
 
+        /** Lấy danh sách slot còn chỗ theo token (public, dành cho trang chọn slot của UV) */
+        ResSlotSelectionPageDTO getSlotsByToken(String token);
+
         /** Lấy thông tin lịch PV qua token để FE hiển thị trước khi UV xác nhận */
         ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token);
 

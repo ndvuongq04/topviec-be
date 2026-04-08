@@ -121,6 +121,21 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Thông báo kết quả phỏng vấn", htmlBody);
     }
 
+    @Override
+    public void sendSlotSelectionEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                       String roundName, String deadline, String selectSlotLink) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("roundName", roundName);
+        context.setVariable("deadline", deadline);
+        context.setVariable("selectSlotLink", selectSlotLink);
+
+        String htmlBody = templateEngine.process("email/select-slot", context);
+        sendHtmlEmail(toEmail, "[Topviec] Chọn lịch phỏng vấn - " + companyName, htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

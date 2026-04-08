@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.response.ResConfirmUpdateInfoDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewHistoryDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewRoundDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewScheduleDTO;
+import com.topviec.topviec_be.dto.response.ResSlotSelectionPageDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,15 @@ import java.util.Map;
 public class PublicInterviewController {
 
     private final InterviewService interviewService;
+
+    /**
+     * GET /interview-schedules/slots?token=xxx
+     * Lấy danh sách slot còn chỗ để FE hiển thị trang chọn lịch (Public, không cần Auth).
+     */
+    @GetMapping("/slots")
+    public ResponseEntity<ResSlotSelectionPageDTO> getSlotsByToken(@RequestParam String token) {
+        return ResponseEntity.ok(interviewService.getSlotsByToken(token));
+    }
 
     /**
      * GET /interview-schedules/confirm?token=xxx&slotId=123

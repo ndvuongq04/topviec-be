@@ -34,4 +34,10 @@ public interface EmailService {
      */
     void sendInterviewResultEmail(String toEmail, String candidateName, String companyName, String jobTitle,
                                   String roundName, boolean passed, Integer rating, String note);
+
+    /**
+     * Thông báo UV chọn slot phỏng vấn (Cách 2: UV tự chọn lịch).
+     */
+    void sendSlotSelectionEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                String roundName, String deadline, String selectSlotLink);
 }

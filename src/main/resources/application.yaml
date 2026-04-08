@@ -66,6 +66,7 @@ app:
   verify-email-url: ${APP_VERIFY_EMAIL_URL:http://localhost:5173/verify-email}
   reset-password-url: ${APP_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
   confirm-interview-url: ${APP_CONFIRM_INTERVIEW_URL:http://localhost:5173/interview-confirm-update}
+  slot-selection-url: ${APP_SLOT_SELECTION_URL:http://localhost:5173/interview-select-slot}
 
   # config cho Cloudinary
   cloudinary:
