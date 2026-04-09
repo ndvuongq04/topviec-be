@@ -14,6 +14,8 @@ public interface InterviewSlotRepository extends JpaRepository<InterviewSlot, Lo
 
     List<InterviewSlot> findByRoundIdOrderByStartTimeAsc(Long roundId);
 
+    List<InterviewSlot> findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(Long roundId, List<Integer> batchNumbers);
+
     boolean existsByRoundId(Long id);
 
     @Modifying

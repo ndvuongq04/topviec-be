@@ -18,7 +18,6 @@ public class ResInterviewRoundDTO {
     private String description;
     private Integer expectedDuration;
     private Boolean isFinal;
-    private LocalDateTime slotDeadline;
     private List<InterviewerInfo> interviewers;
     private Long candidateCount; // số UV đang ở vòng này
     private LocalDateTime createdAt;

@@ -45,6 +45,9 @@ public class InterviewSlot {
     @Column(name = "registered_count", nullable = false)
     private Integer registeredCount = 0;
 
+    @Column(name = "batch_number", nullable = false)
+    private Integer batchNumber;
+
     // ── Relations ─────────────────────────────────────────────────────────────
 
     @ManyToOne(fetch = FetchType.LAZY)

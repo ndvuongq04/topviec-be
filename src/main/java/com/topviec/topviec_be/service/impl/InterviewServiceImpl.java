@@ -22,6 +22,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewRoundRepository roundRepository;
     private final InterviewRoundInterviewerRepository interviewerRepository;
     private final InterviewSlotRepository slotRepository;
+    private final InterviewSlotInvitationRepository invitationRepository;
     private final InterviewRepository interviewRepository;
     private final InterviewResultRepository resultRepository;
     private final ApplicationRepository applicationRepository;
@@ -298,11 +301,10 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Deadline phải là thời gian trong tương lai");
         }
 
-        // Lưu hạn chót vào round
-        round.setSlotDeadline(request.getDeadline());
-        roundRepository.save(round);
+        // Tính batch number cho đợt này
+        int batchNumber = invitationRepository.findMaxBatchNumber(roundId) + 1;
 
-        // Tạo slots 1 lần cho round — không còn loop theo UV
+        // Tạo slots 1 lần cho round — gắn batchNumber để phân biệt đợt
         for (ReqCreateInterviewSlotsDTO.SlotDTO slotDto : request.getSlots()) {
             if (slotDto.getEndTime().isBefore(slotDto.getStartTime()) ||
                     slotDto.getEndTime().isEqual(slotDto.getStartTime())) {
@@ -317,13 +319,14 @@ public class InterviewServiceImpl implements InterviewService {
                     .meetingLink(slotDto.getMeetingLink())
                     .maxCandidates(slotDto.getMaxCandidates())
                     .interviewerName(slotDto.getInterviewerName())
+                    .batchNumber(batchNumber)
                     .build();
             slotRepository.save(slot);
         }
 
         Duration ttl = Duration.between(LocalDateTime.now(), request.getDeadline());
 
-        // Loop UV chỉ để: validate, lưu reminder Redis, generate token, đổi status
+        // Loop UV chỉ để: validate, tạo invitation, lưu reminder Redis, generate token, đổi status
         for (Long applicationId : request.getApplicationIds()) {
             Application application = applicationRepository.findById(applicationId)
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển: " + applicationId));
@@ -331,6 +334,15 @@ public class InterviewServiceImpl implements InterviewService {
             if (!ApplicationStatus.INTERVIEWING.getValue().equals(application.getStatus())) {
                 throw AppException.badRequest("Ứng viên " + applicationId + " không ở trạng thái INTERVIEWING");
             }
+
+            // Lưu invitation: UV này nhận đợt slot nào trong round nào, kèm hạn chọn
+            InterviewSlotInvitation invitation = InterviewSlotInvitation.builder()
+                    .applicationId(applicationId)
+                    .roundId(roundId)
+                    .batchNumber(batchNumber)
+                    .deadline(request.getDeadline())
+                    .build();
+            invitationRepository.save(invitation);
 
             // Lưu reminder info vào Redis thay vì lưu trong Interview entity
             tokenService.storeReminderInfo(applicationId, roundId, request.getDeadline(), ttl);
@@ -380,11 +392,18 @@ public class InterviewServiceImpl implements InterviewService {
 
         findJobAndValidateOwnership(round.getJobPostId(), companyId);
 
+        // Mỗi batch có deadline riêng — lấy 1 lần, map theo batchNumber
+        Map<Integer, LocalDateTime> batchDeadlines = invitationRepository.findByRoundId(roundId).stream()
+                .collect(Collectors.toMap(
+                        InterviewSlotInvitation::getBatchNumber,
+                        InterviewSlotInvitation::getDeadline,
+                        (a, b) -> a));
+
         return slotRepository.findByRoundIdOrderByStartTimeAsc(roundId).stream()
                 .map(slot -> ResInterviewSlotDTO.builder()
                         .id(slot.getId())
                         .roundId(slot.getRoundId())
-                        .slotDeadline(round.getSlotDeadline())
+                        .slotDeadline(batchDeadlines.get(slot.getBatchNumber()))
                         .startTime(slot.getStartTime())
                         .endTime(slot.getEndTime())
                         .interviewType(slot.getInterviewType())
@@ -419,6 +438,12 @@ public class InterviewServiceImpl implements InterviewService {
         InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
 
+        // Lấy deadline của batch mới nhất được gửi cho UV này
+        LocalDateTime deadline = invitationRepository
+                .findTopByApplicationIdAndRoundIdOrderByBatchNumberDesc(applicationId, roundId)
+                .map(InterviewSlotInvitation::getDeadline)
+                .orElse(null);
+
         String jobTitle = "Vị trí ứng tuyển";
         String companyName = "Nhà tuyển dụng";
         JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
@@ -434,7 +459,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .map(slot -> ResInterviewSlotDTO.builder()
                         .id(slot.getId())
                         .roundId(slot.getRoundId())
-                        .slotDeadline(round.getSlotDeadline())
+                        .slotDeadline(deadline)
                         .startTime(slot.getStartTime())
                         .endTime(slot.getEndTime())
                         .interviewType(slot.getInterviewType())
@@ -452,7 +477,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .jobTitle(jobTitle)
                 .roundName("Vòng " + round.getRoundNumber() + " - " + round.getRoundName())
                 .roundNumber(round.getRoundNumber())
-                .deadline(round.getSlotDeadline())
+                .deadline(deadline)
                 .slots(availableSlots)
                 .build();
     }
@@ -1415,7 +1440,6 @@ public class InterviewServiceImpl implements InterviewService {
                 .description(round.getDescription())
                 .expectedDuration(round.getExpectedDuration())
                 .isFinal(round.getIsFinal())
-                .slotDeadline(round.getSlotDeadline())
                 .interviewers(interviewers.stream()
                         .map(i -> ResInterviewRoundDTO.InterviewerInfo.builder()
                                 .id(i.getId())
@@ -1435,6 +1459,47 @@ public class InterviewServiceImpl implements InterviewService {
         CandidateProfile profile = candidateProfileRepository.findByUserId(application.getCandidateUserId())
                 .orElse(null);
 
+        // Lấy thông tin slot UV đã chọn (nếu có)
+        InterviewSlot chosenSlot = interview.getSlotId() != null
+                ? slotRepository.findById(interview.getSlotId()).orElse(null)
+                : null;
+
+        // Lấy danh sách slot đã gửi cho UV này trong round này
+        List<InterviewSlotInvitation> invitations = invitationRepository
+                .findByApplicationIdAndRoundIdOrderByBatchNumberAsc(application.getId(), interview.getRoundId());
+
+        List<ResInterviewScheduleDTO.SentSlotDTO> sentSlots = List.of();
+        if (!invitations.isEmpty()) {
+            // Map batchNumber → deadline từ invitations
+            Map<Integer, LocalDateTime> batchDeadlines = invitations.stream()
+                    .collect(Collectors.toMap(
+                            InterviewSlotInvitation::getBatchNumber,
+                            InterviewSlotInvitation::getDeadline,
+                            (a, b) -> a));
+
+            List<Integer> batchNumbers = invitations.stream()
+                    .map(InterviewSlotInvitation::getBatchNumber)
+                    .toList();
+
+            sentSlots = slotRepository
+                    .findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(interview.getRoundId(), batchNumbers)
+                    .stream()
+                    .map(slot -> ResInterviewScheduleDTO.SentSlotDTO.builder()
+                            .id(slot.getId())
+                            .batchNumber(slot.getBatchNumber())
+                            .deadline(batchDeadlines.get(slot.getBatchNumber()))
+                            .startTime(slot.getStartTime())
+                            .endTime(slot.getEndTime())
+                            .interviewType(slot.getInterviewType())
+                            .location(slot.getLocation())
+                            .meetingLink(slot.getMeetingLink())
+                            .interviewerName(slot.getInterviewerName())
+                            .maxCandidates(slot.getMaxCandidates())
+                            .registeredCount(slot.getRegisteredCount())
+                            .build())
+                    .toList();
+        }
+
         return ResInterviewScheduleDTO.builder()
                 .id(interview.getId())
                 .applicationId(interview.getApplicationId())
@@ -1453,6 +1518,11 @@ public class InterviewServiceImpl implements InterviewService {
                 .confirmedByCandidate(interview.getConfirmedByCandidate())
                 .isDefault(interview.getIsDefault())
                 .interviewerNote(interview.getInterviewerNote())
+                .slotId(chosenSlot != null ? chosenSlot.getId() : null)
+                .slotStartTime(chosenSlot != null ? chosenSlot.getStartTime() : null)
+                .slotEndTime(chosenSlot != null ? chosenSlot.getEndTime() : null)
+                .slotInterviewerName(chosenSlot != null ? chosenSlot.getInterviewerName() : null)
+                .sentSlots(sentSlots)
                 .applicationStatus(application.getStatus())
                 .createdAt(interview.getCreatedAt())
                 .updatedAt(interview.getUpdatedAt())
