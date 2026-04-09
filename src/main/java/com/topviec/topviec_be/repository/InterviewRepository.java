@@ -41,4 +41,10 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
         boolean existsByApplicationIdAndRoundId(Long applicationId, Long roundId);
 
         boolean existsByApplicationIdAndRoundIdAndDeletedAtIsNull(Long applicationId, Long roundId);
+
+        /**
+         * Kiểm tra UV đã có lịch THẬT (isDefault = false) cho vòng này chưa.
+         * Dùng để phân biệt lịch placeholder tạo bởi startInterviewing.
+         */
+        boolean existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(Long applicationId, Long roundId);
 }

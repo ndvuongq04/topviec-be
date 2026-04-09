@@ -29,6 +29,7 @@ public class ResInterviewScheduleDTO {
     private String meetingLink;
     private String status;
     private Boolean confirmedByCandidate;
+    private Boolean isDefault;
     private String interviewerNote;
 
     // Trạng thái đơn ứng tuyển (dùng để FE kiểm tra ứng viên đã OFFERED chưa)

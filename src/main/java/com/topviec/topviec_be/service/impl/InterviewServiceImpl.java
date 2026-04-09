@@ -254,21 +254,24 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Ứng viên không ở trạng thái INTERVIEWING");
         }
 
-        softDeleteExistingInterview(application.getId(), roundId, userId);
+        // Update-in-place: tránh vi phạm UNIQUE(application_id, round_id)
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(application.getId(), roundId)
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(application.getId())
+                        .roundId(roundId)
+                        .build());
 
-        Interview interview = Interview.builder()
-                .applicationId(application.getId())
-                .roundId(roundId)
-                .scheduledAt(request.getScheduledAt())
-                .durationMinutes(request.getDurationMinutes())
-                .interviewType(request.getInterviewType())
-                .location(request.getLocation())
-                .meetingLink(request.getMeetingLink())
-                .interviewerNote(request.getInterviewerNote())
-                .status(InterviewStatus.SCHEDULED.getValue())
-                .confirmedByCandidate(false)
-                .scheduledBy(userId)
-                .build();
+        interview.setScheduledAt(request.getScheduledAt());
+        interview.setDurationMinutes(request.getDurationMinutes());
+        interview.setInterviewType(request.getInterviewType());
+        interview.setLocation(request.getLocation());
+        interview.setMeetingLink(request.getMeetingLink());
+        interview.setInterviewerNote(request.getInterviewerNote());
+        interview.setStatus(InterviewStatus.SCHEDULED.getValue());
+        interview.setConfirmedByCandidate(false);
+        interview.setIsDefault(false);
+        interview.setScheduledBy(userId);
 
         interview = interviewRepository.save(interview);
 
@@ -408,7 +411,7 @@ public class InterviewServiceImpl implements InterviewService {
         Long roundId = Long.parseLong(parts[1]);
 
         boolean alreadySelected = interviewRepository
-                .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(applicationId, roundId);
+                .existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(applicationId, roundId);
         if (alreadySelected) {
             throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
         }
@@ -474,10 +477,9 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Ca phỏng vấn không thuộc vòng phỏng vấn này");
         }
 
-        // Check UV đã chọn slot cho round này chưa (thay vì check isSelected trên
-        // slot)
+        // Check UV đã có lịch THẬT (isDefault = false) cho round này chưa
         boolean alreadySelected = interviewRepository
-                .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(tokenApplicationId, tokenRoundId);
+                .existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(tokenApplicationId, tokenRoundId);
         if (alreadySelected) {
             throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
         }
@@ -487,20 +489,23 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Ca phỏng vấn này đã đủ số lượng ứng viên");
         }
 
-        // Tạo Interview record — bỏ reminderCount, không còn update isSelected trên
-        // slot
-        Interview interview = Interview.builder()
-                .applicationId(tokenApplicationId)
-                .roundId(tokenRoundId)
-                .slotId(slot.getId())
-                .scheduledAt(slot.getStartTime())
-                .interviewType(slot.getInterviewType())
-                .location(slot.getLocation())
-                .meetingLink(slot.getMeetingLink())
-                .status(InterviewStatus.CONFIRMED.getValue())
-                .confirmedByCandidate(true)
-                .scheduledBy(0L)
-                .build();
+        // Update-in-place: tìm placeholder nếu có, không thì tạo mới
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(tokenApplicationId, tokenRoundId)
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(tokenApplicationId)
+                        .roundId(tokenRoundId)
+                        .scheduledBy(0L)
+                        .build());
+
+        interview.setSlotId(slot.getId());
+        interview.setScheduledAt(slot.getStartTime());
+        interview.setInterviewType(slot.getInterviewType());
+        interview.setLocation(slot.getLocation());
+        interview.setMeetingLink(slot.getMeetingLink());
+        interview.setStatus(InterviewStatus.CONFIRMED.getValue());
+        interview.setConfirmedByCandidate(true);
+        interview.setIsDefault(false);
 
         interviewRepository.save(interview);
 
@@ -1103,19 +1108,22 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Không tìm thấy vòng phỏng vấn phù hợp");
         }
 
-        softDeleteExistingInterview(application.getId(), currentRound.getId(), userId);
+        // Update-in-place: tránh vi phạm UNIQUE(application_id, round_id)
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(application.getId(), currentRound.getId())
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(application.getId())
+                        .roundId(currentRound.getId())
+                        .build());
 
-        Interview interview = Interview.builder()
-                .applicationId(application.getId())
-                .roundId(currentRound.getId())
-                .scheduledAt(request.getScheduledAt())
-                .interviewType(request.getInterviewType())
-                .location(request.getLocation())
-                .meetingLink(request.getMeetingLink())
-                .status(InterviewStatus.SCHEDULED.getValue())
-                .confirmedByCandidate(false)
-                .scheduledBy(userId)
-                .build();
+        interview.setScheduledAt(request.getScheduledAt());
+        interview.setInterviewType(request.getInterviewType());
+        interview.setLocation(request.getLocation());
+        interview.setMeetingLink(request.getMeetingLink());
+        interview.setStatus(InterviewStatus.SCHEDULED.getValue());
+        interview.setConfirmedByCandidate(false);
+        interview.setIsDefault(false);
+        interview.setScheduledBy(userId);
 
         interview = interviewRepository.save(interview);
 
@@ -1207,7 +1215,7 @@ public class InterviewServiceImpl implements InterviewService {
                     return roundRepository.save(defaultRound);
                 });
 
-        // Tạo Interview record PENDING cho từng UV cv_passed vào vòng 1
+        // Tạo Interview record PENDING (placeholder) cho từng UV cv_passed vào vòng 1
         for (Application app : cvPassedApps) {
             boolean alreadyExists = interviewRepository
                     .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(app.getId(), round1.getId());
@@ -1216,6 +1224,7 @@ public class InterviewServiceImpl implements InterviewService {
                         .applicationId(app.getId())
                         .roundId(round1.getId())
                         .status(InterviewStatus.PENDING.getValue())
+                        .isDefault(true)
                         .scheduledBy(userId)
                         .build();
                 interviewRepository.save(interview);
@@ -1352,6 +1361,7 @@ public class InterviewServiceImpl implements InterviewService {
                                         .applicationId(application.getId())
                                         .roundId(nextRound.getId())
                                         .status(InterviewStatus.PENDING.getValue())
+                                        .isDefault(true)
                                         .scheduledBy(userId)
                                         .build();
                                 interviewRepository.save(interview);
@@ -1441,6 +1451,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .meetingLink(interview.getMeetingLink())
                 .status(interview.getStatus())
                 .confirmedByCandidate(interview.getConfirmedByCandidate())
+                .isDefault(interview.getIsDefault())
                 .interviewerNote(interview.getInterviewerNote())
                 .applicationStatus(application.getStatus())
                 .createdAt(interview.getCreatedAt())
