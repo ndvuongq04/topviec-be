@@ -1520,6 +1520,17 @@ public class InterviewServiceImpl implements InterviewService {
                             .build())
                     .toList();
         }
+        // Phòng ngừa khi Cron job lỗi
+        // Tính effective applicationStatus: nếu đang SCHEDULE_PENDING mà deadline
+        // của batch mới nhất đã qua → hiển thị là overdue (không update DB)
+        String effectiveApplicationStatus = application.getStatus();
+        if (ApplicationStatus.SCHEDULE_PENDING.getValue().equals(effectiveApplicationStatus)
+                && !invitations.isEmpty()) {
+            LocalDateTime latestDeadline = invitations.get(invitations.size() - 1).getDeadline();
+            if (latestDeadline.isBefore(LocalDateTime.now())) {
+                effectiveApplicationStatus = ApplicationStatus.OVERDUE.getValue();
+            }
+        }
 
         return ResInterviewScheduleDTO.builder()
                 .id(interview.getId())
@@ -1544,7 +1555,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .slotEndTime(chosenSlot != null ? chosenSlot.getEndTime() : null)
                 .slotInterviewerName(chosenSlot != null ? chosenSlot.getInterviewerName() : null)
                 .sentSlots(sentSlots)
-                .applicationStatus(application.getStatus())
+                .applicationStatus(effectiveApplicationStatus)
                 .createdAt(interview.getCreatedAt())
                 .updatedAt(interview.getUpdatedAt())
                 .build();

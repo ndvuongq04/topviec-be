@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -113,6 +114,31 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
         int bulkRejectExcluding(
                         @Param("jobPostId") Long jobPostId,
                         @Param("excludeIds") List<Long> excludeIds);
+
+        /**
+         * Bulk chuyển SCHEDULE_PENDING → OVERDUE cho các application có tất cả
+         * invitation đã qua deadline (không còn invitation nào deadline >= now).
+         *
+         * Nhận :now từ Java để tránh timezone mismatch với CURRENT_TIMESTAMP của DB.
+         */
+        @Modifying
+        @Query("""
+                        UPDATE Application a
+                        SET a.status = 'overdue', a.updatedAt = :now
+                        WHERE a.status = 'schedule_pending'
+                        AND a.deletedAt IS NULL
+                        AND EXISTS (
+                            SELECT 1 FROM InterviewSlotInvitation inv
+                            WHERE inv.applicationId = a.id
+                            AND inv.deadline < :now
+                        )
+                        AND NOT EXISTS (
+                            SELECT 1 FROM InterviewSlotInvitation inv2
+                            WHERE inv2.applicationId = a.id
+                            AND inv2.deadline >= :now
+                        )
+                        """)
+        int bulkMarkOverdue(@Param("now") LocalDateTime now);
 
         /** Đếm số hồ sơ (chưa xóa) theo job post id. */
         long countByJobPostIdAndDeletedAtIsNull(Long jobPostId);
