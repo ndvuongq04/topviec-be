@@ -326,7 +326,8 @@ public class InterviewServiceImpl implements InterviewService {
 
         Duration ttl = Duration.between(LocalDateTime.now(), request.getDeadline());
 
-        // Loop UV chỉ để: validate, tạo invitation, lưu reminder Redis, generate token, đổi status
+        // Loop UV chỉ để: validate, tạo invitation, lưu reminder Redis, generate token,
+        // đổi status
         for (Long applicationId : request.getApplicationIds()) {
             Application application = applicationRepository.findById(applicationId)
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển: " + applicationId));
@@ -363,7 +364,8 @@ public class InterviewServiceImpl implements InterviewService {
                     if (jobPosting != null) {
                         jobTitle = jobPosting.getTitle();
                         Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
-                        if (company != null) companyName = company.getName();
+                        if (company != null)
+                            companyName = company.getName();
                     }
 
                     String roundName = "Vòng " + round.getRoundNumber() + " - " + round.getRoundName();
@@ -450,7 +452,8 @@ public class InterviewServiceImpl implements InterviewService {
         if (jobPosting != null) {
             jobTitle = jobPosting.getTitle();
             Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
-            if (company != null) companyName = company.getName();
+            if (company != null)
+                companyName = company.getName();
         }
 
         List<ResInterviewSlotDTO> availableSlots = slotRepository
@@ -1250,7 +1253,7 @@ public class InterviewServiceImpl implements InterviewService {
                             .jobPostId(jobPostId)
                             .roundNumber(1)
                             .roundName("Vòng 1")
-                            .isFinal(false)
+                            .isFinal(true)
                             .createdBy(userId)
                             .updatedBy(userId)
                             .build();
@@ -1499,7 +1502,8 @@ public class InterviewServiceImpl implements InterviewService {
                     .toList();
 
             sentSlots = slotRepository
-                    .findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(interview.getRoundId(), batchNumbers)
+                    .findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(interview.getRoundId(),
+                            batchNumbers)
                     .stream()
                     .map(slot -> ResInterviewScheduleDTO.SentSlotDTO.builder()
                             .id(slot.getId())
