@@ -1048,6 +1048,23 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     // =========================================================================
+    // Lọc UV theo trạng thái lịch
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResInterviewScheduleDTO> getPendingCandidates(Long roundId, Long companyId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        findJobAndValidateOwnership(round.getJobPostId(), companyId);
+
+        return interviewRepository.findPendingCandidatesByRoundId(roundId).stream()
+                .map(i -> toScheduleResponse(i, round, i.getApplication()))
+                .toList();
+    }
+
+    // =========================================================================
     // Overdue
     // =========================================================================
 

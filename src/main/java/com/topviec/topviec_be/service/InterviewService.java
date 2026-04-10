@@ -78,6 +78,11 @@ public interface InterviewService {
         /** Lấy lịch sử PV của UV (dành cho candidate) */
         ResInterviewHistoryDTO getMyInterviewHistory(Long userId, Long applicationId);
 
+        // ── Lọc UV theo trạng thái lịch ─────────────────────────────────────────
+
+        /** UV chưa có lịch PV thật HOẶC chưa được gửi slot trong vòng này */
+        List<ResInterviewScheduleDTO> getPendingCandidates(Long roundId, Long companyId);
+
         // ── Overdue ──────────────────────────────────────────────────────────────
 
         List<ResOverdueApplicationDTO> getOverdueApplications(Long jobPostId, Long companyId);

@@ -47,4 +47,24 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
          * Dùng để phân biệt lịch placeholder tạo bởi startInterviewing.
          */
         boolean existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(Long applicationId, Long roundId);
+
+        /**
+         * UV chưa có lịch PV thật (isDefault = true)
+         * VÀ chưa được gửi slot (không có InterviewSlotInvitation) trong vòng này.
+         */
+        @Query("""
+                        SELECT i FROM Interview i
+                        JOIN i.application a
+                        WHERE i.roundId = :roundId
+                        AND i.isDefault = true
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        AND NOT EXISTS (
+                            SELECT 1 FROM InterviewSlotInvitation inv
+                            WHERE inv.applicationId = i.applicationId
+                            AND inv.roundId = :roundId
+                        )
+                        ORDER BY i.createdAt ASC
+                        """)
+        List<Interview> findPendingCandidatesByRoundId(@Param("roundId") Long roundId);
 }

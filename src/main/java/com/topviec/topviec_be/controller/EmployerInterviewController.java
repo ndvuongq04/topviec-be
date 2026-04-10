@@ -179,6 +179,18 @@ public class EmployerInterviewController {
         return ResponseEntity.ok(interviewService.getInterviewHistory(applicationId, companyId));
     }
 
+    // ── Lọc UV theo trạng thái lịch ─────────────────────────────────────────
+
+    @GetMapping("/interview-rounds/{roundId}/pending-candidates")
+    public ResponseEntity<List<ResInterviewScheduleDTO>> getPendingCandidates(
+            @PathVariable Long roundId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(interviewService.getPendingCandidates(roundId, companyId));
+    }
+
     // ── Overdue ──────────────────────────────────────────────────────────────
 
     @GetMapping("/job-postings/{jobPostId}/overdue-applications")
