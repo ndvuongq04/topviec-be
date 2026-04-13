@@ -74,6 +74,19 @@ public class PublicApplicationController {
     }
 
     /**
+     * GET /applications/me/with-interviews
+     * Lấy danh sách đơn của UV có ít nhất 1 lịch PV (dùng cho trang "Lịch PV của tôi").
+     * Trả về đúng bất kể application status (interviewing / schedule_pending / overdue / ...).
+     */
+    @GetMapping("/me/with-interviews")
+    public ResponseEntity<List<ResApplicationDTO>> getMyApplicationsWithInterviews(
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ResponseEntity.ok(
+                applicationService.getMyApplicationsWithInterviews(extractUserId(jwt)));
+    }
+
+    /**
      * GET /applications/me
      * CN-UV-013: Theo dõi trạng thái đơn ứng tuyển
      */
