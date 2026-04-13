@@ -79,6 +79,24 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
 
         // ── Interview support ─────────────────────────────────────────────────────
 
+        /**
+         * Lấy các đơn của UV có ít nhất 1 lịch PV (không phân trang).
+         * Dùng EXISTS để tránh duplicate khi 1 đơn có nhiều vòng PV.
+         */
+        @Query("""
+                        SELECT a FROM Application a
+                        LEFT JOIN FETCH a.jobPosting
+                        WHERE a.candidateUserId = :candidateUserId
+                        AND a.deletedAt IS NULL
+                        AND EXISTS (
+                            SELECT 1 FROM Interview i
+                            WHERE i.applicationId = a.id
+                            AND i.deletedAt IS NULL
+                        )
+                        ORDER BY a.updatedAt DESC
+                        """)
+        List<Application> findWithInterviewsByCandidate(@Param("candidateUserId") Long candidateUserId);
+
         List<Application> findByJobPostIdAndStatusAndDeletedAtIsNull(Long jobPostId, String status);
 
         /**

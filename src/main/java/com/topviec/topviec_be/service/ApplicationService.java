@@ -26,6 +26,9 @@ public interface ApplicationService {
     // CN-UV-013: Theo dõi trạng thái đơn (thêm filter status)
     ResultPaginationDTO getMyApplications(Long candidateUserId, String status, Pageable pageable);
 
+    /** Lấy các đơn của UV có ít nhất 1 lịch PV (dùng cho trang "Lịch PV của tôi") */
+    List<ResApplicationDTO> getMyApplicationsWithInterviews(Long candidateUserId);
+
     // CN-UV-015: Rút đơn
     ResApplicationDTO withdraw(Long candidateUserId, Long applicationId, ReqWithdrawApplicationDTO request);
 

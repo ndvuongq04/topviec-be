@@ -158,6 +158,27 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     // -------------------------------------------------------------------------
+    // Trang "Lịch PV của tôi" — đơn có ít nhất 1 lịch PV
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResApplicationDTO> getMyApplicationsWithInterviews(Long candidateUserId) {
+        List<Application> applications = applicationRepository
+                .findWithInterviewsByCandidate(candidateUserId);
+
+        Map<Long, Company> companyMap = companyRepository
+                .findAllById(applications.stream()
+                        .map(a -> a.getJobPosting().getCompanyId())
+                        .distinct().toList())
+                .stream().collect(Collectors.toMap(Company::getId, c -> c));
+
+        return applications.stream()
+                .map(a -> toResponse(a, companyMap))
+                .toList();
+    }
+
+    // -------------------------------------------------------------------------
     // CN-UV-015: Rút đơn
     // -------------------------------------------------------------------------
 
