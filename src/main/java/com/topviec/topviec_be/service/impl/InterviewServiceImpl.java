@@ -1479,8 +1479,9 @@ public class InterviewServiceImpl implements InterviewService {
 
         JobPosting job = findJobAndValidateOwnership(jobPostId, companyId);
 
-        if (!JobPostStatus.INTERVIEWING.getValue().equals(job.getStatus())) {
-            throw AppException.badRequest("Tin tuyển dụng phải ở trạng thái INTERVIEWING");
+        if (!JobPostStatus.INTERVIEWING.getValue().equals(job.getStatus())
+                && !JobPostStatus.CLOSED.getValue().equals(job.getStatus())) {
+            throw AppException.badRequest("Tin tuyển dụng phải ở trạng thái INTERVIEWING hoặc CLOSED");
         }
 
         List<Application> offeredApps = applicationRepository

@@ -57,7 +57,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     @Transactional
     public ResApplicationDTO apply(Long candidateUserId, Long jobPostId, ReqApplyJobDTO request) {
-        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
         Application application = getOrInitializeApplication(
                 candidateUserId, jobPostId, request.getCvId(),
@@ -74,7 +74,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     @Transactional
     public ResApplicationDTO quickApply(Long candidateUserId, Long jobPostId) {
-        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
         // Lấy CV mặc định
         Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId)
@@ -109,7 +109,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         List<ResApplicationDTO> results = new ArrayList<>();
 
         for (Long jobPostId : distinctJobIds) {
-            JobPosting job = findPublishedJobOrThrow(jobPostId);
+            JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
             Application application = getOrInitializeApplication(
                     candidateUserId, jobPostId, request.getCvId(),
@@ -227,11 +227,13 @@ public class ApplicationServiceImpl implements ApplicationService {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private JobPosting findPublishedJobOrThrow(Long jobPostId) {
+    private JobPosting findAcceptingJobOrThrow(Long jobPostId) {
         JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
 
-        if (!JobPostStatus.PUBLISHED.getValue().equals(job.getStatus())) {
+        String status = job.getStatus();
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status)
+                && !JobPostStatus.INTERVIEWING.getValue().equals(status)) {
             throw AppException.badRequest("Tin tuyển dụng không còn nhận hồ sơ");
         }
 
