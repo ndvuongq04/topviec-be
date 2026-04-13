@@ -17,8 +17,12 @@ public class JobPostingSpecification {
                 : cb.equal(root.get("status"), status.trim());
     }
 
-    public static Specification<JobPosting> isPublished() {
-        return hasStatus("published");
+    /**
+     * Tin hiển thị công khai cho UV: published HOẶC interviewing.
+     * Nghiệp vụ: NTT vừa phỏng vấn vừa tuyển dụng → tin vẫn phải hiển thị.
+     */
+    public static Specification<JobPosting> isVisibleToCandidate() {
+        return (root, query, cb) -> root.get("status").in("published", "interviewing");
     }
 
     public static Specification<JobPosting> hasKeyword(String keyword) {
@@ -148,7 +152,7 @@ public class JobPostingSpecification {
             Integer experienceYearsMin, Integer experienceYearsMax) {
 
         return Specification.where(notDeleted())
-                .and(isPublished())
+                .and(isVisibleToCandidate())
                 .and(hasKeyword(keyword))
                 .and(hasCompany(companyId))
                 .and(hasIndustry(industryId))

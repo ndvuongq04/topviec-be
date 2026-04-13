@@ -292,8 +292,10 @@ public class JobPostingServiceImpl implements JobPostingService {
             throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
         }
         String status = jobPosting.getStatus();
-        if (!JobPostStatus.PUBLISHED.getValue().equals(status) && !JobPostStatus.PAUSED.getValue().equals(status)) {
-            throw AppException.badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED hoặc PAUSED");
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status) 
+                && !JobPostStatus.PAUSED.getValue().equals(status)
+                && !JobPostStatus.INTERVIEWING.getValue().equals(status)) {
+            throw AppException.badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED, PAUSED hoặc INTERVIEWING");
         }
         saveEditLog(jobPosting, updatedByUserId);
         jobPosting.setStatus(JobPostStatus.CLOSED.getValue());
