@@ -12,6 +12,10 @@ import java.util.Optional;
 public interface InterviewSlotRepository extends JpaRepository<InterviewSlot, Long> {
 
 
+    List<InterviewSlot> findByRoundIdOrderByStartTimeAsc(Long roundId);
+
+    List<InterviewSlot> findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(Long roundId, List<Integer> batchNumbers);
+
     boolean existsByRoundId(Long id);
 
     @Modifying

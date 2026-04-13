@@ -32,8 +32,20 @@ public interface InterviewService {
         void createSlots(Long roundId, Long userId, Long companyId,
                         ReqCreateInterviewSlotsDTO request);
 
+        /** Lấy danh sách slot của 1 vòng PV */
+        List<ResInterviewSlotDTO> getSlots(Long roundId, Long companyId);
+
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
+
+        /** Lấy danh sách slot còn chỗ theo token (public, dành cho trang chọn slot của UV) */
+        ResSlotSelectionPageDTO getSlotsByToken(String token);
+
+        /** Lấy thông tin lịch PV qua token để FE hiển thị trước khi UV xác nhận */
+        ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token);
+
+        /** UV đã đăng nhập xác nhận lịch trực tiếp trên hệ thống */
+        String confirmScheduleByCandidate(Long scheduleId, Long userId);
 
         /** UV xác nhận lịch (public thông qua link email) */
         String confirmUpdatedSchedule(String token);
@@ -65,6 +77,11 @@ public interface InterviewService {
 
         /** Lấy lịch sử PV của UV (dành cho candidate) */
         ResInterviewHistoryDTO getMyInterviewHistory(Long userId, Long applicationId);
+
+        // ── Lọc UV theo trạng thái lịch ─────────────────────────────────────────
+
+        /** UV chưa có lịch PV thật HOẶC chưa được gửi slot trong vòng này */
+        List<ResInterviewScheduleDTO> getPendingCandidates(Long roundId, Long companyId);
 
         // ── Overdue ──────────────────────────────────────────────────────────────
 

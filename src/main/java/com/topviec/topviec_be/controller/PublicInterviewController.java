@@ -1,9 +1,11 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.service.InterviewService;
+import com.topviec.topviec_be.dto.response.ResConfirmUpdateInfoDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewHistoryDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewRoundDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewScheduleDTO;
+import com.topviec.topviec_be.dto.response.ResSlotSelectionPageDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +28,15 @@ public class PublicInterviewController {
     private final InterviewService interviewService;
 
     /**
+     * GET /interview-schedules/slots?token=xxx
+     * Lấy danh sách slot còn chỗ để FE hiển thị trang chọn lịch (Public, không cần Auth).
+     */
+    @GetMapping("/slots")
+    public ResponseEntity<ResSlotSelectionPageDTO> getSlotsByToken(@RequestParam String token) {
+        return ResponseEntity.ok(interviewService.getSlotsByToken(token));
+    }
+
+    /**
      * GET /interview-schedules/confirm?token=xxx&slotId=123
      * UV click link từ email để chọn slot. Không cần auth.
      */
@@ -40,7 +51,8 @@ public class PublicInterviewController {
 
     /**
      * GET /interview-schedules/applications/{applicationId}
-     * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu
+     * đăng nhập)
      */
     @GetMapping("/applications/{applicationId}")
     public ResponseEntity<List<ResInterviewScheduleDTO>> getMyInterviews(
@@ -52,7 +64,8 @@ public class PublicInterviewController {
 
     /**
      * GET /interview-schedules/applications/{applicationId}/history
-     * Lấy lịch sử phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng nhập)
+     * Lấy lịch sử phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu đăng
+     * nhập)
      */
     @GetMapping("/applications/{applicationId}/history")
     public ResponseEntity<ResInterviewHistoryDTO> getMyInterviewHistory(
@@ -73,10 +86,34 @@ public class PublicInterviewController {
     }
 
     /**
-     * GET /interview-schedules/confirm-update?token=xxx
-     * UV click link từ email để xác nhận lịch PV NĐT vừa cập nhật (Public, không cần Auth).
+     * PATCH /interview-schedules/{scheduleId}/confirm
+     * UV đã đăng nhập xác nhận lịch PV trực tiếp trên hệ thống (yêu cầu đăng nhập).
      */
-    @GetMapping("/confirm-update")
+    @PatchMapping("/{scheduleId}/confirm")
+    public ResponseEntity<Map<String, String>> confirmScheduleByCandidate(
+            @PathVariable Long scheduleId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        String message = interviewService.confirmScheduleByCandidate(scheduleId, userId);
+        return ResponseEntity.ok(Map.of("message", message));
+    }
+
+    /**
+     * GET /interview-schedules/confirm-update/info?token=xxx
+     * Lấy thông tin lịch PV để FE hiển thị trước khi UV xác nhận (Public, không cần
+     * Auth).
+     */
+    @GetMapping("/confirm-update/info")
+    public ResponseEntity<ResConfirmUpdateInfoDTO> getConfirmUpdateInfo(
+            @RequestParam String token) {
+        return ResponseEntity.ok(interviewService.getConfirmUpdateInfo(token));
+    }
+
+    /**
+     * PATCH /interview-schedules/confirm-update?token=xxx
+     * UV xác nhận lịch PV NTT vừa cập nhật (Public, không cần Auth).
+     */
+    @PatchMapping("/confirm-update")
     public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
             @RequestParam String token) {
         String message = interviewService.confirmUpdatedSchedule(token);

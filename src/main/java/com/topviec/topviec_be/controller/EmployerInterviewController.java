@@ -87,6 +87,16 @@ public class EmployerInterviewController {
                 .body(interviewService.createSchedule(roundId, userId, companyId, request));
     }
 
+    @GetMapping("/interview-rounds/{roundId}/schedule-slots")
+    public ResponseEntity<List<ResInterviewSlotDTO>> getSlots(
+            @PathVariable Long roundId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(interviewService.getSlots(roundId, companyId));
+    }
+
     @PostMapping("/interview-rounds/{roundId}/schedule-slots")
     public ResponseEntity<Void> createSlots(
             @PathVariable Long roundId,
@@ -167,6 +177,18 @@ public class EmployerInterviewController {
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
         return ResponseEntity.ok(interviewService.getInterviewHistory(applicationId, companyId));
+    }
+
+    // ── Lọc UV theo trạng thái lịch ─────────────────────────────────────────
+
+    @GetMapping("/interview-rounds/{roundId}/pending-candidates")
+    public ResponseEntity<List<ResInterviewScheduleDTO>> getPendingCandidates(
+            @PathVariable Long roundId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(interviewService.getPendingCandidates(roundId, companyId));
     }
 
     // ── Overdue ──────────────────────────────────────────────────────────────

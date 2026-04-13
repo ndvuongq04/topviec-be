@@ -90,6 +90,52 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Thông báo thay đổi lịch phỏng vấn", htmlBody);
     }
 
+    @Override
+    public void sendCancelScheduleEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                        String scheduledTime, String scheduledDate, String roundName) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("scheduledTime", scheduledTime);
+        context.setVariable("scheduledDate", scheduledDate);
+        context.setVariable("roundName", roundName);
+
+        String htmlBody = templateEngine.process("email/cancel-schedule", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo hủy lịch phỏng vấn", htmlBody);
+    }
+
+    @Override
+    public void sendInterviewResultEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                         String roundName, boolean passed, Integer rating, String note) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("roundName", roundName);
+        context.setVariable("passed", passed);
+        context.setVariable("rating", rating);
+        context.setVariable("note", note);
+
+        String htmlBody = templateEngine.process("email/interview-result", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo kết quả phỏng vấn", htmlBody);
+    }
+
+    @Override
+    public void sendSlotSelectionEmail(String toEmail, String candidateName, String companyName, String jobTitle,
+                                       String roundName, String deadline, String selectSlotLink) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("roundName", roundName);
+        context.setVariable("deadline", deadline);
+        context.setVariable("selectSlotLink", selectSlotLink);
+
+        String htmlBody = templateEngine.process("email/select-slot", context);
+        sendHtmlEmail(toEmail, "[Topviec] Chọn lịch phỏng vấn - " + companyName, htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

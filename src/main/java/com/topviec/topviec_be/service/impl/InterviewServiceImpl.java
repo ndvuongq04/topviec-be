@@ -13,6 +13,7 @@ import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +33,7 @@ public class InterviewServiceImpl implements InterviewService {
     private final InterviewRoundRepository roundRepository;
     private final InterviewRoundInterviewerRepository interviewerRepository;
     private final InterviewSlotRepository slotRepository;
+    private final InterviewSlotInvitationRepository invitationRepository;
     private final InterviewRepository interviewRepository;
     private final InterviewResultRepository resultRepository;
     private final ApplicationRepository applicationRepository;
@@ -40,6 +44,18 @@ public class InterviewServiceImpl implements InterviewService {
     private final TokenService tokenService;
     private final EmailService emailService;
     private final CompanyRepository companyRepository;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
+
+    @Value("${app.confirm-interview-url}")
+    private String confirmInterviewUrl;
+
+    @Value("${app.slot-selection-url}")
+    private String slotSelectionUrl;
+
+    @Value("${app.token.interview-update-ttl}")
+    private long interviewUpdateTtlDays;
 
     // =========================================================================
     // Vòng phỏng vấn
@@ -241,22 +257,24 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Ứng viên không ở trạng thái INTERVIEWING");
         }
 
-        softDeleteExistingInterview(application.getId(), roundId, userId);
+        // Update-in-place: tránh vi phạm UNIQUE(application_id, round_id)
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(application.getId(), roundId)
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(application.getId())
+                        .roundId(roundId)
+                        .build());
 
-        // Bỏ reminderCount — đã xóa khỏi entity Interview
-        Interview interview = Interview.builder()
-                .applicationId(application.getId())
-                .roundId(roundId)
-                .scheduledAt(request.getScheduledAt())
-                .durationMinutes(request.getDurationMinutes())
-                .interviewType(request.getInterviewType())
-                .location(request.getLocation())
-                .meetingLink(request.getMeetingLink())
-                .interviewerNote(request.getInterviewerNote())
-                .status(InterviewStatus.SCHEDULED.getValue())
-                .confirmedByCandidate(false)
-                .scheduledBy(userId)
-                .build();
+        interview.setScheduledAt(request.getScheduledAt());
+        interview.setDurationMinutes(request.getDurationMinutes());
+        interview.setInterviewType(request.getInterviewType());
+        interview.setLocation(request.getLocation());
+        interview.setMeetingLink(request.getMeetingLink());
+        interview.setInterviewerNote(request.getInterviewerNote());
+        interview.setStatus(InterviewStatus.SCHEDULED.getValue());
+        interview.setConfirmedByCandidate(false);
+        interview.setIsDefault(false);
+        interview.setScheduledBy(userId);
 
         interview = interviewRepository.save(interview);
 
@@ -283,27 +301,33 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Deadline phải là thời gian trong tương lai");
         }
 
-        // Check duplicate: slot đã tồn tại cho round này chưa
-        boolean alreadyHasSlots = slotRepository.existsByRoundId(roundId);
-        if (alreadyHasSlots) {
-            throw AppException.badRequest("Vòng phỏng vấn này đã có slot rồi");
-        }
+        // Tính batch number cho đợt này
+        int batchNumber = invitationRepository.findMaxBatchNumber(roundId) + 1;
 
-        // Tạo slots 1 lần cho round — không còn loop theo UV
+        // Tạo slots 1 lần cho round — gắn batchNumber để phân biệt đợt
         for (ReqCreateInterviewSlotsDTO.SlotDTO slotDto : request.getSlots()) {
+            if (slotDto.getEndTime().isBefore(slotDto.getStartTime()) ||
+                    slotDto.getEndTime().isEqual(slotDto.getStartTime())) {
+                throw AppException.badRequest("Giờ kết thúc phải sau giờ bắt đầu");
+            }
             InterviewSlot slot = InterviewSlot.builder()
                     .roundId(roundId)
-                    .proposedAt(slotDto.getProposedAt())
+                    .startTime(slotDto.getStartTime())
+                    .endTime(slotDto.getEndTime())
                     .interviewType(slotDto.getInterviewType())
                     .location(slotDto.getLocation())
                     .meetingLink(slotDto.getMeetingLink())
+                    .maxCandidates(slotDto.getMaxCandidates())
+                    .interviewerName(slotDto.getInterviewerName())
+                    .batchNumber(batchNumber)
                     .build();
             slotRepository.save(slot);
         }
 
         Duration ttl = Duration.between(LocalDateTime.now(), request.getDeadline());
 
-        // Loop UV chỉ để: validate, lưu reminder Redis, generate token, đổi status
+        // Loop UV chỉ để: validate, tạo invitation, lưu reminder Redis, generate token,
+        // đổi status
         for (Long applicationId : request.getApplicationIds()) {
             Application application = applicationRepository.findById(applicationId)
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển: " + applicationId));
@@ -312,6 +336,15 @@ public class InterviewServiceImpl implements InterviewService {
                 throw AppException.badRequest("Ứng viên " + applicationId + " không ở trạng thái INTERVIEWING");
             }
 
+            // Lưu invitation: UV này nhận đợt slot nào trong round nào, kèm hạn chọn
+            InterviewSlotInvitation invitation = InterviewSlotInvitation.builder()
+                    .applicationId(applicationId)
+                    .roundId(roundId)
+                    .batchNumber(batchNumber)
+                    .deadline(request.getDeadline())
+                    .build();
+            invitationRepository.save(invitation);
+
             // Lưu reminder info vào Redis thay vì lưu trong Interview entity
             tokenService.storeReminderInfo(applicationId, roundId, request.getDeadline(), ttl);
 
@@ -319,8 +352,137 @@ public class InterviewServiceImpl implements InterviewService {
             application.setStatus(ApplicationStatus.SCHEDULE_PENDING.getValue());
             applicationRepository.save(application);
 
-            log.info("📧 [TODO] Gửi email slot cho application={}, round={}, token={}", applicationId, roundId, token);
+            try {
+                User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+                if (candidateUser != null) {
+                    String candidateName = getCandidateName(application.getCandidateUserId());
+                    String candidateEmail = candidateUser.getEmail();
+
+                    String jobTitle = "Vị trí ứng tuyển";
+                    String companyName = "Nhà tuyển dụng";
+                    JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                    if (jobPosting != null) {
+                        jobTitle = jobPosting.getTitle();
+                        Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                        if (company != null)
+                            companyName = company.getName();
+                    }
+
+                    String roundName = "Vòng " + round.getRoundNumber() + " - " + round.getRoundName();
+                    String deadlineStr = request.getDeadline()
+                            .format(DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy"));
+                    String selectSlotLink = slotSelectionUrl + "?token=" + token;
+
+                    emailService.sendSlotSelectionEmail(candidateEmail, candidateName, companyName,
+                            jobTitle, roundName, deadlineStr, selectSlotLink);
+                    log.info("📧 Đã gửi email chọn slot cho application={}, round={}", applicationId, roundId);
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi email slot cho application={}, round={}", applicationId, roundId, e);
+            }
         }
+    }
+
+    // =========================================================================
+    // Lấy danh sách slot của 1 vòng PV
+    // =========================================================================
+
+    @Override
+    public List<ResInterviewSlotDTO> getSlots(Long roundId, Long companyId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        findJobAndValidateOwnership(round.getJobPostId(), companyId);
+
+        // Mỗi batch có deadline riêng — lấy 1 lần, map theo batchNumber
+        Map<Integer, LocalDateTime> batchDeadlines = invitationRepository.findByRoundId(roundId).stream()
+                .collect(Collectors.toMap(
+                        InterviewSlotInvitation::getBatchNumber,
+                        InterviewSlotInvitation::getDeadline,
+                        (a, b) -> a));
+
+        return slotRepository.findByRoundIdOrderByStartTimeAsc(roundId).stream()
+                .map(slot -> ResInterviewSlotDTO.builder()
+                        .id(slot.getId())
+                        .roundId(slot.getRoundId())
+                        .slotDeadline(batchDeadlines.get(slot.getBatchNumber()))
+                        .startTime(slot.getStartTime())
+                        .endTime(slot.getEndTime())
+                        .interviewType(slot.getInterviewType())
+                        .location(slot.getLocation())
+                        .meetingLink(slot.getMeetingLink())
+                        .interviewerName(slot.getInterviewerName())
+                        .maxCandidates(slot.getMaxCandidates())
+                        .registeredCount(slot.getRegisteredCount())
+                        .createdAt(slot.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    // =========================================================================
+    // Lấy danh sách slot còn chỗ theo token (trang chọn slot của UV)
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResSlotSelectionPageDTO getSlotsByToken(String token) {
+        String payload = tokenService.verifyInterviewSlotToken(token);
+        String[] parts = payload.split(":");
+        Long applicationId = Long.parseLong(parts[0]);
+        Long roundId = Long.parseLong(parts[1]);
+
+        boolean alreadySelected = interviewRepository
+                .existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(applicationId, roundId);
+        if (alreadySelected) {
+            throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
+        }
+
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        // Lấy deadline của batch mới nhất được gửi cho UV này
+        LocalDateTime deadline = invitationRepository
+                .findTopByApplicationIdAndRoundIdOrderByBatchNumberDesc(applicationId, roundId)
+                .map(InterviewSlotInvitation::getDeadline)
+                .orElse(null);
+
+        String jobTitle = "Vị trí ứng tuyển";
+        String companyName = "Nhà tuyển dụng";
+        JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+        if (jobPosting != null) {
+            jobTitle = jobPosting.getTitle();
+            Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+            if (company != null)
+                companyName = company.getName();
+        }
+
+        List<ResInterviewSlotDTO> availableSlots = slotRepository
+                .findByRoundIdOrderByStartTimeAsc(roundId).stream()
+                .filter(slot -> slot.getRegisteredCount() < slot.getMaxCandidates())
+                .map(slot -> ResInterviewSlotDTO.builder()
+                        .id(slot.getId())
+                        .roundId(slot.getRoundId())
+                        .slotDeadline(deadline)
+                        .startTime(slot.getStartTime())
+                        .endTime(slot.getEndTime())
+                        .interviewType(slot.getInterviewType())
+                        .location(slot.getLocation())
+                        .meetingLink(slot.getMeetingLink())
+                        .interviewerName(slot.getInterviewerName())
+                        .maxCandidates(slot.getMaxCandidates())
+                        .registeredCount(slot.getRegisteredCount())
+                        .createdAt(slot.getCreatedAt())
+                        .build())
+                .toList();
+
+        return ResSlotSelectionPageDTO.builder()
+                .companyName(companyName)
+                .jobTitle(jobTitle)
+                .roundName("Vòng " + round.getRoundNumber() + " - " + round.getRoundName())
+                .roundNumber(round.getRoundNumber())
+                .deadline(deadline)
+                .slots(availableSlots)
+                .build();
     }
 
     // =========================================================================
@@ -343,30 +505,41 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Ca phỏng vấn không thuộc vòng phỏng vấn này");
         }
 
-        // Check UV đã chọn slot cho round này chưa (thay vì check isSelected trên
-        // slot)
+        // Check UV đã có lịch THẬT (isDefault = false) cho round này chưa
         boolean alreadySelected = interviewRepository
-                .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(tokenApplicationId, tokenRoundId);
+                .existsByApplicationIdAndRoundIdAndIsDefaultFalseAndDeletedAtIsNull(tokenApplicationId, tokenRoundId);
         if (alreadySelected) {
             throw AppException.badRequest("Bạn đã chọn lịch phỏng vấn cho vòng này rồi");
         }
 
-        // Tạo Interview record — bỏ reminderCount, không còn update isSelected trên
-        // slot
-        Interview interview = Interview.builder()
-                .applicationId(tokenApplicationId)
-                .roundId(tokenRoundId)
-                .slotId(slot.getId())
-                .scheduledAt(slot.getProposedAt())
-                .interviewType(slot.getInterviewType())
-                .location(slot.getLocation())
-                .meetingLink(slot.getMeetingLink())
-                .status(InterviewStatus.CONFIRMED.getValue())
-                .confirmedByCandidate(true)
-                .scheduledBy(0L)
-                .build();
+        // Kiểm tra slot còn chỗ không
+        if (slot.getRegisteredCount() >= slot.getMaxCandidates()) {
+            throw AppException.badRequest("Ca phỏng vấn này đã đủ số lượng ứng viên");
+        }
+
+        // Update-in-place: tìm placeholder nếu có, không thì tạo mới
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(tokenApplicationId, tokenRoundId)
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(tokenApplicationId)
+                        .roundId(tokenRoundId)
+                        .scheduledBy(0L)
+                        .build());
+
+        interview.setSlotId(slot.getId());
+        interview.setScheduledAt(slot.getStartTime());
+        interview.setInterviewType(slot.getInterviewType());
+        interview.setLocation(slot.getLocation());
+        interview.setMeetingLink(slot.getMeetingLink());
+        interview.setStatus(InterviewStatus.CONFIRMED.getValue());
+        interview.setConfirmedByCandidate(true);
+        interview.setIsDefault(false);
 
         interviewRepository.save(interview);
+
+        // Tăng registeredCount của slot
+        slot.setRegisteredCount(slot.getRegisteredCount() + 1);
+        slotRepository.save(slot);
 
         Application application = applicationRepository.findById(tokenApplicationId).orElse(null);
         if (application != null) {
@@ -381,6 +554,66 @@ public class InterviewServiceImpl implements InterviewService {
         log.info("📧 [TODO] Gửi email xác nhận slot cho application={}, round={}", tokenApplicationId, tokenRoundId);
 
         return "Xác nhận lịch phỏng vấn thành công!";
+    }
+
+    @Override
+    @Transactional
+    public String confirmScheduleByCandidate(Long scheduleId, Long userId) {
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        applicationRepository.findByIdAndCandidateUserId(interview.getApplicationId(), userId)
+                .orElseThrow(() -> AppException.forbidden("Bạn không có quyền xác nhận lịch phỏng vấn này"));
+
+        if (!InterviewStatus.SCHEDULED.getValue().equals(interview.getStatus())) {
+            throw AppException.badRequest("Lịch phỏng vấn đang không ở trạng thái chờ xác nhận");
+        }
+
+        interview.setStatus(InterviewStatus.CONFIRMED.getValue());
+        interview.setConfirmedByCandidate(true);
+        interviewRepository.save(interview);
+
+        return "Xác nhận lịch phỏng vấn thành công!";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResConfirmUpdateInfoDTO getConfirmUpdateInfo(String token) {
+        String scheduleIdStr = tokenService.verifyInterviewUpdateToken(token);
+        Long scheduleId = Long.parseLong(scheduleIdStr);
+
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        InterviewRound round = interview.getRound();
+
+        String jobTitle = "Vị trí ứng tuyển";
+        String companyName = "Nhà tuyển dụng";
+        if (round != null) {
+            JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+            if (jobPosting != null) {
+                jobTitle = jobPosting.getTitle();
+                Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                if (company != null) {
+                    companyName = company.getName();
+                }
+            }
+        }
+
+        return ResConfirmUpdateInfoDTO.builder()
+                .scheduleId(interview.getId())
+                .companyName(companyName)
+                .jobTitle(jobTitle)
+                .roundNumber(round != null ? round.getRoundNumber() : null)
+                .roundName(round != null ? round.getRoundName() : null)
+                .scheduledAt(interview.getScheduledAt())
+                .durationMinutes(interview.getDurationMinutes())
+                .interviewType(interview.getInterviewType())
+                .location(interview.getLocation())
+                .meetingLink(interview.getMeetingLink())
+                .status(interview.getStatus())
+                .confirmedByCandidate(interview.getConfirmedByCandidate())
+                .build();
     }
 
     @Override
@@ -552,12 +785,10 @@ public class InterviewServiceImpl implements InterviewService {
                     interviewerName = "Ban Tuyển Dụng";
                 }
 
-                String token = tokenService.generateInterviewUpdateToken(interview.getId(), Duration.ofDays(7));
-                
-                // Giả sủ base-url API backend/frontend, endpoint API public = baseUrl/api/v1/interview-schedules/confirm-update?token=xxx
-                // Actually tokenService doesn't have baseUrl, we assume we append it to our backend host or frontend host.
-                // Normally we'd inject property "app.base-url" or "app.api-url" but here we construct relative pathway 
-                String confirmLink = "http://localhost:8080/api/v1/interview-schedules/confirm-update?token=" + token;
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(),
+                        Duration.ofDays(interviewUpdateTtlDays));
+
+                String confirmLink = confirmInterviewUrl + "?token=" + token;
 
                 emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
                         oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,
@@ -590,7 +821,51 @@ public class InterviewServiceImpl implements InterviewService {
         interview.setUpdatedBy(userId);
         interviewRepository.save(interview);
 
-        log.info("📧 [TODO] Gửi email thông báo hủy lịch PV schedule={}", scheduleId);
+        log.info("📧 Gửi email thông báo hủy lịch PV schedule={}", scheduleId);
+
+        try {
+            Application application = interview.getApplication();
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+
+                String companyName = "Nhà tuyển dụng";
+                if (jobPosting != null) {
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null)
+                        companyName = company.getName();
+                }
+
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                String scheduledTime = interview.getScheduledAt() != null
+                        ? interview.getScheduledAt().format(timeFormatter)
+                        : "";
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dow = "";
+                if (interview.getScheduledAt() != null) {
+                    int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
+                    dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
+                }
+                String scheduledDate = dow + ", "
+                        + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+
+                String roundName = round != null
+                        ? "Vòng " + round.getRoundNumber()
+                                + (round.getRoundName() != null ? " - " + round.getRoundName() : "")
+                        : "Vòng phỏng vấn";
+
+                emailService.sendCancelScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
+                        scheduledTime, scheduledDate, roundName);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email thông báo hủy lịch PV cho schedule={}", scheduleId, e);
+        }
     }
 
     // =========================================================================
@@ -637,7 +912,7 @@ public class InterviewServiceImpl implements InterviewService {
         Application application = applicationRepository.findById(interview.getApplicationId()).orElse(null);
         if (application != null) {
             handlePostResult(application, round, resultStatus, Boolean.TRUE.equals(request.getNotifyCandidate()),
-                    userId);
+                    userId, request.getRating(), request.getNote());
         }
 
         return toResultResponse(result);
@@ -776,6 +1051,23 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     // =========================================================================
+    // Lọc UV theo trạng thái lịch
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResInterviewScheduleDTO> getPendingCandidates(Long roundId, Long companyId) {
+        InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy vòng phỏng vấn"));
+
+        findJobAndValidateOwnership(round.getJobPostId(), companyId);
+
+        return interviewRepository.findPendingCandidatesByRoundId(roundId).stream()
+                .map(i -> toScheduleResponse(i, round, i.getApplication()))
+                .toList();
+    }
+
+    // =========================================================================
     // Overdue
     // =========================================================================
 
@@ -861,19 +1153,22 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Không tìm thấy vòng phỏng vấn phù hợp");
         }
 
-        softDeleteExistingInterview(application.getId(), currentRound.getId(), userId);
+        // Update-in-place: tránh vi phạm UNIQUE(application_id, round_id)
+        Interview interview = interviewRepository
+                .findByApplicationIdAndRoundIdAndDeletedAtIsNull(application.getId(), currentRound.getId())
+                .orElseGet(() -> Interview.builder()
+                        .applicationId(application.getId())
+                        .roundId(currentRound.getId())
+                        .build());
 
-        Interview interview = Interview.builder()
-                .applicationId(application.getId())
-                .roundId(currentRound.getId())
-                .scheduledAt(request.getScheduledAt())
-                .interviewType(request.getInterviewType())
-                .location(request.getLocation())
-                .meetingLink(request.getMeetingLink())
-                .status(InterviewStatus.SCHEDULED.getValue())
-                .confirmedByCandidate(false)
-                .scheduledBy(userId)
-                .build();
+        interview.setScheduledAt(request.getScheduledAt());
+        interview.setInterviewType(request.getInterviewType());
+        interview.setLocation(request.getLocation());
+        interview.setMeetingLink(request.getMeetingLink());
+        interview.setStatus(InterviewStatus.SCHEDULED.getValue());
+        interview.setConfirmedByCandidate(false);
+        interview.setIsDefault(false);
+        interview.setScheduledBy(userId);
 
         interview = interviewRepository.save(interview);
 
@@ -958,14 +1253,14 @@ public class InterviewServiceImpl implements InterviewService {
                             .jobPostId(jobPostId)
                             .roundNumber(1)
                             .roundName("Vòng 1")
-                            .isFinal(false)
+                            .isFinal(true)
                             .createdBy(userId)
                             .updatedBy(userId)
                             .build();
                     return roundRepository.save(defaultRound);
                 });
 
-        // Tạo Interview record PENDING cho từng UV cv_passed vào vòng 1
+        // Tạo Interview record PENDING (placeholder) cho từng UV cv_passed vào vòng 1
         for (Application app : cvPassedApps) {
             boolean alreadyExists = interviewRepository
                     .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(app.getId(), round1.getId());
@@ -974,6 +1269,7 @@ public class InterviewServiceImpl implements InterviewService {
                         .applicationId(app.getId())
                         .roundId(round1.getId())
                         .status(InterviewStatus.PENDING.getValue())
+                        .isDefault(true)
                         .scheduledBy(userId)
                         .build();
                 interviewRepository.save(interview);
@@ -1057,16 +1353,41 @@ public class InterviewServiceImpl implements InterviewService {
     }
 
     private void handlePostResult(Application application, InterviewRound round,
-            InterviewResultStatus resultStatus, boolean notifyCandidate, long userId) {
+            InterviewResultStatus resultStatus, boolean notifyCandidate, long userId,
+            Integer rating, String note) {
 
-        if (resultStatus == InterviewResultStatus.FAIL) {
+        boolean passed = resultStatus == InterviewResultStatus.PASS;
+        String roundName = "Vòng " + round.getRoundNumber()
+                + (round.getRoundName() != null ? " - " + round.getRoundName() : "");
+
+        // Gửi email kết quả nếu NTT chọn thông báo UV
+        if (notifyCandidate) {
+            log.info("📧 Gửi email kết quả PV ({}) cho application={}", passed ? "PASS" : "FAIL", application.getId());
+            try {
+                User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+                if (candidateUser != null) {
+                    String candidateName = getCandidateName(application.getCandidateUserId());
+                    JobPosting jobPosting = jobPostingRepository.findById(application.getJobPostId()).orElse(null);
+                    String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+                    String companyName = "Nhà tuyển dụng";
+                    if (jobPosting != null) {
+                        Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                        if (company != null)
+                            companyName = company.getName();
+                    }
+                    emailService.sendInterviewResultEmail(candidateUser.getEmail(), candidateName,
+                            companyName, jobTitle, roundName, passed, rating, note);
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi email kết quả PV cho application={}", application.getId(), e);
+            }
+        }
+
+        if (!passed) {
             application.setStatus(ApplicationStatus.REJECTED.getValue());
             application.setRejectedAt(LocalDateTime.now());
             applicationRepository.save(application);
-            if (notifyCandidate) {
-                log.info("📧 [TODO] Gửi email thông báo FAIL cho application={}", application.getId());
-            }
-        } else if (resultStatus == InterviewResultStatus.PASS) {
+        } else {
             if (Boolean.TRUE.equals(round.getIsFinal())) {
                 // application.setStatus(ApplicationStatus.OFFERED.getValue());
                 // applicationRepository.save(application);
@@ -1077,7 +1398,6 @@ public class InterviewServiceImpl implements InterviewService {
                             log.info("➡️ Application {} pass vòng {}, tiếp tục vòng {}",
                                     application.getId(), round.getRoundNumber(), nextRound.getRoundNumber());
 
-                            // Tạo Interview PENDING cho vòng tiếp theo
                             boolean alreadyExists = interviewRepository
                                     .existsByApplicationIdAndRoundIdAndDeletedAtIsNull(
                                             application.getId(), nextRound.getId());
@@ -1086,19 +1406,14 @@ public class InterviewServiceImpl implements InterviewService {
                                         .applicationId(application.getId())
                                         .roundId(nextRound.getId())
                                         .status(InterviewStatus.PENDING.getValue())
-                                        .scheduledBy(userId) // hệ thống tự tạo, không có user cụ thể
+                                        .isDefault(true)
+                                        .scheduledBy(userId)
                                         .build();
                                 interviewRepository.save(interview);
                             }
 
-                            // Chuyển status application sang INTERVIEWING
                             application.setStatus(ApplicationStatus.INTERVIEWING.getValue());
                             applicationRepository.save(application);
-
-                            if (notifyCandidate) {
-                                log.info("📧 [TODO] Gửi email thông báo PASS + slot vòng tiếp cho application={}",
-                                        application.getId());
-                            }
                         });
             }
         }
@@ -1164,6 +1479,59 @@ public class InterviewServiceImpl implements InterviewService {
         CandidateProfile profile = candidateProfileRepository.findByUserId(application.getCandidateUserId())
                 .orElse(null);
 
+        // Lấy thông tin slot UV đã chọn (nếu có)
+        InterviewSlot chosenSlot = interview.getSlotId() != null
+                ? slotRepository.findById(interview.getSlotId()).orElse(null)
+                : null;
+
+        // Lấy danh sách slot đã gửi cho UV này trong round này
+        List<InterviewSlotInvitation> invitations = invitationRepository
+                .findByApplicationIdAndRoundIdOrderByBatchNumberAsc(application.getId(), interview.getRoundId());
+
+        List<ResInterviewScheduleDTO.SentSlotDTO> sentSlots = List.of();
+        if (!invitations.isEmpty()) {
+            // Map batchNumber → deadline từ invitations
+            Map<Integer, LocalDateTime> batchDeadlines = invitations.stream()
+                    .collect(Collectors.toMap(
+                            InterviewSlotInvitation::getBatchNumber,
+                            InterviewSlotInvitation::getDeadline,
+                            (a, b) -> a));
+
+            List<Integer> batchNumbers = invitations.stream()
+                    .map(InterviewSlotInvitation::getBatchNumber)
+                    .toList();
+
+            sentSlots = slotRepository
+                    .findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(interview.getRoundId(),
+                            batchNumbers)
+                    .stream()
+                    .map(slot -> ResInterviewScheduleDTO.SentSlotDTO.builder()
+                            .id(slot.getId())
+                            .batchNumber(slot.getBatchNumber())
+                            .deadline(batchDeadlines.get(slot.getBatchNumber()))
+                            .startTime(slot.getStartTime())
+                            .endTime(slot.getEndTime())
+                            .interviewType(slot.getInterviewType())
+                            .location(slot.getLocation())
+                            .meetingLink(slot.getMeetingLink())
+                            .interviewerName(slot.getInterviewerName())
+                            .maxCandidates(slot.getMaxCandidates())
+                            .registeredCount(slot.getRegisteredCount())
+                            .build())
+                    .toList();
+        }
+        // Phòng ngừa khi Cron job lỗi
+        // Tính effective applicationStatus: nếu đang SCHEDULE_PENDING mà deadline
+        // của batch mới nhất đã qua → hiển thị là overdue (không update DB)
+        String effectiveApplicationStatus = application.getStatus();
+        if (ApplicationStatus.SCHEDULE_PENDING.getValue().equals(effectiveApplicationStatus)
+                && !invitations.isEmpty()) {
+            LocalDateTime latestDeadline = invitations.get(invitations.size() - 1).getDeadline();
+            if (latestDeadline.isBefore(LocalDateTime.now())) {
+                effectiveApplicationStatus = ApplicationStatus.OVERDUE.getValue();
+            }
+        }
+
         return ResInterviewScheduleDTO.builder()
                 .id(interview.getId())
                 .applicationId(interview.getApplicationId())
@@ -1180,8 +1548,14 @@ public class InterviewServiceImpl implements InterviewService {
                 .meetingLink(interview.getMeetingLink())
                 .status(interview.getStatus())
                 .confirmedByCandidate(interview.getConfirmedByCandidate())
+                .isDefault(interview.getIsDefault())
                 .interviewerNote(interview.getInterviewerNote())
-                .applicationStatus(application.getStatus())
+                .slotId(chosenSlot != null ? chosenSlot.getId() : null)
+                .slotStartTime(chosenSlot != null ? chosenSlot.getStartTime() : null)
+                .slotEndTime(chosenSlot != null ? chosenSlot.getEndTime() : null)
+                .slotInterviewerName(chosenSlot != null ? chosenSlot.getInterviewerName() : null)
+                .sentSlots(sentSlots)
+                .applicationStatus(effectiveApplicationStatus)
                 .createdAt(interview.getCreatedAt())
                 .updatedAt(interview.getUpdatedAt())
                 .build();

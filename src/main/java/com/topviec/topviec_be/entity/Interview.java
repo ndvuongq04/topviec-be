@@ -47,6 +47,13 @@ public class Interview {
     @Column(name = "confirmed_by_candidate", nullable = false)
     private Boolean confirmedByCandidate;
 
+    /**
+     * true  = lịch placeholder tạo tự động (startInterviewing / pass vòng tiếp theo)
+     * false = lịch thật sự do NTT đặt hoặc UV chọn slot
+     */
+    @Column(name = "is_default", nullable = false)
+    private Boolean isDefault;
+
     // Lưu Redis
     // @Column(name = "reminder_count", nullable = false)
     // private Integer reminderCount;
@@ -97,6 +104,8 @@ public class Interview {
         this.updatedAt = LocalDateTime.now();
         if (this.confirmedByCandidate == null)
             this.confirmedByCandidate = false;
+        if (this.isDefault == null)
+            this.isDefault = false;
     }
 
     @PreUpdate
