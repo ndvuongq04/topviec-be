@@ -1127,8 +1127,54 @@ public class InterviewServiceImpl implements InterviewService {
         application.setStatus(ApplicationStatus.SCHEDULE_PENDING.getValue());
         applicationRepository.save(application);
 
-        log.info("📧 [TODO] Gửi lại email slot cho application={}, gia hạn thêm {} ngày",
-                applicationId, request.getExtendDays());
+        List<InterviewRound> rounds = roundRepository
+                .findByJobPostIdAndDeletedAtIsNullOrderByRoundNumberAsc(application.getJobPostId());
+        InterviewRound currentRound = findCurrentRoundForApplication(application.getId(), rounds);
+
+        if (currentRound == null) {
+            throw AppException.badRequest("Không tìm thấy vòng phỏng vấn phù hợp");
+        }
+
+        InterviewSlotInvitation invitation = invitationRepository
+                .findTopByApplicationIdAndRoundIdOrderByBatchNumberDesc(applicationId, currentRound.getId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lời mời chọn slot trước đó"));
+
+        LocalDateTime newDeadline = LocalDateTime.now().plusDays(request.getExtendDays());
+        invitation.setDeadline(newDeadline);
+        invitationRepository.save(invitation);
+
+        Duration ttl = Duration.between(LocalDateTime.now(), newDeadline);
+        tokenService.storeReminderInfo(applicationId, currentRound.getId(), newDeadline, ttl);
+
+        try {
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                String jobTitle = "Vị trí ứng tuyển";
+                String companyName = "Nhà tuyển dụng";
+                JobPosting jobPosting = jobPostingRepository.findById(currentRound.getJobPostId()).orElse(null);
+                if (jobPosting != null) {
+                    jobTitle = jobPosting.getTitle();
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null)
+                        companyName = company.getName();
+                }
+
+                String roundName = "Vòng " + currentRound.getRoundNumber() + " - " + currentRound.getRoundName();
+                String deadlineStr = newDeadline.format(DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy"));
+                
+                String token = tokenService.generateInterviewSlotToken(applicationId, currentRound.getId(), ttl);
+                String selectSlotLink = slotSelectionUrl + "?token=" + token;
+
+                emailService.sendSlotSelectionEmail(candidateEmail, candidateName, companyName,
+                        jobTitle, roundName, deadlineStr, selectSlotLink);
+                log.info("📧 Đã gửi email gia hạn chọn slot cho application={}, round={}", applicationId, currentRound.getId());
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email gia hạn slot cho application={}, round={}", applicationId, currentRound.getId(), e);
+        }
     }
 
     @Override
