@@ -142,6 +142,15 @@ public class EmployerInterviewController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/interview-schedules/{scheduleId}/remind")
+    public ResponseEntity<Void> remindConfirmSchedule(@PathVariable Long scheduleId) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        interviewService.remindConfirmSchedule(scheduleId, userId, companyId);
+        return ResponseEntity.ok().build();
+    }
+
     // ── Kết quả phỏng vấn ────────────────────────────────────────────────────
 
     @PostMapping("/interview-schedules/{scheduleId}/results")

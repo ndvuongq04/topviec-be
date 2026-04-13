@@ -38,7 +38,10 @@ public interface InterviewService {
         /** UV xác nhận chọn slot (public, không cần auth) */
         String confirmSlot(String token, Long slotId);
 
-        /** Lấy danh sách slot còn chỗ theo token (public, dành cho trang chọn slot của UV) */
+        /**
+         * Lấy danh sách slot còn chỗ theo token (public, dành cho trang chọn slot của
+         * UV)
+         */
         ResSlotSelectionPageDTO getSlotsByToken(String token);
 
         /** Lấy thông tin lịch PV qua token để FE hiển thị trước khi UV xác nhận */
@@ -56,6 +59,9 @@ public interface InterviewService {
 
         /** Lấy lịch PV của 1 đơn ứng tuyển (dành cho candidate) */
         List<ResInterviewScheduleDTO> getMyInterviews(Long userId, Long applicationId);
+
+        /** Nhắc nhở UV xác nhận lịch PV (gửi lại email xác nhận) */
+        void remindConfirmSchedule(Long scheduleId, Long userId, Long companyId);
 
         /** Sửa lịch PV */
         ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,

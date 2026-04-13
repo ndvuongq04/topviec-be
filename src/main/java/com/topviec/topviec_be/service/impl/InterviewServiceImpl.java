@@ -684,6 +684,82 @@ public class InterviewServiceImpl implements InterviewService {
 
     @Override
     @Transactional
+    public void remindConfirmSchedule(Long scheduleId, Long userId, Long companyId) {
+        Interview interview = interviewRepository.findByIdAndDeletedAtIsNull(scheduleId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lịch phỏng vấn"));
+
+        InterviewRound round = interview.getRound();
+        if (round == null) throw AppException.badRequest("Dữ liệu lỗi: Lịch phỏng vấn không thuộc vòng nào");
+        findJobAndValidateOwnership(round.getJobPostId(), companyId);
+
+        if (!InterviewStatus.SCHEDULED.getValue().equals(interview.getStatus())) {
+            throw AppException.badRequest("Lịch phỏng vấn hiện không ở trạng thái chờ xác nhận");
+        }
+        if (Boolean.TRUE.equals(interview.getConfirmedByCandidate())) {
+            throw AppException.badRequest("Ứng viên đã xác nhận tham dự lịch này rồi");
+        }
+
+        try {
+            Application application = interview.getApplication();
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                JobPosting jobPosting = jobPostingRepository.findById(round.getJobPostId()).orElse(null);
+                String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+
+                String companyName = "Nhà tuyển dụng";
+                if (jobPosting != null) {
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null) {
+                        companyName = company.getName();
+                    }
+                }
+
+                String oldScheduleStr = "Nhắc nhở xác nhận lịch phỏng vấn";
+
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                String newScheduleTimeStr = interview.getScheduledAt() != null
+                        ? interview.getScheduledAt().format(timeFormatter) : "";
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dow = "";
+                if (interview.getScheduledAt() != null) {
+                    int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
+                    dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
+                }
+                String newScheduleDateStr = dow + ", "
+                        + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+
+                String interviewTypeStr = "Phỏng vấn";
+                String interviewLocation = interviewTypeStr
+                        + (interview.getLocation() != null ? " - " + interview.getLocation() : "");
+
+                String interviewerName = interview.getInterviewerNote();
+                if (interviewerName == null || interviewerName.isBlank()) {
+                    interviewerName = "Ban Tuyển Dụng";
+                }
+
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(),
+                        Duration.ofDays(interviewUpdateTtlDays));
+
+                String confirmLink = confirmInterviewUrl + "?token=" + token;
+
+                emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
+                        oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,
+                        confirmLink);
+                log.info("📧 Đã gửi email nhắc nhở xác nhận lịch PV cho schedule={}", scheduleId);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email nhắc nhở xác nhận lịch cho schedule={}", scheduleId, e);
+            throw new AppException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Gửi email thất bại");
+        }
+    }
+
+    @Override
+    @Transactional
     public ResInterviewScheduleDTO updateSchedule(Long scheduleId, Long userId, Long companyId,
             ReqUpdateInterviewScheduleDTO request) {
 
@@ -1164,16 +1240,18 @@ public class InterviewServiceImpl implements InterviewService {
 
                 String roundName = "Vòng " + currentRound.getRoundNumber() + " - " + currentRound.getRoundName();
                 String deadlineStr = newDeadline.format(DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy"));
-                
+
                 String token = tokenService.generateInterviewSlotToken(applicationId, currentRound.getId(), ttl);
                 String selectSlotLink = slotSelectionUrl + "?token=" + token;
 
                 emailService.sendSlotSelectionEmail(candidateEmail, candidateName, companyName,
                         jobTitle, roundName, deadlineStr, selectSlotLink);
-                log.info("📧 Đã gửi email gia hạn chọn slot cho application={}, round={}", applicationId, currentRound.getId());
+                log.info("📧 Đã gửi email gia hạn chọn slot cho application={}, round={}", applicationId,
+                        currentRound.getId());
             }
         } catch (Exception e) {
-            log.error("Lỗi khi gửi email gia hạn slot cho application={}, round={}", applicationId, currentRound.getId(), e);
+            log.error("Lỗi khi gửi email gia hạn slot cho application={}, round={}", applicationId,
+                    currentRound.getId(), e);
         }
     }
 
@@ -1221,7 +1299,69 @@ public class InterviewServiceImpl implements InterviewService {
         application.setStatus(ApplicationStatus.INTERVIEWING.getValue());
         applicationRepository.save(application);
 
-        log.info("📧 [TODO] Gửi email xác nhận lịch PV (force) cho application={}", applicationId);
+        try {
+            User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
+
+            if (candidateUser != null) {
+                String candidateName = getCandidateName(application.getCandidateUserId());
+                String candidateEmail = candidateUser.getEmail();
+
+                JobPosting jobPosting = jobPostingRepository.findById(currentRound.getJobPostId()).orElse(null);
+                String jobTitle = jobPosting != null ? jobPosting.getTitle() : "Vị trí ứng tuyển";
+
+                String companyName = "Nhà tuyển dụng";
+                if (jobPosting != null) {
+                    Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+                    if (company != null) {
+                        companyName = company.getName();
+                    }
+                }
+
+                String oldScheduleStr = "Chưa thiết lập"; // Vì thiết lập hộ từ trạng thái OVERDUE
+
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                String newScheduleTimeStr = interview.getScheduledAt() != null
+                        ? interview.getScheduledAt().format(timeFormatter)
+                        : "";
+
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                String dow = "";
+                if (interview.getScheduledAt() != null) {
+                    int dowValue = interview.getScheduledAt().getDayOfWeek().getValue();
+                    dow = dowValue == 7 ? "Chủ Nhật" : "Thứ " + (dowValue + 1);
+                }
+                String newScheduleDateStr = dow + ", "
+                        + (interview.getScheduledAt() != null ? interview.getScheduledAt().format(dateFormatter) : "");
+
+                String interviewTypeStr = "Phỏng vấn";
+                if (interview.getInterviewType() != null) {
+                    try {
+                        interviewTypeStr = InterviewType.fromValue(interview.getInterviewType()).name();
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                String interviewLocation = interviewTypeStr
+                        + (interview.getLocation() != null ? " - " + interview.getLocation() : "");
+
+                String interviewerName = interview.getInterviewerNote();
+                if (interviewerName == null || interviewerName.isBlank()) {
+                    interviewerName = "Ban Tuyển Dụng";
+                }
+
+                String token = tokenService.generateInterviewUpdateToken(interview.getId(),
+                        Duration.ofDays(interviewUpdateTtlDays));
+
+                String confirmLink = confirmInterviewUrl + "?token=" + token;
+
+                emailService.sendUpdateScheduleEmail(candidateEmail, candidateName, companyName, jobTitle,
+                        oldScheduleStr, newScheduleTimeStr, newScheduleDateStr, interviewLocation, interviewerName,
+                        confirmLink);
+                log.info("📧 Đã gửi email xác nhận lịch PV (force) cho application={}", applicationId);
+            }
+        } catch (Exception e) {
+            log.error("Lỗi khi gửi email xác nhận lịch PV (force) cho application={}", applicationId, e);
+        }
 
         return toScheduleResponse(interview, currentRound, application);
     }
