@@ -1,0 +1,14 @@
+package com.topviec.topviec_be.service;
+
+import com.topviec.topviec_be.dto.request.ReqAddonPackageDTO;
+import com.topviec.topviec_be.dto.response.ResAddonPackageDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.enums.services.AddonPackageGroup;
+import org.springframework.data.domain.Pageable;
+
+public interface AddonPackageService {
+    ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, Pageable pageable);
+    ResAddonPackageDTO getAddonPackageById(Long id);
+    ResAddonPackageDTO createAddonPackage(ReqAddonPackageDTO reqDTO);
+    ResAddonPackageDTO updateAddonPackage(Long id, ReqAddonPackageDTO reqDTO);
+}
