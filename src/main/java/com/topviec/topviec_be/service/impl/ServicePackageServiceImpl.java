@@ -24,6 +24,13 @@ public class ServicePackageServiceImpl implements ServicePackageService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ResServicePackageDTO> getPublicActivePackages() {
+        return servicePackageRepository.findByIsActiveTrueOrderBySortOrderAsc().stream()
+                .map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ResultPaginationDTO getAllServicePackages(Pageable pageable) {
         Page<ServicePackage> page = servicePackageRepository.findAll(pageable);
 
