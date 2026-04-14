@@ -60,6 +60,19 @@ public class CvController {
     }
 
     /**
+     * GET /api/v1/cvs/{id}
+     * Lấy chi tiết CV theo ID của user đang đăng nhập
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<ResCvDTO> getCvById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvDTO data = cvService.getCvById(extractUserId(jwt), id);
+
+        return ResponseEntity.ok(data);
+    }
+
+    /**
      * PATCH /api/v1/cvs/:id/rename
      * Đổi tên CV
      */

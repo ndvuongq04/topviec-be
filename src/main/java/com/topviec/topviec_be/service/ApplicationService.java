@@ -3,8 +3,7 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
-import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
-import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
@@ -27,6 +26,9 @@ public interface ApplicationService {
     // CN-UV-013: Theo dõi trạng thái đơn (thêm filter status)
     ResultPaginationDTO getMyApplications(Long candidateUserId, String status, Pageable pageable);
 
+    /** Lấy các đơn của UV có ít nhất 1 lịch PV (dùng cho trang "Lịch PV của tôi") */
+    List<ResApplicationDTO> getMyApplicationsWithInterviews(Long candidateUserId);
+
     // CN-UV-015: Rút đơn
     ResApplicationDTO withdraw(Long candidateUserId, Long applicationId, ReqWithdrawApplicationDTO request);
 
@@ -36,11 +38,9 @@ public interface ApplicationService {
     // API cho Employer
     // -------------------------------------------------------------------------
 
-    ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable);
+    ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, String search, Pageable pageable);
 
     ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId);
 
-    ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request);
-
-    ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request);
+    ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request);
 }

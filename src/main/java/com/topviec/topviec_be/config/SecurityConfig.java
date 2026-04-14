@@ -33,6 +33,7 @@ public class SecurityConfig {
                         "/auth/**",
                         "/companies/**",
                         "/job-postings/**",
+                        "/interview-schedules/confirm", // UV xác nhận slot PV (không cần auth)
                         "/actuator/health",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

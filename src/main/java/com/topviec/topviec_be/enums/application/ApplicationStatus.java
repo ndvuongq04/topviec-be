@@ -8,8 +8,11 @@ public enum ApplicationStatus {
     PENDING("pending"), // Vừa nộp, NTD chưa xem
     INVITED("invited"), // NTD mời từ talent pool
     SEEN("seen"), // NTD đã mở xem CV
-    CONSIDERING("considering"), // NTD lưu để xem lại sau
+    CONSIDERING("considering"), // NTD lưu để xem lại
+    CV_PASSED("cv_passed"), // Pass vòng CV, chờ setup lịch PV
     INTERVIEWING("interviewing"), // Đang phỏng vấn
+    SCHEDULE_PENDING("schedule_pending"), // Đã gửi email slot, chờ UV chọn lịch
+    OVERDUE("overdue"), // UV không phản hồi chọn lịch sau deadline
     OFFERED("offered"), // NTD gửi offer
     HIRED("hired"), // UV chấp nhận offer
     REJECTED("rejected"), // NTD từ chối
@@ -37,24 +40,35 @@ public enum ApplicationStatus {
         throw new IllegalArgumentException("Unknown ApplicationStatus: " + value);
     }
 
-    // Kiểm tra trạng thái kết thúc (terminal state)
     public boolean isTerminal() {
         return this == HIRED || this == REJECTED || this == WITHDRAWN || this == EXPIRED;
     }
 
-    // Kiểm tra UV có thể rút đơn không
     public boolean isWithdrawable() {
-        return this == PENDING || this == SEEN;
+        return this == PENDING || this == SEEN || this == CV_PASSED;
     }
 
-    // Kiểm tra chuyển trạng thái hợp lệ
     public boolean canTransitionTo(ApplicationStatus next) {
         return switch (this) {
             case PENDING -> next == SEEN || next == WITHDRAWN || next == EXPIRED;
             case INVITED -> next == PENDING || next == EXPIRED;
-            case SEEN -> next == CONSIDERING || next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
-            case CONSIDERING -> next == INTERVIEWING || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
-            case INTERVIEWING -> next == OFFERED || next == REJECTED;
+            case SEEN -> next == CONSIDERING || next == CV_PASSED
+                    || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
+            case CONSIDERING -> next == CV_PASSED || next == REJECTED
+                    || next == EXPIRED || next == WITHDRAWN;
+            case CV_PASSED -> next == INTERVIEWING || next == CONSIDERING
+                    || next == REJECTED || next == WITHDRAWN || next == EXPIRED;
+
+            // INTERVIEWING: khi gửi slot cho UV chọn lịch vòng tiếp → SCHEDULE_PENDING
+            case INTERVIEWING -> next == SCHEDULE_PENDING || next == OFFERED || next == REJECTED;
+
+            // SCHEDULE_PENDING: UV chọn lịch → về INTERVIEWING | quá hạn → OVERDUE
+            case SCHEDULE_PENDING -> next == INTERVIEWING || next == OVERDUE;
+
+            // OVERDUE: NTT gia hạn → SCHEDULE_PENDING | NTT đặt lịch hộ → INTERVIEWING |
+            // NTT từ chối → REJECTED
+            case OVERDUE -> next == SCHEDULE_PENDING || next == INTERVIEWING || next == REJECTED;
+
             case OFFERED -> next == HIRED || next == REJECTED;
             default -> false; // terminal states
         };

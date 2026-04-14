@@ -4,9 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
-import com.topviec.topviec_be.dto.request.ReqUpdateApplicationStatusDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationCvDTO;
-import com.topviec.topviec_be.dto.request.ReqEvaluateApplicationDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -58,7 +57,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     @Transactional
     public ResApplicationDTO apply(Long candidateUserId, Long jobPostId, ReqApplyJobDTO request) {
-        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
         Application application = getOrInitializeApplication(
                 candidateUserId, jobPostId, request.getCvId(),
@@ -75,7 +74,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     @Transactional
     public ResApplicationDTO quickApply(Long candidateUserId, Long jobPostId) {
-        JobPosting job = findPublishedJobOrThrow(jobPostId);
+        JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
         // Lấy CV mặc định
         Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId)
@@ -110,7 +109,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         List<ResApplicationDTO> results = new ArrayList<>();
 
         for (Long jobPostId : distinctJobIds) {
-            JobPosting job = findPublishedJobOrThrow(jobPostId);
+            JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
             Application application = getOrInitializeApplication(
                     candidateUserId, jobPostId, request.getCvId(),
@@ -156,6 +155,27 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .toList());
 
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Trang "Lịch PV của tôi" — đơn có ít nhất 1 lịch PV
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResApplicationDTO> getMyApplicationsWithInterviews(Long candidateUserId) {
+        List<Application> applications = applicationRepository
+                .findWithInterviewsByCandidate(candidateUserId);
+
+        Map<Long, Company> companyMap = companyRepository
+                .findAllById(applications.stream()
+                        .map(a -> a.getJobPosting().getCompanyId())
+                        .distinct().toList())
+                .stream().collect(Collectors.toMap(Company::getId, c -> c));
+
+        return applications.stream()
+                .map(a -> toResponse(a, companyMap))
+                .toList();
     }
 
     // -------------------------------------------------------------------------
@@ -228,11 +248,13 @@ public class ApplicationServiceImpl implements ApplicationService {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private JobPosting findPublishedJobOrThrow(Long jobPostId) {
+    private JobPosting findAcceptingJobOrThrow(Long jobPostId) {
         JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
 
-        if (!JobPostStatus.PUBLISHED.getValue().equals(job.getStatus())) {
+        String status = job.getStatus();
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status)
+                && !JobPostStatus.INTERVIEWING.getValue().equals(status)) {
             throw AppException.badRequest("Tin tuyển dụng không còn nhận hồ sơ");
         }
 
@@ -338,15 +360,16 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, Pageable pageable) {
+    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, String search, Pageable pageable) {
         JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
-        
+
         if (!job.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền xem hồ sơ của tin tuyển dụng này");
         }
 
-        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, pageable);
+        String searchTrim = (search != null && !search.isBlank()) ? search.trim() : null;
+        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, searchTrim, pageable);
         
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
@@ -386,53 +409,37 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional
-    public ResEmployerApplicationDTO changeApplicationStatus(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationStatusDTO request) {
+    public ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request) {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
-        
+
         JobPosting job = application.getJobPosting();
         if (job == null || !job.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền sửa đơn ứng tuyển này");
         }
 
-        ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
-        ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
+            ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
 
-        if (!currentStatus.canTransitionTo(nextStatus)) {
-            throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+            if (!currentStatus.canTransitionTo(nextStatus)) {
+                throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+            }
+
+            application.setStatus(nextStatus.getValue());
+
+            if (nextStatus == ApplicationStatus.REJECTED) {
+                application.setRejectedAt(LocalDateTime.now());
+            } else if (nextStatus == ApplicationStatus.HIRED) {
+                application.setHiredAt(LocalDateTime.now());
+            }
         }
 
-        application.setStatus(nextStatus.getValue());
         if (request.getNote() != null) {
             application.setRecruiterNote(request.getNote());
         }
-
-        if (nextStatus == ApplicationStatus.REJECTED) {
-            application.setRejectedAt(LocalDateTime.now());
-        } else if (nextStatus == ApplicationStatus.HIRED) {
-            application.setHiredAt(LocalDateTime.now());
-        }
-
-        Application saved = applicationRepository.save(application);
-        return toEmployerResponse(saved);
-    }
-
-    @Override
-    @Transactional
-    public ResEmployerApplicationDTO evaluateApplication(Long userId, Long companyId, Long applicationId, ReqEvaluateApplicationDTO request) {
-        Application application = applicationRepository.findById(applicationId)
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
-        
-        JobPosting job = application.getJobPosting();
-        if (job == null || !job.getCompanyId().equals(companyId)) {
-            throw AppException.forbidden("Bạn không có quyền đánh giá đơn ứng tuyển này");
-        }
-
         if (request.getRating() != null) {
             application.setRecruiterRating(request.getRating());
-        }
-        if (request.getNote() != null) {
-            application.setRecruiterNote(request.getNote());
         }
         if (request.getTags() != null) {
             application.setRecruiterTags(request.getTags());
