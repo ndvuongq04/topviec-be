@@ -9,6 +9,11 @@ import com.topviec.topviec_be.entity.AddonPackage;
 import com.topviec.topviec_be.entity.Order;
 import com.topviec.topviec_be.entity.OrderItem;
 import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.entity.CompanySubscription;
+import com.topviec.topviec_be.entity.SubscriptionUsage;
+import com.topviec.topviec_be.entity.CompanyAddon;
+import com.topviec.topviec_be.enums.services.BillingCycle;
+import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.enums.services.OrderItemType;
 import com.topviec.topviec_be.enums.services.OrderStatus;
 import com.topviec.topviec_be.enums.services.OrderType;
@@ -16,6 +21,9 @@ import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AddonPackageRepository;
 import com.topviec.topviec_be.repository.OrderRepository;
 import com.topviec.topviec_be.repository.ServicePackageRepository;
+import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
+import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
+import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +46,9 @@ public class OrderServiceImpl implements OrderService {
     private final ServicePackageRepository servicePackageRepository;
     private final AddonPackageRepository addonPackageRepository;
     private final CompanyService companyService;
+    private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final SubscriptionUsageRepository subscriptionUsageRepository;
+    private final CompanyAddonRepository companyAddonRepository;
 
     @Override
     @Transactional
@@ -100,6 +111,61 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderItems(items);
 
         Order savedOrder = orderRepository.save(order);
+
+        // TODO: Sẽ có phần Gateway thanh toán (VNPAY/MOMO) ở đây để nhận callback
+        // Tạm thời giả lập thanh toán thành công và kích hoạt ngay
+        if (itemType == OrderItemType.SUBSCRIPTION && servicePackage != null) {
+            CompanySubscription sub = CompanySubscription.builder()
+                    .companyId(companyId)
+                    .servicePackageId(servicePackage.getId())
+                    .orderId(savedOrder.getId())
+                    .status(SubscriptionStatus.ACTIVE)
+                    .billingCycle(servicePackage.getBillingCycle())
+                    .startedAt(LocalDateTime.now())
+                    .expiredAt(servicePackage.getBillingCycle() == BillingCycle.MONTHLY
+                            ? LocalDateTime.now().plusMonths(1)
+                            : LocalDateTime.now().plusYears(1))
+                    .build();
+
+            CompanySubscription savedSub = companySubscriptionRepository.save(sub);
+
+            if (servicePackage.getFeatures() instanceof java.util.Map) {
+                java.util.Map<String, Object> featureMap = (java.util.Map<String, Object>) servicePackage.getFeatures();
+                for (java.util.Map.Entry<String, Object> entry : featureMap.entrySet()) {
+                    int total = 0;
+                    if (entry.getValue() instanceof Number) {
+                        total = ((Number) entry.getValue()).intValue();
+                    } else if (entry.getValue() instanceof Boolean) {
+                        total = ((Boolean) entry.getValue()) ? 999999 : 0;
+                    }
+
+                    SubscriptionUsage usage = SubscriptionUsage.builder()
+                            .companySubscriptionId(savedSub.getId())
+                            .companyId(companyId)
+                            .featureCode(entry.getKey())
+                            .quantityTotal(total)
+                            .quantityRemaining(total)
+                            .resetAt(savedSub.getExpiredAt())
+                            .build();
+                    subscriptionUsageRepository.save(usage);
+                }
+            }
+        } else if (itemType == OrderItemType.ADDON && addonPackage != null) {
+            CompanyAddon companyAddon = CompanyAddon.builder()
+                    .companyId(companyId)
+                    .addonPackageId(addonPackage.getId())
+                    .orderId(savedOrder.getId())
+                    .status(SubscriptionStatus.ACTIVE)
+                    .quantityTotal(request.getQuantity())
+                    .quantityRemaining(request.getQuantity())
+                    .startedAt(LocalDateTime.now())
+                    .expiredAt(addonPackage.getDurationDays() != null
+                            ? LocalDateTime.now().plusDays(addonPackage.getDurationDays())
+                            : null)
+                    .build();
+            companyAddonRepository.save(companyAddon);
+        }
+
         return mapToDTO(savedOrder);
     }
 
