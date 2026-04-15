@@ -37,13 +37,8 @@ public class AddonPackageServiceImpl implements AddonPackageService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, Pageable pageable) {
-        Page<AddonPackage> page;
-        if (groupCode != null) {
-            page = addonPackageRepository.findByGroupCode(groupCode, pageable);
-        } else {
-            page = addonPackageRepository.findAll(pageable);
-        }
+    public ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, String keyword, Pageable pageable) {
+        Page<AddonPackage> page = addonPackageRepository.searchAll(groupCode, keyword, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber() + 1);

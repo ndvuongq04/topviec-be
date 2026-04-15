@@ -31,8 +31,8 @@ public class ServicePackageServiceImpl implements ServicePackageService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getAllServicePackages(Pageable pageable) {
-        Page<ServicePackage> page = servicePackageRepository.findAll(pageable);
+    public ResultPaginationDTO getAllServicePackages(String keyword, Pageable pageable) {
+        Page<ServicePackage> page = servicePackageRepository.searchAll(keyword, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber() + 1);

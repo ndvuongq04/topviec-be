@@ -31,8 +31,9 @@ public class AdminAddonPackageController {
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
     public ResponseEntity<ResultPaginationDTO> getAllAddonPackages(
             @RequestParam(required = false) AddonPackageGroup groupCode,
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(addonPackageService.getAllAddonPackages(groupCode, pageable));
+        return ResponseEntity.ok(addonPackageService.getAllAddonPackages(groupCode, keyword, pageable));
     }
 
     @PostMapping
