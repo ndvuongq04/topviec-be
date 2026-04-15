@@ -25,6 +25,18 @@ public class AddonPackageServiceImpl implements AddonPackageService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ResAddonPackageDTO> getPublicActiveAddonPackages(AddonPackageGroup groupCode) {
+        List<AddonPackage> packages;
+        if (groupCode != null) {
+            packages = addonPackageRepository.findByIsActiveTrueAndGroupCode(groupCode);
+        } else {
+            packages = addonPackageRepository.findByIsActiveTrue();
+        }
+        return packages.stream().map(this::mapToDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, Pageable pageable) {
         Page<AddonPackage> page;
         if (groupCode != null) {

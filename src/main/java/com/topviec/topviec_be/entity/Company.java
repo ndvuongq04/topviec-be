@@ -8,7 +8,11 @@ import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Entity lưu trữ thông tin hồ sơ công ty trên hệ thống TopViec.
@@ -180,6 +184,10 @@ public class Company {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> orders = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
