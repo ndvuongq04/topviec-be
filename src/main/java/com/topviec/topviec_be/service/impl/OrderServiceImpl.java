@@ -68,7 +68,7 @@ public class OrderServiceImpl implements OrderService {
             servicePackage = servicePackageRepository.findById(request.getPackageId())
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy gói dịch vụ (Subscription)."));
             if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
-                 throw AppException.badRequest("Gói dịch vụ này không còn hoạt động.");
+                throw AppException.badRequest("Gói dịch vụ này không còn hoạt động.");
             }
             unitPrice = servicePackage.getPrice();
         } else {
@@ -94,8 +94,10 @@ public class OrderServiceImpl implements OrderService {
                 .createdBy(userId)
                 .build();
 
+        Order savedOrder = orderRepository.save(order);
+
         OrderItem item = OrderItem.builder()
-                .order(order)
+                .orderId(savedOrder.getId())
                 .itemType(itemType)
                 .servicePackageId(servicePackage != null ? servicePackage.getId() : null)
                 .addonPackageId(addonPackage != null ? addonPackage.getId() : null)
@@ -108,9 +110,7 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> items = new ArrayList<>();
         items.add(item);
-        order.setOrderItems(items);
-
-        Order savedOrder = orderRepository.save(order);
+        savedOrder.setOrderItems(items);
 
         // TODO: Sẽ có phần Gateway thanh toán (VNPAY/MOMO) ở đây để nhận callback
         // Tạm thời giả lập thanh toán thành công và kích hoạt ngay
@@ -301,8 +301,7 @@ public class OrderServiceImpl implements OrderService {
                     .totalPrice(item.getTotalPrice())
                     .billingCycle(item.getBillingCycle())
                     .durationDays(item.getDurationDays())
-                    .build()
-            ).collect(Collectors.toList());
+                    .build()).collect(Collectors.toList());
         }
 
         return ResOrderDTO.builder()
