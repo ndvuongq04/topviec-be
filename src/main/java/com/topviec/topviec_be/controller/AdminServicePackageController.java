@@ -29,8 +29,9 @@ public class AdminServicePackageController {
             + AdminRoleConstants.SUPPORT_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
     public ResponseEntity<ResultPaginationDTO> getAllServicePackages(
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 10, sort = "sortOrder") Pageable pageable) {
-        return ResponseEntity.ok(servicePackageService.getAllServicePackages(pageable));
+        return ResponseEntity.ok(servicePackageService.getAllServicePackages(keyword, pageable));
     }
 
     @PostMapping

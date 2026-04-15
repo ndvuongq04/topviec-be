@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface ServicePackageService {
     List<ResServicePackageDTO> getPublicActivePackages();
-    ResultPaginationDTO getAllServicePackages(Pageable pageable);
+    ResultPaginationDTO getAllServicePackages(String keyword, Pageable pageable);
     ResServicePackageDTO getServicePackageById(Long id);
     ResServicePackageDTO createServicePackage(ReqServicePackageDTO reqDTO);
     ResServicePackageDTO updateServicePackage(Long id, ReqServicePackageDTO reqDTO);

@@ -10,7 +10,7 @@ import java.util.List;
 
 public interface AddonPackageService {
     List<ResAddonPackageDTO> getPublicActiveAddonPackages(AddonPackageGroup groupCode);
-    ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, Pageable pageable);
+    ResultPaginationDTO getAllAddonPackages(AddonPackageGroup groupCode, String keyword, Pageable pageable);
     ResAddonPackageDTO getAddonPackageById(Long id);
     ResAddonPackageDTO createAddonPackage(ReqAddonPackageDTO reqDTO);
     ResAddonPackageDTO updateAddonPackage(Long id, ReqAddonPackageDTO reqDTO);
