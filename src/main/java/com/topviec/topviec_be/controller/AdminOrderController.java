@@ -3,6 +3,7 @@ package com.topviec.topviec_be.controller;
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
 import com.topviec.topviec_be.enums.services.OrderStatus;
 import com.topviec.topviec_be.enums.services.OrderType;
 import com.topviec.topviec_be.service.OrderService;
@@ -24,7 +25,9 @@ public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) OrderType type,
@@ -39,13 +42,17 @@ public class AdminOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
     public ResponseEntity<ResOrderDTO> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
     public ResponseEntity<ResOrderDTO> updateOrderStatus(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id,
