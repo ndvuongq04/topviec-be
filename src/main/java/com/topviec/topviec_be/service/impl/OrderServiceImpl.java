@@ -97,8 +97,10 @@ public class OrderServiceImpl implements OrderService {
                 .createdBy(userId)
                 .build();
 
+        Order savedOrder = orderRepository.save(order);
+
         OrderItem item = OrderItem.builder()
-                .order(order)
+                .orderId(savedOrder.getId())
                 .itemType(itemType)
                 .servicePackageId(servicePackage != null ? servicePackage.getId() : null)
                 .addonPackageId(addonPackage != null ? addonPackage.getId() : null)
@@ -111,9 +113,7 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> items = new ArrayList<>();
         items.add(item);
-        order.setOrderItems(items);
-
-        Order savedOrder = orderRepository.save(order);
+        savedOrder.setOrderItems(items);
 
         // TODO: Sẽ có phần Gateway thanh toán (VNPAY/MOMO) ở đây để nhận callback
         // Tạm thời giả lập thanh toán thành công và kích hoạt ngay
