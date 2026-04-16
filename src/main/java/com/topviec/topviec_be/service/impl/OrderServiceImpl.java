@@ -248,7 +248,7 @@ public class OrderServiceImpl implements OrderService {
     public ResultPaginationDTO getAllOrders(
             String keyword, OrderType type, OrderStatus status,
             String dateFilter, String startDate, String endDate,
-            Boolean failedOrPending, Pageable pageable) {
+            Pageable pageable) {
 
         LocalDateTime startDt = null;
         LocalDateTime endDt = null;
@@ -293,7 +293,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Specification<Order> spec = OrderSpecification.withFilter(
-                keyword, type, status, startDt, endDt, failedOrPending);
+                keyword, type, status, startDt, endDt);
 
         Page<Order> page = orderRepository.findAll(spec, pageable);
 
