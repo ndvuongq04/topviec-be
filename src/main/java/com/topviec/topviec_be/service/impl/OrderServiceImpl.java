@@ -389,17 +389,48 @@ public class OrderServiceImpl implements OrderService {
     private ResOrderDTO mapToDTO(Order entity) {
         List<ResOrderItemDTO> itemDTOs = new ArrayList<>();
         if (entity.getOrderItems() != null) {
-            itemDTOs = entity.getOrderItems().stream().map(item -> ResOrderItemDTO.builder()
-                    .id(item.getId())
-                    .itemType(item.getItemType())
-                    .servicePackageId(item.getServicePackageId())
-                    .addonPackageId(item.getAddonPackageId())
-                    .quantity(item.getQuantity())
-                    .unitPrice(item.getUnitPrice())
-                    .totalPrice(item.getTotalPrice())
-                    .billingCycle(item.getBillingCycle())
-                    .durationDays(item.getDurationDays())
-                    .build()).collect(Collectors.toList());
+            itemDTOs = entity.getOrderItems().stream().map(item -> {
+                String packageName = null;
+                Object features = null;
+
+                if (item.getServicePackage() != null) {
+                    packageName = item.getServicePackage().getName();
+                    features = item.getServicePackage().getFeatures();
+                } else if (item.getServicePackageId() != null) {
+                    try {
+                        var spOpt = servicePackageRepository.findById(item.getServicePackageId());
+                        if (spOpt.isPresent()) {
+                            packageName = spOpt.get().getName();
+                            features = spOpt.get().getFeatures();
+                        }
+                    } catch (Exception e) {}
+                }
+
+                if (packageName == null && item.getAddonPackage() != null) {
+                    packageName = item.getAddonPackage().getName();
+                } else if (packageName == null && item.getAddonPackageId() != null) {
+                    try {
+                        var addonOpt = addonPackageRepository.findById(item.getAddonPackageId());
+                        if (addonOpt.isPresent()) {
+                            packageName = addonOpt.get().getName();
+                        }
+                    } catch (Exception e) {}
+                }
+
+                return ResOrderItemDTO.builder()
+                        .id(item.getId())
+                        .itemType(item.getItemType())
+                        .servicePackageId(item.getServicePackageId())
+                        .addonPackageId(item.getAddonPackageId())
+                        .packageName(packageName)
+                        .features(features)
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .totalPrice(item.getTotalPrice())
+                        .billingCycle(item.getBillingCycle())
+                        .durationDays(item.getDurationDays())
+                        .build();
+            }).collect(Collectors.toList());
         }
 
         ResOrderDTO.CompanyInfo companyInfo = null;
