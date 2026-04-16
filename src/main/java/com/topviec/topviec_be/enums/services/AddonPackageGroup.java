@@ -15,7 +15,6 @@ public enum AddonPackageGroup {
         this.value = value;
     }
 
-    @JsonValue
     public String getValue() {
         return value;
     }
