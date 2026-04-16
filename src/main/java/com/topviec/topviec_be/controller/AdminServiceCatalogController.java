@@ -1,10 +1,11 @@
 package com.topviec.topviec_be.controller;
 
-import com.topviec.topviec_be.dto.request.ReqServicePackageDTO;
-import com.topviec.topviec_be.dto.response.ResServicePackageDTO;
+import com.topviec.topviec_be.dto.request.ReqServiceDTO;
+import com.topviec.topviec_be.dto.response.ResServiceDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
-import com.topviec.topviec_be.service.ServicePackageService;
+import com.topviec.topviec_be.enums.services.ServiceCategory;
+import com.topviec.topviec_be.service.ServiceCatalogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -15,12 +16,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/admin/service-packages")
+@RequestMapping("/admin/services")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
-public class AdminServicePackageController {
+public class AdminServiceCatalogController {
 
-    private final ServicePackageService servicePackageService;
+    private final ServiceCatalogService serviceCatalogService;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
@@ -28,36 +29,36 @@ public class AdminServicePackageController {
             + AdminRoleConstants.FINANCE_ADMIN + "', '"
             + AdminRoleConstants.SUPPORT_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
-    public ResponseEntity<ResultPaginationDTO> getAllServicePackages(
+    public ResponseEntity<ResultPaginationDTO> getAllServices(
+            @RequestParam(required = false) ServiceCategory category,
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 10, sort = "sortOrder") Pageable pageable) {
-        return ResponseEntity.ok(servicePackageService.getAllServicePackages(keyword, pageable));
+            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(serviceCatalogService.getAllServices(category, keyword, pageable));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
-    public ResponseEntity<ResServicePackageDTO> getServicePackageById(@PathVariable Long id) {
-        return ResponseEntity.ok(servicePackageService.getServicePackageById(id));
+    public ResponseEntity<ResServiceDTO> getServiceById(@PathVariable Long id) {
+        return ResponseEntity.ok(serviceCatalogService.getServiceById(id));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
-    public ResponseEntity<ResServicePackageDTO> createServicePackage(
-            @Valid @RequestBody ReqServicePackageDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(servicePackageService.createServicePackage(request));
+    public ResponseEntity<ResServiceDTO> createService(@Valid @RequestBody ReqServiceDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(serviceCatalogService.createService(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
-    public ResponseEntity<ResServicePackageDTO> updateServicePackage(
+    public ResponseEntity<ResServiceDTO> updateService(
             @PathVariable Long id,
-            @Valid @RequestBody ReqServicePackageDTO request) {
-        return ResponseEntity.ok(servicePackageService.updateServicePackage(id, request));
+            @Valid @RequestBody ReqServiceDTO request) {
+        return ResponseEntity.ok(serviceCatalogService.updateService(id, request));
     }
 }

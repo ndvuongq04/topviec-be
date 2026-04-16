@@ -27,6 +27,7 @@ public class ResCompanySubscriptionDTO {
     public static class ResSubscriptionUsageDTO {
         private Long id;
         private String featureCode;
+        private String featureName;
         private Integer quantityTotal;
         private Integer quantityRemaining;
         private LocalDateTime resetAt;

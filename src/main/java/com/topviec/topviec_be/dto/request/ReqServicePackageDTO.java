@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Map;
+import java.util.List;
 
 @Data
 public class ReqServicePackageDTO {
@@ -23,11 +23,20 @@ public class ReqServicePackageDTO {
     @NotNull(message = "Giá không được để trống")
     private BigDecimal price;
 
-    private Map<String, Object> features;
-
     private String description;
 
     private Boolean isActive;
 
     private Integer sortOrder;
+
+    private List<DetailItem> details;
+
+    @Data
+    public static class DetailItem {
+        @NotNull(message = "ID dịch vụ không được để trống")
+        private Long serviceId;
+
+        @NotNull(message = "Số lượng không được để trống")
+        private Integer quantity;
+    }
 }

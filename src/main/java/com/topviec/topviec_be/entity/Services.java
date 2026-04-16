@@ -1,40 +1,36 @@
 package com.topviec.topviec_be.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.topviec.topviec_be.enums.services.BillingCycle;
+import com.topviec.topviec_be.enums.services.ServiceCategory;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
-@Table(name = "service_packages")
+@Table(name = "services")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ServicePackage {
+public class Services {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name", length = 100, nullable = false)
-    private String name;
-
-    @Column(name = "code", length = 50, unique = true, nullable = false)
+    @Column(name = "code", length = 100, unique = true, nullable = false)
     private String code;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "billing_cycle", length = 20)
-    private BillingCycle billingCycle;
+    @Column(name = "name", length = 255, nullable = false)
+    private String name;
 
-    @Column(name = "price", precision = 15, scale = 2)
-    private BigDecimal price;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 50)
+    private ServiceCategory category;
+
+    @Column(name = "unit", length = 50)
+    private String unit;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
@@ -43,19 +39,11 @@ public class ServicePackage {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "sort_order")
-    private Integer sortOrder;
-
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @JsonIgnore
-    @Builder.Default
-    @OneToMany(mappedBy = "servicePackage", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<ServicePackageDetail> details = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

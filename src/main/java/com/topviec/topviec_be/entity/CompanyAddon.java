@@ -28,13 +28,13 @@ public class CompanyAddon {
     @JoinColumn(name = "company_id", insertable = false, updatable = false)
     private Company company;
 
-    @Column(name = "addon_package_id", nullable = false)
-    private Long addonPackageId;
+    @Column(name = "addon_service_id", nullable = false)
+    private Long addonServiceId;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "addon_package_id", insertable = false, updatable = false)
-    private AddonPackage addonPackage;
+    @JoinColumn(name = "addon_service_id", insertable = false, updatable = false)
+    private AddonService addonService;
 
     @Column(name = "order_id", nullable = false)
     private Long orderId;
