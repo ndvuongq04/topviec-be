@@ -175,13 +175,63 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getMyOrders(Long userId, Pageable pageable) {
+    public ResultPaginationDTO getMyOrders(
+            Long userId,
+            String keyword, OrderType type, OrderStatus status,
+            String dateFilter, String startDate, String endDate,
+            Pageable pageable) {
         Long companyId = companyService.getCompanyIdByUserId(userId);
         if (companyId == null) {
             throw AppException.badRequest("Chưa có hồ sơ công ty.");
         }
 
-        Page<Order> page = orderRepository.findByCompanyIdOrderByCreatedAtDesc(companyId, pageable);
+        LocalDateTime startDt = null;
+        LocalDateTime endDt = null;
+
+        if (dateFilter != null && !dateFilter.isBlank()) {
+            LocalDateTime now = LocalDateTime.now();
+            switch (dateFilter.toLowerCase()) {
+                case "today":
+                    startDt = now.toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+                case "last7days":
+                    startDt = now.minusDays(7).toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+                case "thismonth":
+                    startDt = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+            }
+        } else {
+            if (startDate != null && !startDate.isBlank()) {
+                try {
+                    startDt = LocalDateTime.parse(startDate);
+                } catch (Exception e) {
+                    try {
+                        startDt = java.time.LocalDate.parse(startDate).atStartOfDay();
+                    } catch (Exception ex) {
+                    }
+                }
+            }
+            if (endDate != null && !endDate.isBlank()) {
+                try {
+                    endDt = LocalDateTime.parse(endDate);
+                } catch (Exception e) {
+                    try {
+                        endDt = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
+                    } catch (Exception ex) {
+                    }
+                }
+            }
+        }
+
+        Specification<Order> spec = OrderSpecification.withFilter(
+                keyword, type, status, startDt, endDt)
+                .and(OrderSpecification.hasCompanyId(companyId));
+
+        Page<Order> page = orderRepository.findAll(spec, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber() + 1);

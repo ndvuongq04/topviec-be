@@ -11,6 +11,12 @@ import java.time.LocalDateTime;
 
 public class OrderSpecification {
 
+    public static Specification<Order> hasCompanyId(Long companyId) {
+        return (root, query, cb) -> companyId == null
+                ? null
+                : cb.equal(root.get("companyId"), companyId);
+    }
+
     public static Specification<Order> searchKeyword(String keyword) {
         return (root, query, cb) -> {
             if (keyword == null || keyword.isBlank()) {

@@ -15,6 +15,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import com.topviec.topviec_be.enums.services.OrderStatus;
+import com.topviec.topviec_be.enums.services.OrderType;
+
 @RestController
 @RequestMapping("/employer/orders")
 @RequiredArgsConstructor
@@ -26,8 +29,14 @@ public class EmployerOrderController {
     @GetMapping
     public ResponseEntity<ResultPaginationDTO> getMyOrders(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) OrderType type,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) String dateFilter,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(orderService.getMyOrders(extractUserId(jwt), pageable));
+        return ResponseEntity.ok(orderService.getMyOrders(extractUserId(jwt), search, type, status, dateFilter, startDate, endDate, pageable));
     }
 
     @GetMapping("/{id}")
