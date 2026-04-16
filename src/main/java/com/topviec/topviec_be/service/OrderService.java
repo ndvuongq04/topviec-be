@@ -13,7 +13,10 @@ public interface OrderService {
     ResOrderDTO getMyOrderById(Long userId, Long orderId);
     ResOrderDTO cancelOrder(Long userId, Long orderId);
     
-    ResultPaginationDTO getAllOrders(OrderStatus status, Pageable pageable);
+    ResultPaginationDTO getAllOrders(
+            String keyword, com.topviec.topviec_be.enums.services.OrderType type, OrderStatus status,
+            String dateFilter, String startDate, String endDate,
+            Boolean failedOrPending, Pageable pageable);
     ResOrderDTO getOrderById(Long orderId);
     ResOrderDTO updateOrderStatus(Long adminId, Long orderId, ReqUpdateOrderStatusDTO request);
 }

@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
 import com.topviec.topviec_be.enums.services.OrderStatus;
+import com.topviec.topviec_be.enums.services.OrderType;
 import com.topviec.topviec_be.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +29,16 @@ public class AdminOrderController {
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
     public ResponseEntity<ResultPaginationDTO> getAllOrders(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) OrderType type,
             @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) String dateFilter,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Boolean failedOrPending,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(orderService.getAllOrders(status, pageable));
+        return ResponseEntity.ok(orderService.getAllOrders(search, type, status, dateFilter, startDate, endDate,
+                failedOrPending, pageable));
     }
 
     @GetMapping("/{id}")
