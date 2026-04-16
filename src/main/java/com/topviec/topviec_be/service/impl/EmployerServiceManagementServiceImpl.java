@@ -103,6 +103,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                     .addonName(pkg != null ? pkg.getName() : null)
                     .addonCode(pkg != null ? pkg.getCode() : null)
                     .groupCode(pkg != null ? pkg.getGroupCode() : null)
+                    .groupName(pkg != null ? pkg.getGroupName() : null)
                     .status(addon.getStatus())
                     .quantityTotal(addon.getQuantityTotal())
                     .quantityRemaining(addon.getQuantityRemaining())
