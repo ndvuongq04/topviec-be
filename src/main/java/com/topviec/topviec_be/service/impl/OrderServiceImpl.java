@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateOrderDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
+import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResOrderItemDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -351,6 +352,28 @@ public class OrderServiceImpl implements OrderService {
                     .build()).collect(Collectors.toList());
         }
 
+        ResOrderDTO.CompanyInfo companyInfo = null;
+        if (entity.getCompany() != null) {
+            companyInfo = ResOrderDTO.CompanyInfo.builder()
+                    .name(entity.getCompany().getName())
+                    .logoUrl(entity.getCompany().getLogoUrl())
+                    .email(entity.getCompany().getEmail())
+                    .phone(entity.getCompany().getPhone())
+                    .build();
+        } else if (entity.getCompanyId() != null) {
+            try {
+                ResCompanyDTO dto = companyService.getById(entity.getCompanyId());
+                companyInfo = ResOrderDTO.CompanyInfo.builder()
+                        .name(dto.getName())
+                        .logoUrl(dto.getLogoUrl())
+                        .email(dto.getEmail())
+                        .phone(dto.getPhone())
+                        .build();
+            } catch (Exception e) {
+                // Ignore if not found
+            }
+        }
+
         return ResOrderDTO.builder()
                 .id(entity.getId())
                 .orderCode(entity.getOrderCode())
@@ -363,6 +386,7 @@ public class OrderServiceImpl implements OrderService {
                 .note(entity.getNote())
                 .createdAt(entity.getCreatedAt())
                 .items(itemDTOs)
+                .company(companyInfo)
                 .build();
     }
 }
