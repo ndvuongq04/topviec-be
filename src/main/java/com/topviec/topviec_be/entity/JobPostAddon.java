@@ -36,13 +36,13 @@ public class JobPostAddon {
     @JoinColumn(name = "company_addon_id", insertable = false, updatable = false)
     private CompanyAddon companyAddon;
 
-    @Column(name = "addon_package_id", nullable = false)
-    private Long addonPackageId;
+    @Column(name = "addon_service_id", nullable = false)
+    private Long addonServiceId;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "addon_package_id", insertable = false, updatable = false)
-    private AddonPackage addonPackage;
+    @JoinColumn(name = "addon_service_id", insertable = false, updatable = false)
+    private AddonService addonService;
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;

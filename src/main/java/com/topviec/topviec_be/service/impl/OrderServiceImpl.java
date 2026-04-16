@@ -5,11 +5,14 @@ import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResOrderItemDTO;
+import com.topviec.topviec_be.dto.response.ResServicePackageDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
-import com.topviec.topviec_be.entity.AddonPackage;
+import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.Order;
 import com.topviec.topviec_be.entity.OrderItem;
+import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.entity.ServicePackageDetail;
 import com.topviec.topviec_be.entity.CompanySubscription;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
 import com.topviec.topviec_be.entity.CompanyAddon;
@@ -19,9 +22,11 @@ import com.topviec.topviec_be.enums.services.OrderItemType;
 import com.topviec.topviec_be.enums.services.OrderStatus;
 import com.topviec.topviec_be.enums.services.OrderType;
 import com.topviec.topviec_be.exception.AppException;
-import com.topviec.topviec_be.repository.AddonPackageRepository;
+import com.topviec.topviec_be.repository.AddonServiceRepository;
 import com.topviec.topviec_be.repository.OrderRepository;
 import com.topviec.topviec_be.repository.ServicePackageRepository;
+import com.topviec.topviec_be.repository.ServicePackageDetailRepository;
+import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
@@ -48,7 +53,9 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final ServicePackageRepository servicePackageRepository;
-    private final AddonPackageRepository addonPackageRepository;
+    private final ServicePackageDetailRepository servicePackageDetailRepository;
+    private final ServiceRepository serviceRepository;
+    private final AddonServiceRepository addonServiceRepository;
     private final CompanyService companyService;
     private final CompanySubscriptionRepository companySubscriptionRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
@@ -64,25 +71,25 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal unitPrice = BigDecimal.ZERO;
         ServicePackage servicePackage = null;
-        AddonPackage addonPackage = null;
+        AddonService addonService = null;
         OrderItemType itemType;
 
         if (request.getType() == OrderType.SUBSCRIPTION) {
             itemType = OrderItemType.SUBSCRIPTION;
             servicePackage = servicePackageRepository.findById(request.getPackageId())
-                    .orElseThrow(() -> AppException.notFound("Không tìm thấy gói dịch vụ (Subscription)."));
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy gói dịch vụ."));
             if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
                 throw AppException.badRequest("Gói dịch vụ này không còn hoạt động.");
             }
             unitPrice = servicePackage.getPrice();
         } else {
             itemType = OrderItemType.ADDON;
-            addonPackage = addonPackageRepository.findById(request.getPackageId())
-                    .orElseThrow(() -> AppException.notFound("Không tìm thấy gói dịch vụ phụ (Addon)."));
-            if (addonPackage.getIsActive() == null || !addonPackage.getIsActive()) {
-                throw AppException.badRequest("Gói dịch vụ phụ này không còn hoạt động.");
+            addonService = addonServiceRepository.findById(request.getPackageId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ lẻ."));
+            if (addonService.getIsActive() == null || !addonService.getIsActive()) {
+                throw AppException.badRequest("Dịch vụ lẻ này không còn hoạt động.");
             }
-            unitPrice = addonPackage.getPrice();
+            unitPrice = addonService.getPrice();
         }
 
         BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(request.getQuantity()));
@@ -104,12 +111,12 @@ public class OrderServiceImpl implements OrderService {
                 .orderId(savedOrder.getId())
                 .itemType(itemType)
                 .servicePackageId(servicePackage != null ? servicePackage.getId() : null)
-                .addonPackageId(addonPackage != null ? addonPackage.getId() : null)
+                .addonServiceId(addonService != null ? addonService.getId() : null)
                 .quantity(request.getQuantity())
                 .unitPrice(unitPrice)
                 .totalPrice(totalAmount)
                 .billingCycle(servicePackage != null ? servicePackage.getBillingCycle() : null)
-                .durationDays(addonPackage != null ? addonPackage.getDurationDays() : null)
+                .durationDays(addonService != null ? addonService.getDurationDays() : null)
                 .build();
 
         List<OrderItem> items = new ArrayList<>();
@@ -119,58 +126,64 @@ public class OrderServiceImpl implements OrderService {
         // TODO: Sẽ có phần Gateway thanh toán (VNPAY/MOMO) ở đây để nhận callback
         // Tạm thời giả lập thanh toán thành công và kích hoạt ngay
         if (itemType == OrderItemType.SUBSCRIPTION && servicePackage != null) {
-            CompanySubscription sub = CompanySubscription.builder()
-                    .companyId(companyId)
-                    .servicePackageId(servicePackage.getId())
-                    .orderId(savedOrder.getId())
-                    .status(SubscriptionStatus.ACTIVE)
-                    .billingCycle(servicePackage.getBillingCycle())
-                    .startedAt(LocalDateTime.now())
-                    .expiredAt(servicePackage.getBillingCycle() == BillingCycle.MONTHLY
-                            ? LocalDateTime.now().plusMonths(1)
-                            : LocalDateTime.now().plusYears(1))
-                    .build();
-
-            CompanySubscription savedSub = companySubscriptionRepository.save(sub);
-
-            if (servicePackage.getFeatures() instanceof java.util.Map) {
-                java.util.Map<String, Object> featureMap = (java.util.Map<String, Object>) servicePackage.getFeatures();
-                for (java.util.Map.Entry<String, Object> entry : featureMap.entrySet()) {
-                    int total = 0;
-                    if (entry.getValue() instanceof Number) {
-                        total = ((Number) entry.getValue()).intValue();
-                    } else if (entry.getValue() instanceof Boolean) {
-                        total = ((Boolean) entry.getValue()) ? 999999 : 0;
-                    }
-
-                    SubscriptionUsage usage = SubscriptionUsage.builder()
-                            .companySubscriptionId(savedSub.getId())
-                            .companyId(companyId)
-                            .featureCode(entry.getKey())
-                            .quantityTotal(total)
-                            .quantityRemaining(total)
-                            .resetAt(savedSub.getExpiredAt())
-                            .build();
-                    subscriptionUsageRepository.save(usage);
-                }
-            }
-        } else if (itemType == OrderItemType.ADDON && addonPackage != null) {
-            CompanyAddon companyAddon = CompanyAddon.builder()
-                    .companyId(companyId)
-                    .addonPackageId(addonPackage.getId())
-                    .orderId(savedOrder.getId())
-                    .status(SubscriptionStatus.ACTIVE)
-                    .quantityTotal(request.getQuantity())
-                    .quantityRemaining(request.getQuantity())
-                    .startedAt(LocalDateTime.now())
-                    .expiredAt(addonPackage.getDurationDays() != null
-                            ? LocalDateTime.now().plusDays(addonPackage.getDurationDays())
-                            : null)
-                    .build();
-            companyAddonRepository.save(companyAddon);
+            activateSubscription(companyId, savedOrder.getId(), servicePackage);
+        } else if (itemType == OrderItemType.ADDON && addonService != null) {
+            activateAddon(companyId, savedOrder.getId(), addonService, request.getQuantity());
         }
 
         return mapToDTO(savedOrder);
+    }
+
+    private void activateSubscription(Long companyId, Long orderId, ServicePackage servicePackage) {
+        CompanySubscription sub = CompanySubscription.builder()
+                .companyId(companyId)
+                .servicePackageId(servicePackage.getId())
+                .orderId(orderId)
+                .status(SubscriptionStatus.ACTIVE)
+                .billingCycle(servicePackage.getBillingCycle())
+                .startedAt(LocalDateTime.now())
+                .expiredAt(servicePackage.getBillingCycle() == BillingCycle.MONTHLY
+                        ? LocalDateTime.now().plusMonths(1)
+                        : LocalDateTime.now().plusYears(1))
+                .build();
+
+        CompanySubscription savedSub = companySubscriptionRepository.save(sub);
+
+        // Tạo SubscriptionUsage từ ServicePackageDetails (thay thế JSON features cũ)
+        List<ServicePackageDetail> details = servicePackageDetailRepository
+                .findByServicePackageId(servicePackage.getId());
+
+        for (ServicePackageDetail detail : details) {
+            Services svc = serviceRepository.findById(detail.getServiceId()).orElse(null);
+            if (svc == null) continue;
+
+            SubscriptionUsage usage = SubscriptionUsage.builder()
+                    .companySubscriptionId(savedSub.getId())
+                    .companyId(companyId)
+                    .featureCode(svc.getCode())
+                    .quantityTotal(detail.getQuantity())
+                    .quantityRemaining(detail.getQuantity())
+                    .resetAt(savedSub.getExpiredAt())
+                    .build();
+
+            subscriptionUsageRepository.save(usage);
+        }
+    }
+
+    private void activateAddon(Long companyId, Long orderId, AddonService addonService, int quantity) {
+        CompanyAddon companyAddon = CompanyAddon.builder()
+                .companyId(companyId)
+                .addonServiceId(addonService.getId())
+                .orderId(orderId)
+                .status(SubscriptionStatus.ACTIVE)
+                .quantityTotal(quantity * addonService.getQuantity())
+                .quantityRemaining(quantity * addonService.getQuantity())
+                .startedAt(LocalDateTime.now())
+                .expiredAt(addonService.getDurationDays() != null
+                        ? LocalDateTime.now().plusDays(addonService.getDurationDays())
+                        : null)
+                .build();
+        companyAddonRepository.save(companyAddon);
     }
 
     @Override
@@ -185,69 +198,14 @@ public class OrderServiceImpl implements OrderService {
             throw AppException.badRequest("Chưa có hồ sơ công ty.");
         }
 
-        LocalDateTime startDt = null;
-        LocalDateTime endDt = null;
+        LocalDateTime startDt = parseDateFilter(dateFilter, startDate, true);
+        LocalDateTime endDt = parseDateFilter(dateFilter, endDate, false);
 
-        if (dateFilter != null && !dateFilter.isBlank()) {
-            LocalDateTime now = LocalDateTime.now();
-            switch (dateFilter.toLowerCase()) {
-                case "today":
-                    startDt = now.toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-                case "last7days":
-                    startDt = now.minusDays(7).toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-                case "thismonth":
-                    startDt = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-            }
-        } else {
-            if (startDate != null && !startDate.isBlank()) {
-                try {
-                    startDt = LocalDateTime.parse(startDate);
-                } catch (Exception e) {
-                    try {
-                        startDt = java.time.LocalDate.parse(startDate).atStartOfDay();
-                    } catch (Exception ex) {
-                    }
-                }
-            }
-            if (endDate != null && !endDate.isBlank()) {
-                try {
-                    endDt = LocalDateTime.parse(endDate);
-                } catch (Exception e) {
-                    try {
-                        endDt = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
-                    } catch (Exception ex) {
-                    }
-                }
-            }
-        }
-
-        Specification<Order> spec = OrderSpecification.withFilter(
-                keyword, type, status, startDt, endDt)
+        Specification<Order> spec = OrderSpecification.withFilter(keyword, type, status, startDt, endDt)
                 .and(OrderSpecification.hasCompanyId(companyId));
 
         Page<Order> page = orderRepository.findAll(spec, pageable);
-
-        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
-        meta.setPageSize(pageable.getPageSize());
-        meta.setPages(page.getTotalPages());
-        meta.setTotals(page.getTotalElements());
-
-        List<ResOrderDTO> results = page.getContent().stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
-
-        ResultPaginationDTO response = new ResultPaginationDTO();
-        response.setMeta(meta);
-        response.setResult(results);
-
-        return response;
+        return buildPaginationResult(page, pageable);
     }
 
     @Override
@@ -284,13 +242,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw AppException.badRequest("Chỉ có thể hủy hóa đơn đang trong trạng thái chờ thanh toán (PENDING).");
+            throw AppException.badRequest("Chỉ có thể hủy đơn hàng đang trong trạng thái chờ thanh toán (PENDING).");
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        Order updatedOrder = orderRepository.save(order);
-
-        return mapToDTO(updatedOrder);
+        return mapToDTO(orderRepository.save(order));
     }
 
     @Override
@@ -300,67 +256,12 @@ public class OrderServiceImpl implements OrderService {
             String dateFilter, String startDate, String endDate,
             Pageable pageable) {
 
-        LocalDateTime startDt = null;
-        LocalDateTime endDt = null;
+        LocalDateTime startDt = parseDateFilter(dateFilter, startDate, true);
+        LocalDateTime endDt = parseDateFilter(dateFilter, endDate, false);
 
-        if (dateFilter != null && !dateFilter.isBlank()) {
-            LocalDateTime now = LocalDateTime.now();
-            switch (dateFilter.toLowerCase()) {
-                case "today":
-                    startDt = now.toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-                case "last7days":
-                    startDt = now.minusDays(7).toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-                case "thismonth":
-                    startDt = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
-                    endDt = now.toLocalDate().atTime(23, 59, 59);
-                    break;
-            }
-        } else {
-            if (startDate != null && !startDate.isBlank()) {
-                try {
-                    startDt = LocalDateTime.parse(startDate);
-                } catch (Exception e) {
-                    try {
-                        startDt = java.time.LocalDate.parse(startDate).atStartOfDay();
-                    } catch (Exception ex) {
-                    }
-                }
-            }
-            if (endDate != null && !endDate.isBlank()) {
-                try {
-                    endDt = LocalDateTime.parse(endDate);
-                } catch (Exception e) {
-                    try {
-                        endDt = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
-                    } catch (Exception ex) {
-                    }
-                }
-            }
-        }
-
-        Specification<Order> spec = OrderSpecification.withFilter(
-                keyword, type, status, startDt, endDt);
-
+        Specification<Order> spec = OrderSpecification.withFilter(keyword, type, status, startDt, endDt);
         Page<Order> page = orderRepository.findAll(spec, pageable);
-
-        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
-        meta.setPageSize(pageable.getPageSize());
-        meta.setPages(page.getTotalPages());
-        meta.setTotals(page.getTotalElements());
-
-        List<ResOrderDTO> results = page.getContent().stream()
-                .map(this::mapToDTO).collect(Collectors.toList());
-
-        ResultPaginationDTO response = new ResultPaginationDTO();
-        response.setMeta(meta);
-        response.setResult(results);
-
-        return response;
+        return buildPaginationResult(page, pageable);
     }
 
     @Override
@@ -382,8 +283,51 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(request.getStatus());
-        Order updatedOrder = orderRepository.save(order);
-        return mapToDTO(updatedOrder);
+        return mapToDTO(orderRepository.save(order));
+    }
+
+    // ─── helpers ─────────────────────────────────────────────────────────────
+
+    private LocalDateTime parseDateFilter(String dateFilter, String rawDate, boolean isStart) {
+        if (dateFilter != null && !dateFilter.isBlank()) {
+            LocalDateTime now = LocalDateTime.now();
+            switch (dateFilter.toLowerCase()) {
+                case "today":
+                    return isStart ? now.toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
+                case "last7days":
+                    return isStart ? now.minusDays(7).toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
+                case "thismonth":
+                    return isStart ? now.withDayOfMonth(1).toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
+            }
+        }
+        if (rawDate != null && !rawDate.isBlank()) {
+            try {
+                return LocalDateTime.parse(rawDate);
+            } catch (Exception e) {
+                try {
+                    return isStart
+                            ? java.time.LocalDate.parse(rawDate).atStartOfDay()
+                            : java.time.LocalDate.parse(rawDate).atTime(23, 59, 59);
+                } catch (Exception ex) {}
+            }
+        }
+        return null;
+    }
+
+    private ResultPaginationDTO buildPaginationResult(Page<Order> page, Pageable pageable) {
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        List<ResOrderDTO> results = page.getContent().stream()
+                .map(this::mapToDTO).collect(Collectors.toList());
+
+        ResultPaginationDTO response = new ResultPaginationDTO();
+        response.setMeta(meta);
+        response.setResult(results);
+        return response;
     }
 
     private ResOrderDTO mapToDTO(Order entity) {
@@ -391,39 +335,53 @@ public class OrderServiceImpl implements OrderService {
         if (entity.getOrderItems() != null) {
             itemDTOs = entity.getOrderItems().stream().map(item -> {
                 String packageName = null;
-                Object features = null;
+                List<ResServicePackageDetailDTO> detailDTOs = new ArrayList<>();
 
-                if (item.getServicePackage() != null) {
-                    packageName = item.getServicePackage().getName();
-                    features = item.getServicePackage().getFeatures();
-                } else if (item.getServicePackageId() != null) {
-                    try {
-                        var spOpt = servicePackageRepository.findById(item.getServicePackageId());
-                        if (spOpt.isPresent()) {
-                            packageName = spOpt.get().getName();
-                            features = spOpt.get().getFeatures();
+                if (item.getServicePackageId() != null) {
+                    ServicePackage sp = item.getServicePackage();
+                    if (sp == null) {
+                        sp = servicePackageRepository.findById(item.getServicePackageId()).orElse(null);
+                    }
+                    if (sp != null) {
+                        packageName = sp.getName();
+                        final ServicePackage finalSp = sp;
+                        List<ServicePackageDetail> details = finalSp.getDetails();
+                        if (details == null || details.isEmpty()) {
+                            details = servicePackageDetailRepository.findByServicePackageId(finalSp.getId());
                         }
-                    } catch (Exception e) {}
+                        detailDTOs = details.stream().map(d -> {
+                            Services svc = serviceRepository.findById(d.getServiceId()).orElse(null);
+                            return ResServicePackageDetailDTO.builder()
+                                    .id(d.getId())
+                                    .serviceId(d.getServiceId())
+                                    .serviceCode(svc != null ? svc.getCode() : null)
+                                    .serviceName(svc != null ? svc.getName() : null)
+                                    .serviceCategory(svc != null ? svc.getCategory() : null)
+                                    .serviceCategoryName(svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
+                                    .serviceUnit(svc != null ? svc.getUnit() : null)
+                                    .quantity(d.getQuantity())
+                                    .build();
+                        }).collect(Collectors.toList());
+                    }
                 }
 
-                if (packageName == null && item.getAddonPackage() != null) {
-                    packageName = item.getAddonPackage().getName();
-                } else if (packageName == null && item.getAddonPackageId() != null) {
-                    try {
-                        var addonOpt = addonPackageRepository.findById(item.getAddonPackageId());
-                        if (addonOpt.isPresent()) {
-                            packageName = addonOpt.get().getName();
-                        }
-                    } catch (Exception e) {}
+                if (packageName == null && item.getAddonServiceId() != null) {
+                    AddonService addon = item.getAddonService();
+                    if (addon == null) {
+                        addon = addonServiceRepository.findById(item.getAddonServiceId()).orElse(null);
+                    }
+                    if (addon != null) {
+                        packageName = addon.getName();
+                    }
                 }
 
                 return ResOrderItemDTO.builder()
                         .id(item.getId())
                         .itemType(item.getItemType())
                         .servicePackageId(item.getServicePackageId())
-                        .addonPackageId(item.getAddonPackageId())
+                        .addonServiceId(item.getAddonServiceId())
                         .packageName(packageName)
-                        .features(features)
+                        .details(detailDTOs)
                         .quantity(item.getQuantity())
                         .unitPrice(item.getUnitPrice())
                         .totalPrice(item.getTotalPrice())

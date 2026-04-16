@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,10 +16,10 @@ public class ResServicePackageDTO {
     private String code;
     private BillingCycle billingCycle;
     private BigDecimal price;
-    private Object features;
     private String description;
     private Boolean isActive;
     private Integer sortOrder;
+    private List<ResServicePackageDetailDTO> details;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

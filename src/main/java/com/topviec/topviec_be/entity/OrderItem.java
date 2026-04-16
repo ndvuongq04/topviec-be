@@ -41,13 +41,13 @@ public class OrderItem {
     @JoinColumn(name = "service_package_id", insertable = false, updatable = false)
     private ServicePackage servicePackage;
 
-    @Column(name = "addon_package_id")
-    private Long addonPackageId;
+    @Column(name = "addon_service_id")
+    private Long addonServiceId;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "addon_package_id", insertable = false, updatable = false)
-    private AddonPackage addonPackage;
+    @JoinColumn(name = "addon_service_id", insertable = false, updatable = false)
+    private AddonService addonService;
 
     @Column(name = "quantity", nullable = false)
     @Builder.Default

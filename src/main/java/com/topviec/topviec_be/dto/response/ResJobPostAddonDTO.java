@@ -12,7 +12,7 @@ public class ResJobPostAddonDTO {
     private Long id;
     private Long jobPostingId;
     private Long companyAddonId;
-    private Long addonPackageId;
+    private Long addonServiceId;
     private String addonName;
     private JobPostAddonStatus status;
     private LocalDateTime startedAt;

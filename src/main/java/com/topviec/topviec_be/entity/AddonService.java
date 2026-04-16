@@ -1,37 +1,44 @@
 package com.topviec.topviec_be.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.topviec.topviec_be.enums.services.BillingCycle;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
-@Table(name = "service_packages")
+@Table(name = "addon_services")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ServicePackage {
+public class AddonService {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name", length = 100, nullable = false)
+    @Column(name = "service_id", nullable = false)
+    private Long serviceId;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_id", insertable = false, updatable = false)
+    private Services service;
+
+    @Column(name = "name", length = 255, nullable = false)
     private String name;
 
-    @Column(name = "code", length = 50, unique = true, nullable = false)
+    @Column(name = "code", length = 100, unique = true, nullable = false)
     private String code;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "billing_cycle", length = 20)
-    private BillingCycle billingCycle;
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+
+    @Column(name = "duration_days")
+    private Integer durationDays;
 
     @Column(name = "price", precision = 15, scale = 2)
     private BigDecimal price;
@@ -43,19 +50,11 @@ public class ServicePackage {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "sort_order")
-    private Integer sortOrder;
-
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @JsonIgnore
-    @Builder.Default
-    @OneToMany(mappedBy = "servicePackage", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-    private List<ServicePackageDetail> details = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
