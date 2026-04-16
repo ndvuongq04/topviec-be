@@ -26,9 +26,12 @@ import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.OrderService;
+import com.topviec.topviec_be.specification.OrderSpecification;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +71,7 @@ public class OrderServiceImpl implements OrderService {
             servicePackage = servicePackageRepository.findById(request.getPackageId())
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy gói dịch vụ (Subscription)."));
             if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
-                 throw AppException.badRequest("Gói dịch vụ này không còn hoạt động.");
+                throw AppException.badRequest("Gói dịch vụ này không còn hoạt động.");
             }
             unitPrice = servicePackage.getPrice();
         } else {
@@ -241,13 +244,57 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getAllOrders(OrderStatus status, Pageable pageable) {
-        Page<Order> page;
-        if (status != null) {
-            page = orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+    public ResultPaginationDTO getAllOrders(
+            String keyword, OrderType type, OrderStatus status,
+            String dateFilter, String startDate, String endDate,
+            Boolean failedOrPending, Pageable pageable) {
+
+        LocalDateTime startDt = null;
+        LocalDateTime endDt = null;
+
+        if (dateFilter != null && !dateFilter.isBlank()) {
+            LocalDateTime now = LocalDateTime.now();
+            switch (dateFilter.toLowerCase()) {
+                case "today":
+                    startDt = now.toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+                case "last7days":
+                    startDt = now.minusDays(7).toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+                case "thismonth":
+                    startDt = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+                    endDt = now.toLocalDate().atTime(23, 59, 59);
+                    break;
+            }
         } else {
-            page = orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+            if (startDate != null && !startDate.isBlank()) {
+                try {
+                    startDt = LocalDateTime.parse(startDate);
+                } catch (Exception e) {
+                    try {
+                        startDt = java.time.LocalDate.parse(startDate).atStartOfDay();
+                    } catch (Exception ex) {
+                    }
+                }
+            }
+            if (endDate != null && !endDate.isBlank()) {
+                try {
+                    endDt = LocalDateTime.parse(endDate);
+                } catch (Exception e) {
+                    try {
+                        endDt = java.time.LocalDate.parse(endDate).atTime(23, 59, 59);
+                    } catch (Exception ex) {
+                    }
+                }
+            }
         }
+
+        Specification<Order> spec = OrderSpecification.withFilter(
+                keyword, type, status, startDt, endDt, failedOrPending);
+
+        Page<Order> page = orderRepository.findAll(spec, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber() + 1);
@@ -301,8 +348,7 @@ public class OrderServiceImpl implements OrderService {
                     .totalPrice(item.getTotalPrice())
                     .billingCycle(item.getBillingCycle())
                     .durationDays(item.getDurationDays())
-                    .build()
-            ).collect(Collectors.toList());
+                    .build()).collect(Collectors.toList());
         }
 
         return ResOrderDTO.builder()
