@@ -37,15 +37,6 @@ public class OrderSpecification {
                 : cb.equal(root.get("status"), status);
     }
 
-    public static Specification<Order> isFailedOrPending(Boolean failedOrPending) {
-        return (root, query, cb) -> {
-            if (failedOrPending == null || !failedOrPending) {
-                return null;
-            }
-            return root.get("status").in(OrderStatus.FAILED, OrderStatus.PENDING);
-        };
-    }
-
     public static Specification<Order> createdAfter(LocalDateTime startDate) {
         return (root, query, cb) -> startDate == null
                 ? null
@@ -60,13 +51,11 @@ public class OrderSpecification {
 
     public static Specification<Order> withFilter(
             String search, OrderType type, OrderStatus status,
-            LocalDateTime startDate, LocalDateTime endDate,
-            Boolean failedOrPending) {
+            LocalDateTime startDate, LocalDateTime endDate) {
         return Specification.where(searchKeyword(search))
                 .and(hasType(type))
                 .and(hasStatus(status))
                 .and(createdAfter(startDate))
-                .and(createdBefore(endDate))
-                .and(isFailedOrPending(failedOrPending));
+                .and(createdBefore(endDate));
     }
 }

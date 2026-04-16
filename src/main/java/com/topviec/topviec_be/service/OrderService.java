@@ -16,7 +16,7 @@ public interface OrderService {
     ResultPaginationDTO getAllOrders(
             String keyword, com.topviec.topviec_be.enums.services.OrderType type, OrderStatus status,
             String dateFilter, String startDate, String endDate,
-            Boolean failedOrPending, Pageable pageable);
+            Pageable pageable);
     ResOrderDTO getOrderById(Long orderId);
     ResOrderDTO updateOrderStatus(Long adminId, Long orderId, ReqUpdateOrderStatusDTO request);
 }

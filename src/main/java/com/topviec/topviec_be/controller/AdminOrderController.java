@@ -35,10 +35,9 @@ public class AdminOrderController {
             @RequestParam(required = false) String dateFilter,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
-            @RequestParam(required = false) Boolean failedOrPending,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
         return ResponseEntity.ok(orderService.getAllOrders(search, type, status, dateFilter, startDate, endDate,
-                failedOrPending, pageable));
+                pageable));
     }
 
     @GetMapping("/{id}")
