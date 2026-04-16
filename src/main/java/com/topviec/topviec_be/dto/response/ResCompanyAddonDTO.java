@@ -15,6 +15,7 @@ public class ResCompanyAddonDTO {
     private String addonName;
     private String addonCode;
     private AddonPackageGroup groupCode;
+    private String groupName;
     private SubscriptionStatus status;
     private Integer quantityTotal;
     private Integer quantityRemaining;
