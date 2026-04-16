@@ -27,7 +27,7 @@ public class OrderSpecification {
     public static Specification<Order> hasType(OrderType type) {
         return (root, query, cb) -> type == null
                 ? null
-                : cb.equal(root.get("type"), type.getValue());
+                : cb.equal(root.get("type"), type);
     }
 
     public static Specification<Order> hasStatus(OrderStatus status) {
