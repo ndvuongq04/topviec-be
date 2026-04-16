@@ -20,15 +20,14 @@ public class OrderSpecification {
             Join<Object, Object> company = root.join("company", JoinType.LEFT);
             return cb.or(
                     cb.like(cb.lower(root.get("orderCode")), likeKeyword),
-                    cb.like(cb.lower(company.get("name")), likeKeyword)
-            );
+                    cb.like(cb.lower(company.get("name")), likeKeyword));
         };
     }
 
     public static Specification<Order> hasType(OrderType type) {
         return (root, query, cb) -> type == null
                 ? null
-                : cb.equal(root.get("type"), type);
+                : cb.equal(root.get("type"), type.getValue());
     }
 
     public static Specification<Order> hasStatus(OrderStatus status) {
