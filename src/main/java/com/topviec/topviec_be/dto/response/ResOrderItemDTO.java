@@ -19,4 +19,6 @@ public class ResOrderItemDTO {
     private BigDecimal totalPrice;
     private BillingCycle billingCycle;
     private Integer durationDays;
+    private String packageName;
+    private Object features;
 }
