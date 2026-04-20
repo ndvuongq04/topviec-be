@@ -68,18 +68,16 @@ public class JobPostingActivationService {
      * Xử lý kích hoạt Tin HOT
      */
     private ResJobPostAddonDTO applyHotService(JobPosting jobPosting, CompanyAddon companyAddon, AddonService addonService) {
-        // 1. Kiểm tra tin đã HOT chưa
-        if (Boolean.TRUE.equals(jobPosting.getIsHot())
-                && jobPosting.getHotExpiredAt() != null
-                && jobPosting.getHotExpiredAt().isAfter(LocalDateTime.now())) {
-            throw AppException.badRequest(
-                    "Tin tuyển dụng này đang ở trạng thái HOT (hết hạn lúc "
-                            + jobPosting.getHotExpiredAt() + "). Không cần áp dụng thêm.");
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Kiểm tra tin đã HOT chưa (dựa vào JobPostAddon)
+        long activeHotCountForJob = jobPostAddonRepository.countActiveAddonForJob(jobPosting.getId(), CODE_HOT, now);
+        if (activeHotCountForJob > 0) {
+            throw AppException.badRequest("Tin tuyển dụng này đang ở trạng thái HOT. Không cần áp dụng thêm.");
         }
 
         // 2. Kiểm tra slot HOT trên hệ thống
-        LocalDateTime now = LocalDateTime.now();
-        long activeHotCount = jobPostingRepository.countActiveHotPosts(now);
+        long activeHotCount = jobPostAddonRepository.countActiveGlobalAddons(CODE_HOT, now);
         if (activeHotCount >= maxHotSlots) {
             throw AppException.badRequest(
                     "Đã đạt giới hạn " + maxHotSlots
@@ -90,13 +88,7 @@ public class JobPostingActivationService {
         int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 30;
         LocalDateTime hotExpiredAt = now.plusDays(durationDays);
 
-        // 4. Cập nhật tin tuyển dụng
-        jobPosting.setIsHot(true);
-        jobPosting.setHotStartedAt(now);
-        jobPosting.setHotExpiredAt(hotExpiredAt);
-        jobPostingRepository.save(jobPosting);
-
-        // 5. Tạo & trả JobPostAddon
+        // 4. Tạo & trả JobPostAddon (status = ACTIVE)
         return createJobPostAddonRecord(jobPosting.getId(), companyAddon, addonService, now, hotExpiredAt);
     }
 

@@ -109,16 +109,6 @@ public class JobPosting {
     @Column(name = "refreshed_at")
     private LocalDateTime refreshedAt;
 
-    @Builder.Default
-    @Column(name = "is_hot")
-    private Boolean isHot = false;
-
-    @Column(name = "hot_started_at")
-    private LocalDateTime hotStartedAt;
-
-    @Column(name = "hot_expired_at")
-    private LocalDateTime hotExpiredAt;
-
     @Column(name = "moderation_note", columnDefinition = "TEXT")
     private String moderationNote;
 
