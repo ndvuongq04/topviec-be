@@ -33,6 +33,7 @@ public class AdminJobPostingController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean isFeatured,
             @RequestParam(required = false) Boolean isUrgent,
+            @RequestParam(required = false) Boolean isHot,
             @RequestParam(required = false) Long salaryMin,
             @RequestParam(required = false) Long salaryMax,
             @RequestParam(required = false) Integer experienceYearsMin,
@@ -42,7 +43,7 @@ public class AdminJobPostingController {
         // Truyền companyId = null để lấy toàn bộ
         return ResponseEntity.ok(jobPostingService.getList(
                 keyword, null, industryId, levelId, workType, status,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
     }
 

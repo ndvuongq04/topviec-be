@@ -139,8 +139,9 @@ public class JobPosting {
     // @JdbcTypeCode(SqlTypes.VECTOR)
     // private float[] embedding;
 
+    @Builder.Default
     @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<JobPostSkill> skills = new ArrayList();
+    private List<JobPostSkill> skills = new ArrayList<>();
 
     // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
     // = true, fetch = FetchType.LAZY)
