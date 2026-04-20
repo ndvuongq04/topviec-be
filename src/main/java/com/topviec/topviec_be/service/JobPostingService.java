@@ -16,7 +16,7 @@ public interface JobPostingService {
          */
         ResultPaginationDTO getList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType, String status,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
@@ -28,7 +28,7 @@ public interface JobPostingService {
          */
         ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType, String status,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
@@ -36,7 +36,7 @@ public interface JobPostingService {
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
