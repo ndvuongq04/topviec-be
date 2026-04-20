@@ -88,7 +88,11 @@ public class JobPostingActivationService {
         int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 30;
         LocalDateTime hotExpiredAt = now.plusDays(durationDays);
 
-        // 4. Tạo & trả JobPostAddon (status = ACTIVE)
+        // 4. Bật cờ isHot trên JobPosting để dễ truy vấn
+        jobPosting.setIsHot(true);
+        jobPostingRepository.save(jobPosting);
+
+        // 5. Tạo & trả JobPostAddon (status = ACTIVE)
         return createJobPostAddonRecord(jobPosting.getId(), companyAddon, addonService, now, hotExpiredAt);
     }
 

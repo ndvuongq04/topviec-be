@@ -36,6 +36,7 @@ public class ResJobPostingDetail {
 
     private Boolean isFeatured;
     private Boolean isUrgent;
+    private Boolean isHot;
 
     private Integer viewCount;
     private Integer editCount;

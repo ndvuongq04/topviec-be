@@ -23,6 +23,7 @@ public class ResJobPostingSummary {
     private Boolean salaryNegotiable;
     private Boolean isFeatured;
     private Boolean isUrgent;
+    private Boolean isHot;
     private Integer viewCount;
     private Integer applicationCount;   // Tổng số hồ sơ đã nộp vào tin
     private Integer interviewRoundsCount; // Tổng số vòng phỏng vấn của tin

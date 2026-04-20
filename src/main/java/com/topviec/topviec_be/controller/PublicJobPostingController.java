@@ -35,6 +35,7 @@ public class PublicJobPostingController {
             @RequestParam(required = false) String workType,
             @RequestParam(required = false) Boolean isFeatured,
             @RequestParam(required = false) Boolean isUrgent,
+            @RequestParam(required = false) Boolean isHot,
             @RequestParam(required = false) Long salaryMin,
             @RequestParam(required = false) Long salaryMax,
             @RequestParam(required = false) Integer experienceYearsMin,
@@ -43,8 +44,22 @@ public class PublicJobPostingController {
 
         return ResponseEntity.ok(jobPostingService.getPublicList(
                 keyword, companyId, industryId, levelId, workType,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
+    }
+
+    /**
+     * GET /job-postings/hot
+     * Lấy danh sách tin tuyển dụng HOT cho trang chủ.
+     */
+    @GetMapping("/hot")
+    public ResponseEntity<ResultPaginationDTO> getHotJobPosts(
+            @PageableDefault(size = 10) Pageable pageable) {
+
+        return ResponseEntity.ok(jobPostingService.getPublicList(
+                null, null, null, null, null,
+                null, null, true, null, null,
+                null, null, pageable));
     }
 
     /**

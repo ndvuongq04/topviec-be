@@ -114,14 +114,14 @@ public class JobPostingServiceImpl implements JobPostingService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getList(String keyword, Long companyId, Long industryId,
             Long levelId, String workType, String status,
-            Boolean isFeatured, Boolean isUrgent,
+            Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax,
             Pageable pageable) {
 
         Specification<JobPosting> spec = JobPostingSpecification.withFilter(
                 keyword, companyId, industryId, levelId, workType, status,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
         return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, false);
@@ -135,7 +135,7 @@ public class JobPostingServiceImpl implements JobPostingService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
             Long levelId, String workType, String status,
-            Boolean isFeatured, Boolean isUrgent,
+            Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax,
             Pageable pageable) {
@@ -143,7 +143,7 @@ public class JobPostingServiceImpl implements JobPostingService {
         // Specification không có notDeleted() — lấy hết cả tin đã xóa mềm
         Specification<JobPosting> spec = JobPostingSpecification.withEmployerFilter(
                 keyword, companyId, industryId, levelId, workType, status,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
         return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, true);
@@ -157,14 +157,14 @@ public class JobPostingServiceImpl implements JobPostingService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
             Long levelId, String workType,
-            Boolean isFeatured, Boolean isUrgent,
+            Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax,
             Pageable pageable) {
 
         Specification<JobPosting> spec = JobPostingSpecification.withPublicFilter(
                 keyword, companyId, industryId, levelId, workType,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
         return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, false);
@@ -625,6 +625,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .salaryNegotiable(j.getSalaryNegotiable())
                 .isFeatured(j.getIsFeatured())
                 .isUrgent(j.getIsUrgent())
+                .isHot(j.getIsHot())
                 .viewCount(j.getViewCount())
                 .applicationCount(applicationCount)
                 .interviewRoundsCount(interviewRoundsCount)
@@ -708,6 +709,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .status(j.getStatus())
                 .isFeatured(j.getIsFeatured())
                 .isUrgent(j.getIsUrgent())
+                .isHot(j.getIsHot())
                 .viewCount(j.getViewCount())
                 .editCount(j.getEditCount())
                 .applicationCount(applicationCount)

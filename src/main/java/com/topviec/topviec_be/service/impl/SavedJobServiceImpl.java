@@ -168,6 +168,7 @@ public class SavedJobServiceImpl implements SavedJobService {
                                 .salaryNegotiable(j.getSalaryNegotiable())
                                 .isFeatured(j.getIsFeatured())
                                 .isUrgent(j.getIsUrgent())
+                                .isHot(j.getIsHot())
                                 .viewCount(j.getViewCount())
                                 .deadline(j.getDeadline())
                                 .publishedAt(j.getPublishedAt())
