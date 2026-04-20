@@ -14,7 +14,6 @@ public enum ServiceCategory {
         this.value = value;
     }
 
-    @JsonValue
     public String getValue() {
         return value;
     }
