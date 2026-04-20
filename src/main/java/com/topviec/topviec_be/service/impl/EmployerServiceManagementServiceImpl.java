@@ -14,6 +14,7 @@ import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.entity.ServicePackage;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
+import com.topviec.topviec_be.enums.services.ServiceCategory;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AddonServiceRepository;
@@ -26,7 +27,9 @@ import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
+import com.topviec.topviec_be.service.activation.ServiceActivationRouter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EmployerServiceManagementServiceImpl implements EmployerServiceManagementService {
 
         private final CompanyService companyService;
@@ -48,6 +52,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         private final ServicePackageRepository servicePackageRepository;
         private final JobPostingRepository jobPostingRepository;
         private final JobPostAddonRepository jobPostAddonRepository;
+        private final ServiceActivationRouter serviceActivationRouter;
 
         @Override
         @Transactional(readOnly = true)
@@ -134,6 +139,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         public ResJobPostAddonDTO applyAddonToJobPost(Long userId, Long jobPostingId, ReqApplyAddonDTO request) {
                 Long companyId = getCompanyId(userId);
 
+                // 1. Validate tin tuyển dụng
                 JobPosting jobPosting = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostingId)
                                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng."));
 
@@ -141,6 +147,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                         throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng này.");
                 }
 
+                // 2. Validate dịch vụ lẻ đã mua
                 CompanyAddon companyAddon = companyAddonRepository.findById(request.getCompanyAddonId())
                                 .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ lẻ."));
 
@@ -160,9 +167,34 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                         throw AppException.badRequest("Dịch vụ lẻ này đã hết số lượng sử dụng.");
                 }
 
+                // 3. Lấy thông tin cấu hình dịch vụ lẻ
                 AddonService addonService = addonServiceRepository.findById(companyAddon.getAddonServiceId())
                                 .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin dịch vụ lẻ."));
 
+                // 4. Tìm service category and code để route
+                Services service = serviceRepository.findById(addonService.getServiceId()).orElse(null);
+                ServiceCategory serviceCategory = service != null ? service.getCategory() : null;
+                String serviceCode = service != null ? service.getCode() : null;
+
+                // 5. Nếu có handler trong Router → delegate hoàn toàn
+                if (serviceCategory != null && serviceCode != null
+                                && serviceActivationRouter.isSupported(serviceCategory, serviceCode)) {
+                        log.info("[applyAddon] Routing to handler: {} for job #{}", serviceCode, jobPostingId);
+                        return serviceActivationRouter.activate(serviceCategory, serviceCode, jobPosting, companyAddon,
+                                        addonService);
+                }
+
+                // 6. Fallback: xử lý generic cho các dịch vụ chưa có handler riêng
+                log.info("[applyAddon] Generic fallback for service: {} on job #{}", serviceCode, jobPostingId);
+                return applyGenericAddon(jobPostingId, companyAddon, addonService);
+        }
+
+        /**
+         * Xử lý generic cho các dịch vụ chưa có handler riêng.
+         * Tạo JobPostAddon record và trừ số lượng.
+         */
+        private ResJobPostAddonDTO applyGenericAddon(Long jobPostingId, CompanyAddon companyAddon,
+                        AddonService addonService) {
                 LocalDateTime now = LocalDateTime.now();
                 LocalDateTime expiredAt = addonService.getDurationDays() != null
                                 ? now.plusDays(addonService.getDurationDays())

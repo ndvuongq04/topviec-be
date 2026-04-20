@@ -63,6 +63,8 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
     @Override
     @Transactional
     public ResServiceDTO createService(ReqServiceDTO reqDTO) {
+        validateServiceCodePrefix(reqDTO.getCategory(), reqDTO.getCode());
+
         if (serviceRepository.existsByCode(reqDTO.getCode())) {
             throw AppException.badRequest("Mã dịch vụ đã tồn tại, vui lòng chọn mã khác.");
         }
@@ -82,6 +84,8 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
     @Override
     @Transactional
     public ResServiceDTO updateService(Long id, ReqServiceDTO reqDTO) {
+        validateServiceCodePrefix(reqDTO.getCategory(), reqDTO.getCode());
+        
         Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ với ID: " + id));
 
@@ -99,6 +103,22 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
         }
 
         return mapToDTO(serviceRepository.save(service));
+    }
+
+    private void validateServiceCodePrefix(ServiceCategory category, String code) {
+        if (category == null || code == null || code.trim().isEmpty()) {
+            return;
+        }
+
+        String expectedPrefix = category == ServiceCategory.ADDON_PACKAGE 
+                ? "ADDON_PACKAGE_GROUP_" 
+                : category.name() + "_";
+
+        if (!code.startsWith(expectedPrefix)) {
+            throw AppException.badRequest(
+                    "Mã dịch vụ thuộc nhóm '" + category.getValue() + 
+                    "' phải bắt đầu bằng '" + expectedPrefix + "'.");
+        }
     }
 
     private ResServiceDTO mapToDTO(Services entity) {

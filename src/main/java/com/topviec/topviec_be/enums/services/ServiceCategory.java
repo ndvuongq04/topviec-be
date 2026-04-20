@@ -6,7 +6,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum ServiceCategory {
     JOB_POSTING("Tin tuyển dụng"),
     CANDIDATE("Hồ sơ ứng viên"),
-    BRANDING("Thương hiệu");
+    BRANDING("Thương hiệu"),
+    ADDON_PACKAGE("Gói dịch vụ thêm");
 
     private final String value;
 
