@@ -25,6 +25,7 @@ public interface CompanyBrandingRepository extends JpaRepository<CompanyBranding
                                @Param("serviceCode") String serviceCode,
                                @Param("now") LocalDateTime now);
 
-    /** Tìm các record đã hết hạn để scheduler xử lý */
-    List<CompanyBranding> findByStatusAndExpiredAtBefore(BrandingAddonStatus status, LocalDateTime now);
+    /** Tìm các record của 1 service đã hết hạn để scheduler xử lý */
+    List<CompanyBranding> findByServiceCodeAndStatusAndExpiredAtBefore(
+            String serviceCode, BrandingAddonStatus status, LocalDateTime now);
 }

@@ -2,6 +2,7 @@ package com.topviec.topviec_be.job;
 
 import com.topviec.topviec_be.entity.*;
 import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
+import com.topviec.topviec_be.service.activation.BrandingActivationService;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.repository.*;
 import com.topviec.topviec_be.service.EmailService;
@@ -219,34 +220,36 @@ public class RecruitmentSchedulerJob {
     }
 
     /**
-     * Tự động gỡ cờ isBanner và đánh dấu EXPIRED cho các banner trang chủ đã hết hạn.
+     * Tự động gỡ các dịch vụ BRANDING đã hết hạn và reset cờ tương ứng trên Company.
      * Chạy mỗi 5 phút.
      */
     @Scheduled(cron = "0 0/5 * * * *")
     @Transactional
-    public void expireBannerHomePosts() {
+    public void expireBrandingServices() {
         LocalDateTime now = LocalDateTime.now();
-        List<CompanyBranding> expiredBanners = companyBrandingRepository
-                .findByStatusAndExpiredAtBefore(BrandingAddonStatus.ACTIVE, now);
+        expireBrandingByCode(BrandingActivationService.CODE_BANNER_HOME, now,
+                company -> company.setIsBanner(false));
+        expireBrandingByCode(BrandingActivationService.CODE_TOP_EMPLOYER, now,
+                company -> company.setIsTopEmployer(false));
+    }
 
-        if (expiredBanners.isEmpty()) {
-            return;
-        }
+    private void expireBrandingByCode(String serviceCode, LocalDateTime now,
+            java.util.function.Consumer<Company> flagResetter) {
+        List<CompanyBranding> expired = companyBrandingRepository
+                .findByServiceCodeAndStatusAndExpiredAtBefore(serviceCode, BrandingAddonStatus.ACTIVE, now);
 
-        log.info("[Scheduler] expireBannerHomePosts chạy lúc: {}, tìm thấy {} banner hết hạn", now,
-                expiredBanners.size());
+        if (expired.isEmpty()) return;
 
-        for (CompanyBranding banner : expiredBanners) {
-            banner.setStatus(BrandingAddonStatus.EXPIRED);
-            companyBrandingRepository.save(banner);
+        log.info("[Scheduler] Expire {} — {} bản ghi hết hạn", serviceCode, expired.size());
 
-            companyRepository.findById(banner.getCompanyId()).ifPresent(company -> {
-                company.setIsBanner(false);
+        for (CompanyBranding record : expired) {
+            record.setStatus(BrandingAddonStatus.EXPIRED);
+            companyBrandingRepository.save(record);
+            companyRepository.findById(record.getCompanyId()).ifPresent(company -> {
+                flagResetter.accept(company);
                 companyRepository.save(company);
             });
         }
-
-        log.info("[Scheduler] Đã gỡ cờ isBanner cho {} công ty", expiredBanners.size());
     }
 
     /**
