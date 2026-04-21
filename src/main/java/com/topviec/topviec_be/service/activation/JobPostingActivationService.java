@@ -42,9 +42,6 @@ public class JobPostingActivationService {
     private final JobPostAddonRepository jobPostAddonRepository;
     private final CompanyAddonRepository companyAddonRepository;
 
-    @Value("${app.service.hot.max-slots:10}")
-    private int maxHotSlots;
-
     /**
      * Dispatcher method: phân luồng xử lý tùy theo từng loại service code
      */
@@ -79,15 +76,7 @@ public class JobPostingActivationService {
             throw AppException.badRequest("Tin tuyển dụng này đang ở trạng thái HOT. Không cần áp dụng thêm.");
         }
 
-        // 2. Kiểm tra slot HOT trên hệ thống
-        long activeHotCount = jobPostAddonRepository.countActiveGlobalAddons(CODE_HOT, now);
-        if (activeHotCount >= maxHotSlots) {
-            throw AppException.badRequest(
-                    "Đã đạt giới hạn " + maxHotSlots
-                            + " tin HOT trên hệ thống. Vui lòng thử lại sau khi có tin HOT hết hạn.");
-        }
-
-        // 3. Tính thời hạn HOT
+        // 2. Tính thời hạn HOT
         int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 30;
         LocalDateTime hotExpiredAt = now.plusDays(durationDays);
 
@@ -104,8 +93,24 @@ public class JobPostingActivationService {
      */
     private ResJobPostAddonDTO applyUrgentService(JobPosting jobPosting, CompanyAddon companyAddon,
             AddonService addonService) {
-        // TODO: Logic kích hoạt tin gấp (ví dụ update is_urgent = true)
-        throw AppException.badRequest("Tính năng áp dụng Dịch Vụ Tin Gấp đang được xây dựng.");
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Kiểm tra tin đã URGENT chưa
+        long activeUrgentCountForJob = jobPostAddonRepository.countActiveAddonForJob(jobPosting.getId(), CODE_URGENT, now);
+        if (activeUrgentCountForJob > 0) {
+            throw AppException.badRequest("Tin tuyển dụng này đang ở trạng thái TUYỂN GẤP. Không cần áp dụng thêm.");
+        }
+
+        // 2. Tính thời hạn URGENT (mặc định 14 ngày nếu không cấu hình)
+        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 14;
+        LocalDateTime urgentExpiredAt = now.plusDays(durationDays);
+
+        // 4. Bật cờ isUrgent trên JobPosting để dễ truy vấn
+        jobPosting.setIsUrgent(true);
+        jobPostingRepository.save(jobPosting);
+
+        // 5. Tạo & trả JobPostAddon (status = ACTIVE)
+        return createJobPostAddonRecord(jobPosting.getId(), companyAddon, addonService, now, urgentExpiredAt);
     }
 
     /**
