@@ -34,9 +34,9 @@ public class JobPostingActivationService {
 
     public static final ServiceCategory CATEGORY = ServiceCategory.JOB_POSTING;
 
-    public static final String CODE_HOT = "JOB_POST_HOT";
-    public static final String CODE_URGENT = "JOB_POST_URGENT";
-    public static final String CODE_REFRESH = "JOB_POST_REFRESH";
+    public static final String CODE_HOT = "JOB_POSTING_HOT";
+    public static final String CODE_URGENT = "JOB_POSTING_URGENT";
+    public static final String CODE_REFRESH = "JOB_POSTING_REFRESH";
 
     private final JobPostingRepository jobPostingRepository;
     private final JobPostAddonRepository jobPostAddonRepository;
@@ -49,9 +49,10 @@ public class JobPostingActivationService {
      * Dispatcher method: phân luồng xử lý tùy theo từng loại service code
      */
     @Transactional
-    public ResJobPostAddonDTO activate(String serviceCode, JobPosting jobPosting, CompanyAddon companyAddon, AddonService addonService) {
+    public ResJobPostAddonDTO activate(String serviceCode, JobPosting jobPosting, CompanyAddon companyAddon,
+            AddonService addonService) {
         log.info("[JobPostingActivationService] Kích hoạt dịch vụ {} cho tin #{}", serviceCode, jobPosting.getId());
-        
+
         switch (serviceCode) {
             case CODE_HOT:
                 return applyHotService(jobPosting, companyAddon, addonService);
@@ -60,14 +61,16 @@ public class JobPostingActivationService {
             case CODE_REFRESH:
                 return applyRefreshService(jobPosting, companyAddon, addonService);
             default:
-                throw AppException.badRequest("Mã dịch vụ nhóm Tuyển Dụng không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
+                throw AppException
+                        .badRequest("Mã dịch vụ nhóm Tuyển Dụng không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
         }
     }
 
     /**
      * Xử lý kích hoạt Tin HOT
      */
-    private ResJobPostAddonDTO applyHotService(JobPosting jobPosting, CompanyAddon companyAddon, AddonService addonService) {
+    private ResJobPostAddonDTO applyHotService(JobPosting jobPosting, CompanyAddon companyAddon,
+            AddonService addonService) {
         LocalDateTime now = LocalDateTime.now();
 
         // 1. Kiểm tra tin đã HOT chưa (dựa vào JobPostAddon)
@@ -99,7 +102,8 @@ public class JobPostingActivationService {
     /**
      * Xử lý kích hoạt Tin Gấp
      */
-    private ResJobPostAddonDTO applyUrgentService(JobPosting jobPosting, CompanyAddon companyAddon, AddonService addonService) {
+    private ResJobPostAddonDTO applyUrgentService(JobPosting jobPosting, CompanyAddon companyAddon,
+            AddonService addonService) {
         // TODO: Logic kích hoạt tin gấp (ví dụ update is_urgent = true)
         throw AppException.badRequest("Tính năng áp dụng Dịch Vụ Tin Gấp đang được xây dựng.");
     }
@@ -107,15 +111,17 @@ public class JobPostingActivationService {
     /**
      * Xử lý kích hoạt Làm mới tin
      */
-    private ResJobPostAddonDTO applyRefreshService(JobPosting jobPosting, CompanyAddon companyAddon, AddonService addonService) {
-         // TODO: Logic làm mới tin (ví dụ update refreshed_at = now)
+    private ResJobPostAddonDTO applyRefreshService(JobPosting jobPosting, CompanyAddon companyAddon,
+            AddonService addonService) {
+        // TODO: Logic làm mới tin (ví dụ update refreshed_at = now)
         throw AppException.badRequest("Tính năng áp dụng Dịch Vụ Làm Mới Tin đang được xây dựng.");
     }
 
     /**
      * Hàm dùng chung để tạo record lịch sử sử dụng dịch vụ & trừ quota CompanyAddon
      */
-    private ResJobPostAddonDTO createJobPostAddonRecord(Long jobPostingId, CompanyAddon companyAddon, AddonService addonService, LocalDateTime startedAt, LocalDateTime expiredAt) {
+    private ResJobPostAddonDTO createJobPostAddonRecord(Long jobPostingId, CompanyAddon companyAddon,
+            AddonService addonService, LocalDateTime startedAt, LocalDateTime expiredAt) {
         JobPostAddon jobPostAddon = JobPostAddon.builder()
                 .jobPostingId(jobPostingId)
                 .companyAddonId(companyAddon.getId())
