@@ -157,15 +157,14 @@ public class RecruitmentSchedulerJob {
     }
 
     /**
-     * Tự động gỡ cờ HOT và đánh dấu EXPIRED cho các gói dịch vụ HOT đã hết thời
-     * hạn.
+     * Tự động gỡ cờ HOT và đánh dấu EXPIRED cho các gói dịch vụ HOT đã hết thời hạn.
      * Chạy mỗi 5 phút.
      */
     @Scheduled(cron = "0 0/5 * * * *")
     @Transactional
     public void expireHotJobPosts() {
         LocalDateTime now = LocalDateTime.now();
-        List<JobPostAddon> expiredAddons = jobPostAddonRepository.findExpiredAddons("JOB_POST_HOT", now);
+        List<JobPostAddon> expiredAddons = jobPostAddonRepository.findExpiredAddons("JOB_POSTING_HOT", now);
 
         if (expiredAddons.isEmpty()) {
             return;
@@ -185,6 +184,36 @@ public class RecruitmentSchedulerJob {
         }
 
         log.info("[Scheduler] Đã gỡ cờ HOT cho {} tin tuyển dụng", expiredAddons.size());
+    }
+
+    /**
+     * Tự động gỡ cờ URGENT và đánh dấu EXPIRED cho các gói dịch vụ TUYỂN GẤP đã hết thời hạn.
+     * Chạy mỗi 5 phút.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireUrgentJobPosts() {
+        LocalDateTime now = LocalDateTime.now();
+        List<JobPostAddon> expiredAddons = jobPostAddonRepository.findExpiredAddons("JOB_POSTING_URGENT", now);
+
+        if (expiredAddons.isEmpty()) {
+            return;
+        }
+
+        log.info("[Scheduler] expireUrgentJobPosts chạy lúc: {}, tìm thấy {} tin TUYỂN GẤP hết hạn", now, expiredAddons.size());
+
+        for (JobPostAddon addon : expiredAddons) {
+            addon.setStatus(JobPostAddonStatus.EXPIRED);
+            jobPostAddonRepository.save(addon);
+
+            JobPosting jobPosting = addon.getJobPosting();
+            if (jobPosting != null) {
+                jobPosting.setIsUrgent(false);
+                jobPostingRepository.save(jobPosting);
+            }
+        }
+
+        log.info("[Scheduler] Đã gỡ cờ URGENT cho {} tin tuyển dụng", expiredAddons.size());
     }
 
     /**
