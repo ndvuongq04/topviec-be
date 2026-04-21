@@ -46,6 +46,11 @@ public class ResCompanyDTO {
     private Long verifiedBy;
     private String rejectionReason;
 
+    // Dịch vụ Branding đang active
+    private Boolean isBanner;
+    private Boolean isTopEmployer;
+    private Boolean isBrandVerified;
+
     // Trạng thái
     private CompanyStatus status;
     private Integer violationScore;

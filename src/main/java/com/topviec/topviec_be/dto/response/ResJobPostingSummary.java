@@ -45,6 +45,8 @@ public class ResJobPostingSummary {
         private String slug;
         private String logoUrl;
         private String address;
+        private Boolean isTopEmployer;
+        private Boolean isBrandVerified;
     }
 
     @Getter
