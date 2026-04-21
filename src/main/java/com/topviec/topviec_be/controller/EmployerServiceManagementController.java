@@ -57,14 +57,15 @@ public class EmployerServiceManagementController {
     }
 
     /**
-     * Áp dụng dịch vụ Banner trang chủ cho công ty
+     * Áp dụng dịch vụ BRANDING cho công ty (Banner trang chủ, Top Employer, ...).
+     * Service code được tự động xác định từ companyAddonId.
      */
-    @PostMapping("/company/apply-banner")
-    public ResponseEntity<ResCompanyBrandingDTO> applyBannerToCompany(
+    @PostMapping("/company/apply-branding")
+    public ResponseEntity<ResCompanyBrandingDTO> applyBrandingToCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqApplyAddonDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(employerServiceManagementService.applyBannerToCompany(extractUserId(jwt), request));
+                .body(employerServiceManagementService.applyBrandingToCompany(extractUserId(jwt), request));
     }
 
     private Long extractUserId(Jwt jwt) {

@@ -19,6 +19,6 @@ public interface EmployerServiceManagementService {
     /** Áp dụng dịch vụ lẻ cho một tin tuyển dụng */
     ResJobPostAddonDTO applyAddonToJobPost(Long userId, Long jobPostingId, ReqApplyAddonDTO request);
 
-    /** Áp dụng dịch vụ Banner trang chủ cho công ty */
-    ResCompanyBrandingDTO applyBannerToCompany(Long userId, ReqApplyAddonDTO request);
+    /** Áp dụng dịch vụ BRANDING cho công ty (route tự động theo service code của addon) */
+    ResCompanyBrandingDTO applyBrandingToCompany(Long userId, ReqApplyAddonDTO request);
 }

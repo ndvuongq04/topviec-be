@@ -232,7 +232,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
 
         @Override
         @Transactional
-        public ResCompanyBrandingDTO applyBannerToCompany(Long userId, ReqApplyAddonDTO request) {
+        public ResCompanyBrandingDTO applyBrandingToCompany(Long userId, ReqApplyAddonDTO request) {
                 Long companyId = getCompanyId(userId);
 
                 CompanyAddon companyAddon = companyAddonRepository.findById(request.getCompanyAddonId())
@@ -241,15 +241,12 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 if (!companyAddon.getCompanyId().equals(companyId)) {
                         throw AppException.forbidden("Dịch vụ lẻ này không thuộc công ty của bạn.");
                 }
-
                 if (companyAddon.getStatus() != SubscriptionStatus.ACTIVE) {
                         throw AppException.badRequest("Dịch vụ lẻ này đã hết hiệu lực.");
                 }
-
                 if (companyAddon.getExpiredAt() != null && companyAddon.getExpiredAt().isBefore(LocalDateTime.now())) {
                         throw AppException.badRequest("Dịch vụ lẻ này đã hết hạn sử dụng.");
                 }
-
                 if (companyAddon.getQuantityRemaining() <= 0) {
                         throw AppException.badRequest("Dịch vụ lẻ này đã hết số lượng sử dụng.");
                 }
@@ -260,11 +257,11 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 Services service = serviceRepository.findById(addonService.getServiceId()).orElse(null);
                 String serviceCode = service != null ? service.getCode() : null;
 
-                if (!BrandingActivationService.CODE_BANNER_HOME.equals(serviceCode)) {
-                        throw AppException.badRequest("Dịch vụ lẻ này không phải là dịch vụ Banner trang chủ.");
+                if (!BrandingActivationService.isSupported(serviceCode)) {
+                        throw AppException.badRequest("Dịch vụ lẻ này không thuộc nhóm dịch vụ BRANDING.");
                 }
 
-                return brandingActivationService.applyBannerHomeService(companyId, companyAddon, addonService);
+                return brandingActivationService.activate(serviceCode, companyId, companyAddon, addonService);
         }
 
         private Long getCompanyId(Long userId) {

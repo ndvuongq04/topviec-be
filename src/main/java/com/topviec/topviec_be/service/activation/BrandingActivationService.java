@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -24,33 +25,55 @@ import java.time.LocalDateTime;
 public class BrandingActivationService {
 
     public static final ServiceCategory CATEGORY = ServiceCategory.BRANDING;
-    public static final String CODE_BANNER_HOME = "BRANDING_BANNER_HOME";
+    public static final String CODE_BANNER_HOME    = "BRANDING_BANNER_HOME";
+    public static final String CODE_TOP_EMPLOYER   = "BRANDING_TOP_EMPLOYER";
 
     private final CompanyRepository companyRepository;
     private final CompanyBrandingRepository companyBrandingRepository;
     private final CompanyAddonRepository companyAddonRepository;
 
     @Transactional
-    public ResCompanyBrandingDTO applyBannerHomeService(Long companyId, CompanyAddon companyAddon,
-            AddonService addonService) {
+    public ResCompanyBrandingDTO activate(String serviceCode, Long companyId,
+            CompanyAddon companyAddon, AddonService addonService) {
+        return switch (serviceCode) {
+            case CODE_BANNER_HOME -> applyBrandingService(
+                    companyId, companyAddon, addonService, CODE_BANNER_HOME,
+                    "Công ty đang có Banner trang chủ đang hoạt động. Không cần áp dụng thêm.",
+                    30, company -> company.setIsBanner(true));
+            case CODE_TOP_EMPLOYER -> applyBrandingService(
+                    companyId, companyAddon, addonService, CODE_TOP_EMPLOYER,
+                    "Công ty đang có nhãn Top Employer đang hoạt động. Không cần áp dụng thêm.",
+                    30, company -> company.setIsTopEmployer(true));
+            default -> throw AppException.badRequest(
+                    "Mã dịch vụ BRANDING không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
+        };
+    }
+
+    public static boolean isSupported(String serviceCode) {
+        return CODE_BANNER_HOME.equals(serviceCode) || CODE_TOP_EMPLOYER.equals(serviceCode);
+    }
+
+    private ResCompanyBrandingDTO applyBrandingService(Long companyId, CompanyAddon companyAddon,
+            AddonService addonService, String serviceCode, String duplicateMessage,
+            int defaultDurationDays, Consumer<Company> flagSetter) {
+
         LocalDateTime now = LocalDateTime.now();
+        log.info("[BrandingActivationService] Kích hoạt {} cho công ty #{}", serviceCode, companyId);
 
-        log.info("[BrandingActivationService] Kích hoạt {} cho công ty #{}", CODE_BANNER_HOME, companyId);
-
-        // 1. Kiểm tra công ty đang có banner active chưa
-        long active = companyBrandingRepository.countActiveForCompany(companyId, CODE_BANNER_HOME, now);
+        // 1. Kiểm tra đang active chưa
+        long active = companyBrandingRepository.countActiveForCompany(companyId, serviceCode, now);
         if (active > 0) {
-            throw AppException.badRequest("Công ty đang có Banner trang chủ đang hoạt động. Không cần áp dụng thêm.");
+            throw AppException.badRequest(duplicateMessage);
         }
 
-        // 2. Tính thời hạn (mặc định 30 ngày)
-        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 30;
+        // 2. Tính thời hạn
+        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : defaultDurationDays;
         LocalDateTime expiredAt = now.plusDays(durationDays);
 
-        // 3. Bật cờ isBanner trên Company
+        // 3. Bật cờ trên Company
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty."));
-        company.setIsBanner(true);
+        flagSetter.accept(company);
         companyRepository.save(company);
 
         // 4. Tạo record CompanyBranding để track expiry
@@ -58,6 +81,7 @@ public class BrandingActivationService {
                 .companyId(companyId)
                 .companyAddonId(companyAddon.getId())
                 .addonServiceId(addonService.getId())
+                .serviceCode(serviceCode)
                 .status(BrandingAddonStatus.ACTIVE)
                 .startedAt(now)
                 .expiredAt(expiredAt)
@@ -74,7 +98,7 @@ public class BrandingActivationService {
                 .companyAddonId(saved.getCompanyAddonId())
                 .addonServiceId(saved.getAddonServiceId())
                 .addonName(addonService.getName())
-                .serviceCode(CODE_BANNER_HOME)
+                .serviceCode(serviceCode)
                 .status(saved.getStatus())
                 .startedAt(saved.getStartedAt())
                 .expiredAt(saved.getExpiredAt())

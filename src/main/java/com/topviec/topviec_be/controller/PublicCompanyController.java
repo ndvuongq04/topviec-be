@@ -31,10 +31,11 @@ public class PublicCompanyController {
             @RequestParam(required = false) Integer provinceId,
             @RequestParam(required = false) Long industryId,
             @RequestParam(required = false) Boolean isBanner,
+            @RequestParam(required = false) Boolean isTopEmployer,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
         return ResponseEntity.ok(
-                companyService.getPublicCompanies(keyword, provinceId, industryId, isBanner, pageable));
+                companyService.getPublicCompanies(keyword, provinceId, industryId, isBanner, isTopEmployer, pageable));
     }
 
     /**

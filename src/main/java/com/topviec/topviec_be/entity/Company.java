@@ -186,6 +186,10 @@ public class Company {
     @Column(name = "is_banner")
     private Boolean isBanner = false;
 
+    @Builder.Default
+    @Column(name = "is_top_employer")
+    private Boolean isTopEmployer = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

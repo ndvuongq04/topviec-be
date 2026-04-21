@@ -44,11 +44,13 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
             AND (:provinceId IS NULL OR c.provinceId = :provinceId)
             AND (:industryId IS NULL OR c.industryId = :industryId)
             AND (:isBanner IS NULL OR c.isBanner = :isBanner)
+            AND (:isTopEmployer IS NULL OR c.isTopEmployer = :isTopEmployer)
             """)
     Page<Company> findPublicCompanies(
             @Param("keyword") String keyword,
             @Param("provinceId") Integer provinceId,
             @Param("industryId") Long industryId,
             @Param("isBanner") Boolean isBanner,
+            @Param("isTopEmployer") Boolean isTopEmployer,
             Pageable pageable);
 }

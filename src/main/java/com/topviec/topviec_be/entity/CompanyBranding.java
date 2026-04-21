@@ -44,6 +44,9 @@ public class CompanyBranding {
     @JoinColumn(name = "addon_service_id", insertable = false, updatable = false)
     private AddonService addonService;
 
+    @Column(name = "service_code", length = 100, nullable = false)
+    private String serviceCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private BrandingAddonStatus status;
