@@ -231,6 +231,8 @@ public class RecruitmentSchedulerJob {
                 company -> company.setIsBanner(false));
         expireBrandingByCode(BrandingActivationService.CODE_TOP_EMPLOYER, now,
                 company -> company.setIsTopEmployer(false));
+        expireBrandingByCode(BrandingActivationService.CODE_VERIFIED, now,
+                company -> company.setIsBrandVerified(false));
     }
 
     private void expireBrandingByCode(String serviceCode, LocalDateTime now,
