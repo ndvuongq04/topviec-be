@@ -27,6 +27,7 @@ public class BrandingActivationService {
     public static final ServiceCategory CATEGORY = ServiceCategory.BRANDING;
     public static final String CODE_BANNER_HOME    = "BRANDING_BANNER_HOME";
     public static final String CODE_TOP_EMPLOYER   = "BRANDING_TOP_EMPLOYER";
+    public static final String CODE_VERIFIED       = "BRANDING_VERIFIED";
 
     private final CompanyRepository companyRepository;
     private final CompanyBrandingRepository companyBrandingRepository;
@@ -44,13 +45,19 @@ public class BrandingActivationService {
                     companyId, companyAddon, addonService, CODE_TOP_EMPLOYER,
                     "Công ty đang có nhãn Top Employer đang hoạt động. Không cần áp dụng thêm.",
                     30, company -> company.setIsTopEmployer(true));
+            case CODE_VERIFIED -> applyBrandingService(
+                    companyId, companyAddon, addonService, CODE_VERIFIED,
+                    "Công ty đang có nhãn Doanh Nghiệp Xác Thực đang hoạt động. Không cần áp dụng thêm.",
+                    365, company -> company.setIsBrandVerified(true));
             default -> throw AppException.badRequest(
                     "Mã dịch vụ BRANDING không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
         };
     }
 
     public static boolean isSupported(String serviceCode) {
-        return CODE_BANNER_HOME.equals(serviceCode) || CODE_TOP_EMPLOYER.equals(serviceCode);
+        return CODE_BANNER_HOME.equals(serviceCode)
+                || CODE_TOP_EMPLOYER.equals(serviceCode)
+                || CODE_VERIFIED.equals(serviceCode);
     }
 
     private ResCompanyBrandingDTO applyBrandingService(Long companyId, CompanyAddon companyAddon,

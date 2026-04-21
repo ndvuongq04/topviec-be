@@ -607,6 +607,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                                 .slug(company.getSlug())
                                 .logoUrl(company.getLogoUrl())
                                 .address(company.getAddress())
+                                .isTopEmployer(company.getIsTopEmployer())
+                                .isBrandVerified(company.getIsBrandVerified())
                                 .build())
                 .industry(industry == null ? null
                         : ResJobPostingSummary.IndustryDTO.builder()
@@ -687,6 +689,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                                 .name(company.getName())
                                 .slug(company.getSlug())
                                 .logoUrl(company.getLogoUrl())
+                                .isTopEmployer(company.getIsTopEmployer())
+                                .isBrandVerified(company.getIsBrandVerified())
                                 .build())
                 .industry(industry == null ? null
                         : ResJobPostingDetail.IndustryDTO.builder()

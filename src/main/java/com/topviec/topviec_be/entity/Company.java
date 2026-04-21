@@ -190,6 +190,10 @@ public class Company {
     @Column(name = "is_top_employer")
     private Boolean isTopEmployer = false;
 
+    @Builder.Default
+    @Column(name = "is_brand_verified")
+    private Boolean isBrandVerified = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

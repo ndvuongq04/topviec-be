@@ -97,12 +97,13 @@ public class CompanyServiceImpl implements CompanyService {
     @Override
     @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicCompanies(String keyword, Integer provinceId,
-            Long industryId, Boolean isBanner, Boolean isTopEmployer, Pageable pageable) {
+            Long industryId, Boolean isBanner, Boolean isTopEmployer, Boolean isBrandVerified,
+            Pageable pageable) {
 
         String keywordParam = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
         Page<Company> page = companyRepository.findPublicCompanies(
-                keywordParam, provinceId, industryId, isBanner, isTopEmployer, pageable);
+                keywordParam, provinceId, industryId, isBanner, isTopEmployer, isBrandVerified, pageable);
 
         return toResultPagination(page, pageable);
     }
@@ -387,6 +388,9 @@ public class CompanyServiceImpl implements CompanyService {
                 .violationScore(c.getViolationScore())
                 .suspendedAt(c.getSuspendedAt())
                 .suspendedReason(c.getSuspendedReason())
+                .isBanner(c.getIsBanner())
+                .isTopEmployer(c.getIsTopEmployer())
+                .isBrandVerified(c.getIsBrandVerified())
                 .createdBy(c.getCreatedBy())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
