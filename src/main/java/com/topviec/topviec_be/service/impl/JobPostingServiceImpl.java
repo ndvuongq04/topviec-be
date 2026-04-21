@@ -543,12 +543,27 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
+        // Batch load locations kèm province (1 query, tránh N+1)
+        List<Long> allJobIds = jobs.stream().map(JobPosting::getId).toList();
+        Map<Long, List<ResJobPostingSummary.LocationDTO>> locationMap = new java.util.HashMap<>();
+        if (!allJobIds.isEmpty()) {
+            jobPostLocationRepository.findByJobPostIdInWithProvince(allJobIds).forEach(loc -> {
+                locationMap.computeIfAbsent(loc.getJobPostId(), k -> new java.util.ArrayList<>())
+                        .add(ResJobPostingSummary.LocationDTO.builder()
+                                .id(loc.getProvinceId())
+                                .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
+                                .addressDetail(loc.getAddressDetail())
+                                .isRemote(loc.getIsRemote())
+                                .build());
+            });
+        }
+
         // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ dùng cho Employer)
         Map<Long, Integer> appCountMap = new java.util.HashMap<>();
         Map<Long, Integer> interviewRoundsCountMap = new java.util.HashMap<>();
         Map<Long, Integer> hiredCountMap = new java.util.HashMap<>();
         if (includeApplicationCount && !jobs.isEmpty()) {
-            List<Long> jobIds = jobs.stream().map(JobPosting::getId).toList();
+            List<Long> jobIds = allJobIds;
             applicationRepository.countByJobPostIds(jobIds).forEach(row -> {
                 Long jobId = (Long) row[0];
                 Long count = (Long) row[1];
@@ -579,7 +594,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                         includeApplicationCount ? appCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? interviewRoundsCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? hiredCountMap.getOrDefault(j.getId(), 0) : null,
-                        includeApplicationCount))
+                        includeApplicationCount,
+                        locationMap.getOrDefault(j.getId(), java.util.Collections.emptyList())))
                 .toList());
         return result;
     }
@@ -591,7 +607,8 @@ public class JobPostingServiceImpl implements JobPostingService {
             Integer applicationCount,
             Integer interviewRoundsCount,
             Integer hiredCount,
-            boolean includeDeletedAt) {
+            boolean includeDeletedAt,
+            List<ResJobPostingSummary.LocationDTO> locations) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
         Level level = levelMap.get(j.getLevelId());
@@ -637,6 +654,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())
                 .deletedAt(includeDeletedAt ? j.getDeletedAt() : null)
+                .locations(locations)
                 .build();
     }
 

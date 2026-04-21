@@ -12,8 +12,10 @@ import java.util.List;
 @Repository
 public interface JobPostLocationRepository extends JpaRepository<JobPostLocation, Long> {
 
-    // Dùng derived query — đơn giản, không cần @Query
     List<JobPostLocation> findByJobPostId(Long jobPostId);
+
+    @Query("SELECT l FROM JobPostLocation l LEFT JOIN FETCH l.province WHERE l.jobPostId IN :jobPostIds")
+    List<JobPostLocation> findByJobPostIdInWithProvince(@Param("jobPostIds") List<Long> jobPostIds);
 
     @Modifying
     @Query("DELETE FROM JobPostLocation j WHERE j.jobPostId = :jobPostId")

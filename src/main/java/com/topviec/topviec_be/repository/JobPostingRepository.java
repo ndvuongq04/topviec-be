@@ -30,4 +30,10 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
     @Query("UPDATE JobPosting j SET j.viewCount = j.viewCount + 1 WHERE j.id = :id")
     void incrementViewCount(@Param("id") Long id);
 
+    @Query("SELECT j.companyId, COUNT(j) FROM JobPosting j WHERE j.companyId IN :companyIds AND j.status IN ('published', 'interviewing') AND j.deletedAt IS NULL GROUP BY j.companyId")
+    List<Object[]> countActiveByCompanyIds(@Param("companyIds") List<Long> companyIds);
+
+    @Query("SELECT COUNT(j) FROM JobPosting j WHERE j.companyId = :companyId AND j.status IN ('published', 'interviewing') AND j.deletedAt IS NULL")
+    long countActiveByCompanyId(@Param("companyId") Long companyId);
+
 }

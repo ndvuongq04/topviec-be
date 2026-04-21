@@ -21,6 +21,8 @@ public class ResCompanyDTO {
     private String coverUrl;
     private String description;
     private Long industryId;
+    private String industryName;
+    private Integer jobCount;
     private CompanySize companySize;
     private Integer foundedYear;
 
