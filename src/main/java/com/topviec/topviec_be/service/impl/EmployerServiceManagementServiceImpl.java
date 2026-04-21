@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
+import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO.ResSubscriptionUsageDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
@@ -27,6 +28,7 @@ import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
+import com.topviec.topviec_be.service.activation.BrandingActivationService;
 import com.topviec.topviec_be.service.activation.ServiceActivationRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,7 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         private final JobPostingRepository jobPostingRepository;
         private final JobPostAddonRepository jobPostAddonRepository;
         private final ServiceActivationRouter serviceActivationRouter;
+        private final BrandingActivationService brandingActivationService;
 
         @Override
         @Transactional(readOnly = true)
@@ -225,6 +228,43 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                 .expiredAt(saved.getExpiredAt())
                                 .createdAt(saved.getCreatedAt())
                                 .build();
+        }
+
+        @Override
+        @Transactional
+        public ResCompanyBrandingDTO applyBannerToCompany(Long userId, ReqApplyAddonDTO request) {
+                Long companyId = getCompanyId(userId);
+
+                CompanyAddon companyAddon = companyAddonRepository.findById(request.getCompanyAddonId())
+                                .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ lẻ."));
+
+                if (!companyAddon.getCompanyId().equals(companyId)) {
+                        throw AppException.forbidden("Dịch vụ lẻ này không thuộc công ty của bạn.");
+                }
+
+                if (companyAddon.getStatus() != SubscriptionStatus.ACTIVE) {
+                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hiệu lực.");
+                }
+
+                if (companyAddon.getExpiredAt() != null && companyAddon.getExpiredAt().isBefore(LocalDateTime.now())) {
+                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hạn sử dụng.");
+                }
+
+                if (companyAddon.getQuantityRemaining() <= 0) {
+                        throw AppException.badRequest("Dịch vụ lẻ này đã hết số lượng sử dụng.");
+                }
+
+                AddonService addonService = addonServiceRepository.findById(companyAddon.getAddonServiceId())
+                                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin dịch vụ lẻ."));
+
+                Services service = serviceRepository.findById(addonService.getServiceId()).orElse(null);
+                String serviceCode = service != null ? service.getCode() : null;
+
+                if (!BrandingActivationService.CODE_BANNER_HOME.equals(serviceCode)) {
+                        throw AppException.badRequest("Dịch vụ lẻ này không phải là dịch vụ Banner trang chủ.");
+                }
+
+                return brandingActivationService.applyBannerHomeService(companyId, companyAddon, addonService);
         }
 
         private Long getCompanyId(Long userId) {
