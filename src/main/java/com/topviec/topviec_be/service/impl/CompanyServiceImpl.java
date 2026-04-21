@@ -97,12 +97,12 @@ public class CompanyServiceImpl implements CompanyService {
     @Override
     @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicCompanies(String keyword, Integer provinceId,
-            Long industryId, Pageable pageable) {
+            Long industryId, Boolean isBanner, Pageable pageable) {
 
         String keywordParam = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
 
         Page<Company> page = companyRepository.findPublicCompanies(
-                keywordParam, provinceId, industryId, pageable);
+                keywordParam, provinceId, industryId, isBanner, pageable);
 
         return toResultPagination(page, pageable);
     }

@@ -182,6 +182,10 @@ public class Company {
     @Column(name = "updated_by")
     private Long updatedBy;
 
+    @Builder.Default
+    @Column(name = "is_banner")
+    private Boolean isBanner = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

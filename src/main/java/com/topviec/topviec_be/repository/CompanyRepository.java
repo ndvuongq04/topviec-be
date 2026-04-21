@@ -43,10 +43,12 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
             AND (:keyword IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
             AND (:provinceId IS NULL OR c.provinceId = :provinceId)
             AND (:industryId IS NULL OR c.industryId = :industryId)
+            AND (:isBanner IS NULL OR c.isBanner = :isBanner)
             """)
     Page<Company> findPublicCompanies(
             @Param("keyword") String keyword,
             @Param("provinceId") Integer provinceId,
             @Param("industryId") Long industryId,
+            @Param("isBanner") Boolean isBanner,
             Pageable pageable);
 }

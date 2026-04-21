@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.job;
 
 import com.topviec.topviec_be.entity.*;
+import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.repository.*;
 import com.topviec.topviec_be.service.EmailService;
@@ -34,6 +35,7 @@ public class RecruitmentSchedulerJob {
     private final JobPostingRepository jobPostingRepository;
     private final JobPostAddonRepository jobPostAddonRepository;
     private final CompanyRepository companyRepository;
+    private final CompanyBrandingRepository companyBrandingRepository;
     private final TokenService tokenService;
     private final EmailService emailService;
 
@@ -214,6 +216,37 @@ public class RecruitmentSchedulerJob {
         }
 
         log.info("[Scheduler] Đã gỡ cờ URGENT cho {} tin tuyển dụng", expiredAddons.size());
+    }
+
+    /**
+     * Tự động gỡ cờ isBanner và đánh dấu EXPIRED cho các banner trang chủ đã hết hạn.
+     * Chạy mỗi 5 phút.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireBannerHomePosts() {
+        LocalDateTime now = LocalDateTime.now();
+        List<CompanyBranding> expiredBanners = companyBrandingRepository
+                .findByStatusAndExpiredAtBefore(BrandingAddonStatus.ACTIVE, now);
+
+        if (expiredBanners.isEmpty()) {
+            return;
+        }
+
+        log.info("[Scheduler] expireBannerHomePosts chạy lúc: {}, tìm thấy {} banner hết hạn", now,
+                expiredBanners.size());
+
+        for (CompanyBranding banner : expiredBanners) {
+            banner.setStatus(BrandingAddonStatus.EXPIRED);
+            companyBrandingRepository.save(banner);
+
+            companyRepository.findById(banner.getCompanyId()).ifPresent(company -> {
+                company.setIsBanner(false);
+                companyRepository.save(company);
+            });
+        }
+
+        log.info("[Scheduler] Đã gỡ cờ isBanner cho {} công ty", expiredBanners.size());
     }
 
     /**

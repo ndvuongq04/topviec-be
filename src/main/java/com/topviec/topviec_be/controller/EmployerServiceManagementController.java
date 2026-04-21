@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
+import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
@@ -53,6 +54,17 @@ public class EmployerServiceManagementController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(employerServiceManagementService.applyAddonToJobPost(
                         extractUserId(jwt), jobPostingId, request));
+    }
+
+    /**
+     * Áp dụng dịch vụ Banner trang chủ cho công ty
+     */
+    @PostMapping("/company/apply-banner")
+    public ResponseEntity<ResCompanyBrandingDTO> applyBannerToCompany(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ReqApplyAddonDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(employerServiceManagementService.applyBannerToCompany(extractUserId(jwt), request));
     }
 
     private Long extractUserId(Jwt jwt) {
