@@ -17,6 +17,9 @@ public interface JobPostLocationRepository extends JpaRepository<JobPostLocation
     @Query("SELECT l FROM JobPostLocation l LEFT JOIN FETCH l.province WHERE l.jobPostId IN :jobPostIds")
     List<JobPostLocation> findByJobPostIdInWithProvince(@Param("jobPostIds") List<Long> jobPostIds);
 
+    @Query("SELECT l FROM JobPostLocation l LEFT JOIN FETCH l.province WHERE l.jobPostId = :jobPostId")
+    List<JobPostLocation> findByJobPostIdWithProvince(@Param("jobPostId") Long jobPostId);
+
     @Modifying
     @Query("DELETE FROM JobPostLocation j WHERE j.jobPostId = :jobPostId")
     void deleteByJobPostId(@Param("jobPostId") Long jobPostId);

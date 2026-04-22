@@ -46,7 +46,7 @@ public class ResJobPostingDetail {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    private List<ResJobPostLocationDTO> locations;
+    private List<LocationDTO> locations;
     private List<ResJobPostSkillDTO> skills;
 
     @Getter
@@ -81,5 +81,17 @@ public class ResJobPostingDetail {
     public static class LevelDTO {
         private Long id;
         private String name;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LocationDTO {
+        private Long id;
+        private String name;
+        private String addressDetail;
+        private Boolean isRemote;
     }
 }

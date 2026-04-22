@@ -7,7 +7,6 @@ import com.topviec.topviec_be.dto.request.ReqJobPostSkillDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateJobPostingDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
 import com.topviec.topviec_be.dto.response.ResJobPostingSummary;
-import com.topviec.topviec_be.dto.response.ResJobPostLocationDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostSkillDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Company;
@@ -675,12 +674,12 @@ public class JobPostingServiceImpl implements JobPostingService {
     // ── Mapper: dùng cho chi tiết (kèm locations + skills) ───────────────────
 
     private ResJobPostingDetail toDetailResponse(JobPosting j) {
-        List<ResJobPostLocationDTO> locations = jobPostLocationRepository
-                .findByJobPostId(j.getId())
+        List<ResJobPostingDetail.LocationDTO> locations = jobPostLocationRepository
+                .findByJobPostIdWithProvince(j.getId())
                 .stream()
-                .map(loc -> ResJobPostLocationDTO.builder()
-                        .id(loc.getId())
-                        .provinceId(loc.getProvinceId())
+                .map(loc -> ResJobPostingDetail.LocationDTO.builder()
+                        .id(loc.getProvinceId())
+                        .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
                         .addressDetail(loc.getAddressDetail())
                         .isRemote(loc.getIsRemote())
                         .build())
