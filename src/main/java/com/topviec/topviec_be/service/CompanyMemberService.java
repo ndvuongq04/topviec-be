@@ -3,6 +3,7 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
@@ -50,4 +51,9 @@ public interface CompanyMemberService {
      * Xóa thành viên khỏi công ty.
      */
     void removeMember(Long inviterUserId, Long companyId, Long targetUserId);
+
+    /**
+     * Lấy thông tin cá nhân của nhà tuyển dụng đang đăng nhập.
+     */
+    ResEmployerProfileDTO getMyProfile(Long userId);
 }
