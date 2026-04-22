@@ -155,6 +155,18 @@ public class JobPostingServiceImpl implements JobPostingService {
 
     @Override
     @Transactional(readOnly = true)
+    public ResultPaginationDTO getPublicCompanyList(String keyword, Long companyId,
+            Pageable pageable) {
+
+        // Specification không có notDeleted() — lấy hết cả tin đã xóa mềm
+        Specification<JobPosting> spec = JobPostingSpecification.withPublicCompanyFilter(
+                keyword, companyId);
+
+        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
             Long levelId, String workType,
             Boolean isFeatured, Boolean isUrgent, Boolean isHot,
@@ -292,10 +304,11 @@ public class JobPostingServiceImpl implements JobPostingService {
             throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
         }
         String status = jobPosting.getStatus();
-        if (!JobPostStatus.PUBLISHED.getValue().equals(status) 
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status)
                 && !JobPostStatus.PAUSED.getValue().equals(status)
                 && !JobPostStatus.INTERVIEWING.getValue().equals(status)) {
-            throw AppException.badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED, PAUSED hoặc INTERVIEWING");
+            throw AppException
+                    .badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED, PAUSED hoặc INTERVIEWING");
         }
         saveEditLog(jobPosting, updatedByUserId);
         jobPosting.setStatus(JobPostStatus.CLOSED.getValue());
@@ -558,7 +571,8 @@ public class JobPostingServiceImpl implements JobPostingService {
             });
         }
 
-        // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ dùng cho Employer)
+        // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ
+        // dùng cho Employer)
         Map<Long, Integer> appCountMap = new java.util.HashMap<>();
         Map<Long, Integer> interviewRoundsCountMap = new java.util.HashMap<>();
         Map<Long, Integer> hiredCountMap = new java.util.HashMap<>();

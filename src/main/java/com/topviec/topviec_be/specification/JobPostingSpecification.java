@@ -151,6 +151,14 @@ public class JobPostingSpecification {
                 .and(experienceAtMost(experienceYearsMax));
     }
 
+    public static Specification<JobPosting> withPublicCompanyFilter(
+            String keyword, Long companyId) {
+
+        // Không dùng notDeleted() → lấy tất cả kể cả đã xóa mềm
+        return Specification.where(hasKeyword(keyword))
+                .and(hasCompany(companyId));
+    }
+
     // ── Bộ lọc public (chỉ published, không có filter status) ─────────────
 
     public static Specification<JobPosting> withPublicFilter(
