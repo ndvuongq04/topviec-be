@@ -159,7 +159,9 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
         // 2. Fallback về default role permissions
         RoleDefault roleDefault = member.getRoleDefault();
-        return roleDefault != null && roleDefault.getActions().getOrDefault(action, false);
+        if (roleDefault == null || roleDefault.getActions() == null) return false;
+        return roleDefault.getActions().stream()
+                .anyMatch(a -> a.getCode().equals(action) && a.isEnabled());
     }
 
     @Override
