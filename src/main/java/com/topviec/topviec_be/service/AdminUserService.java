@@ -26,4 +26,7 @@ public interface AdminUserService {
 
     // keyword: tìm theo tên, adminRole: lọc theo role (cả 2 optional)
     ResultPaginationDTO getAllAdmins(String keyword, String adminRole, Pageable pageable);
+
+    // Lấy thông tin cá nhân của admin đang đăng nhập
+    ResAdminUser getMyAdminProfile(Long userId);
 }

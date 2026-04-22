@@ -86,6 +86,14 @@ public class AdminUserServiceImpl implements AdminUserService {
         return toResponse(admin);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResAdminUser getMyAdminProfile(Long userId) {
+        AdminUser admin = adminUserRepository.findActiveByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin admin"));
+        return toResponse(admin);
+    }
+
     // -------------------------------------------------------------------------
     // Update
     // -------------------------------------------------------------------------
