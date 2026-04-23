@@ -337,6 +337,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                                                 .id(company.getId())
                                                 .name(company.getName())
                                                 .logoUrl(company.getLogoUrl())
+                                                .isBrandVerified(company.getIsBrandVerified())
                                                 .build())
                                 .build())
                 .build();

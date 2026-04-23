@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.topviec.topviec_be.dto.request.ReqChangePasswordDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.entity.Company;
@@ -220,6 +221,28 @@ public class AuthServiceImpl implements AuthService {
         // 3. Tạo token mới → gửi lại email
         String token = tokenService.resendVerifyEmailToken(email);
         emailService.sendVerifyEmail(email, token);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Long userId, ReqChangePasswordDTO request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw AppException.badRequest("Mật khẩu xác nhận không khớp");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Người dùng không tồn tại"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw AppException.badRequest("Mật khẩu hiện tại không đúng");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw AppException.badRequest("Mật khẩu mới không được trùng với mật khẩu hiện tại");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
     @Override

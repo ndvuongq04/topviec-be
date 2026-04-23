@@ -7,7 +7,6 @@ import com.topviec.topviec_be.dto.request.ReqJobPostSkillDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateJobPostingDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
 import com.topviec.topviec_be.dto.response.ResJobPostingSummary;
-import com.topviec.topviec_be.dto.response.ResJobPostLocationDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostSkillDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Company;
@@ -155,6 +154,18 @@ public class JobPostingServiceImpl implements JobPostingService {
 
     @Override
     @Transactional(readOnly = true)
+    public ResultPaginationDTO getPublicCompanyList(String keyword, Long companyId,
+            Pageable pageable) {
+
+        // Specification không có notDeleted() — lấy hết cả tin đã xóa mềm
+        Specification<JobPosting> spec = JobPostingSpecification.withPublicCompanyFilter(
+                keyword, companyId);
+
+        return toResultPagination(jobPostingRepository.findAll(spec, pageable), pageable, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
             Long levelId, String workType,
             Boolean isFeatured, Boolean isUrgent, Boolean isHot,
@@ -292,10 +303,11 @@ public class JobPostingServiceImpl implements JobPostingService {
             throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng của công ty khác");
         }
         String status = jobPosting.getStatus();
-        if (!JobPostStatus.PUBLISHED.getValue().equals(status) 
+        if (!JobPostStatus.PUBLISHED.getValue().equals(status)
                 && !JobPostStatus.PAUSED.getValue().equals(status)
                 && !JobPostStatus.INTERVIEWING.getValue().equals(status)) {
-            throw AppException.badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED, PAUSED hoặc INTERVIEWING");
+            throw AppException
+                    .badRequest("Chỉ có thể đóng tin khi đang ở trạng thái PUBLISHED, PAUSED hoặc INTERVIEWING");
         }
         saveEditLog(jobPosting, updatedByUserId);
         jobPosting.setStatus(JobPostStatus.CLOSED.getValue());
@@ -543,12 +555,28 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .findAllById(jobs.stream().map(JobPosting::getLevelId).distinct().toList())
                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
-        // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ dùng cho Employer)
+        // Batch load locations kèm province (1 query, tránh N+1)
+        List<Long> allJobIds = jobs.stream().map(JobPosting::getId).toList();
+        Map<Long, List<ResJobPostingSummary.LocationDTO>> locationMap = new java.util.HashMap<>();
+        if (!allJobIds.isEmpty()) {
+            jobPostLocationRepository.findByJobPostIdInWithProvince(allJobIds).forEach(loc -> {
+                locationMap.computeIfAbsent(loc.getJobPostId(), k -> new java.util.ArrayList<>())
+                        .add(ResJobPostingSummary.LocationDTO.builder()
+                                .id(loc.getProvinceId())
+                                .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
+                                .addressDetail(loc.getAddressDetail())
+                                .isRemote(loc.getIsRemote())
+                                .build());
+            });
+        }
+
+        // Batch query applicationCount, interviewRoundsCount và hiredCount nếu cần (chỉ
+        // dùng cho Employer)
         Map<Long, Integer> appCountMap = new java.util.HashMap<>();
         Map<Long, Integer> interviewRoundsCountMap = new java.util.HashMap<>();
         Map<Long, Integer> hiredCountMap = new java.util.HashMap<>();
         if (includeApplicationCount && !jobs.isEmpty()) {
-            List<Long> jobIds = jobs.stream().map(JobPosting::getId).toList();
+            List<Long> jobIds = allJobIds;
             applicationRepository.countByJobPostIds(jobIds).forEach(row -> {
                 Long jobId = (Long) row[0];
                 Long count = (Long) row[1];
@@ -579,7 +607,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                         includeApplicationCount ? appCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? interviewRoundsCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? hiredCountMap.getOrDefault(j.getId(), 0) : null,
-                        includeApplicationCount))
+                        includeApplicationCount,
+                        locationMap.getOrDefault(j.getId(), java.util.Collections.emptyList())))
                 .toList());
         return result;
     }
@@ -591,7 +620,8 @@ public class JobPostingServiceImpl implements JobPostingService {
             Integer applicationCount,
             Integer interviewRoundsCount,
             Integer hiredCount,
-            boolean includeDeletedAt) {
+            boolean includeDeletedAt,
+            List<ResJobPostingSummary.LocationDTO> locations) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
         Level level = levelMap.get(j.getLevelId());
@@ -637,18 +667,19 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .publishedAt(j.getPublishedAt())
                 .createdAt(j.getCreatedAt())
                 .deletedAt(includeDeletedAt ? j.getDeletedAt() : null)
+                .locations(locations)
                 .build();
     }
 
     // ── Mapper: dùng cho chi tiết (kèm locations + skills) ───────────────────
 
     private ResJobPostingDetail toDetailResponse(JobPosting j) {
-        List<ResJobPostLocationDTO> locations = jobPostLocationRepository
-                .findByJobPostId(j.getId())
+        List<ResJobPostingDetail.LocationDTO> locations = jobPostLocationRepository
+                .findByJobPostIdWithProvince(j.getId())
                 .stream()
-                .map(loc -> ResJobPostLocationDTO.builder()
-                        .id(loc.getId())
-                        .provinceId(loc.getProvinceId())
+                .map(loc -> ResJobPostingDetail.LocationDTO.builder()
+                        .id(loc.getProvinceId())
+                        .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
                         .addressDetail(loc.getAddressDetail())
                         .isRemote(loc.getIsRemote())
                         .build())

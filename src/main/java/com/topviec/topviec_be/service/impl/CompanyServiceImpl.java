@@ -11,7 +11,10 @@ import com.topviec.topviec_be.enums.company.VerificationStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.repository.IndustryRepository;
+import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.Industry;
 import com.topviec.topviec_be.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -20,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,8 @@ public class CompanyServiceImpl implements CompanyService {
 
     private final CompanyRepository companyRepository;
     private final CompanyMemberRepository companyMemberRepository;
+    private final IndustryRepository industryRepository;
+    private final JobPostingRepository jobPostingRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -345,6 +352,28 @@ public class CompanyServiceImpl implements CompanyService {
     }
 
     private ResultPaginationDTO toResultPagination(Page<Company> page, Pageable pageable) {
+        List<Company> companies = page.getContent();
+        List<Long> companyIds = companies.stream().map(Company::getId).toList();
+
+        // Batch load industry names (1 query)
+        Map<Long, String> industryNameMap = new java.util.HashMap<>();
+        List<Long> industryIds = companies.stream()
+                .map(Company::getIndustryId).filter(id -> id != null).distinct().toList();
+        if (!industryIds.isEmpty()) {
+            industryRepository.findAllById(industryIds)
+                    .forEach(i -> industryNameMap.put(i.getId(), i.getName()));
+        }
+
+        // Batch load job counts (1 query)
+        Map<Long, Integer> jobCountMap = new java.util.HashMap<>();
+        if (!companyIds.isEmpty()) {
+            jobPostingRepository.countActiveByCompanyIds(companyIds).forEach(row -> {
+                Long companyId = (Long) row[0];
+                Long count = (Long) row[1];
+                jobCountMap.put(companyId, count.intValue());
+            });
+        }
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -353,11 +382,23 @@ public class CompanyServiceImpl implements CompanyService {
 
         ResultPaginationDTO result = new ResultPaginationDTO();
         result.setMeta(meta);
-        result.setResult(page.getContent().stream().map(this::toResponse).toList());
+        result.setResult(companies.stream()
+                .map(c -> toResponse(c,
+                        industryNameMap.get(c.getIndustryId()),
+                        jobCountMap.getOrDefault(c.getId(), 0)))
+                .toList());
         return result;
     }
 
     private ResCompanyDTO toResponse(Company c) {
+        String industryName = c.getIndustryId() != null
+                ? industryRepository.findById(c.getIndustryId()).map(Industry::getName).orElse(null)
+                : null;
+        int jobCount = (int) jobPostingRepository.countActiveByCompanyId(c.getId());
+        return toResponse(c, industryName, jobCount);
+    }
+
+    private ResCompanyDTO toResponse(Company c, String industryName, Integer jobCount) {
         return ResCompanyDTO.builder()
                 .id(c.getId())
                 .slug(c.getSlug())
@@ -366,6 +407,8 @@ public class CompanyServiceImpl implements CompanyService {
                 .coverUrl(c.getCoverUrl())
                 .description(c.getDescription())
                 .industryId(c.getIndustryId())
+                .industryName(industryName)
+                .jobCount(jobCount)
                 .companySize(c.getCompanySize() != null ? CompanySize.fromValue(c.getCompanySize()) : null)
                 .foundedYear(c.getFoundedYear())
                 .website(c.getWebsite())

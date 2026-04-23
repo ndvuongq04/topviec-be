@@ -5,12 +5,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.HttpHeaders;
 
+import com.topviec.topviec_be.dto.request.ReqChangePasswordDTO;
 import com.topviec.topviec_be.dto.request.ReqForgotPasswordDTO;
 import com.topviec.topviec_be.dto.request.ReqLoginDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
@@ -204,6 +208,16 @@ public class AuthController {
                                 .build();
 
                 return ResponseEntity.ok(resLoginDTO);
+        }
+
+        @PostMapping("/change-password")
+        @PreAuthorize("isAuthenticated()")
+        public ResponseEntity<String> changePassword(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @Valid @RequestBody ReqChangePasswordDTO request) {
+                Long userId = Long.parseLong(jwt.getSubject());
+                authService.changePassword(userId, request);
+                return ResponseEntity.ok("Đổi mật khẩu thành công!");
         }
 
         @PostMapping("/logout")

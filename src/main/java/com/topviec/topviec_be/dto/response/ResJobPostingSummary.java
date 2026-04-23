@@ -2,6 +2,7 @@ package com.topviec.topviec_be.dto.response;
 
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -33,6 +34,7 @@ public class ResJobPostingSummary {
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
     private LocalDateTime deletedAt;   // null = đang hoạt động, non-null = đã xóa mềm
+    private List<LocationDTO> locations;
 
     @Getter
     @Setter
@@ -67,5 +69,17 @@ public class ResJobPostingSummary {
     public static class LevelDTO {
         private Long id;
         private String name;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LocationDTO {
+        private Long id;
+        private String name;
+        private String addressDetail;
+        private Boolean isRemote;
     }
 }

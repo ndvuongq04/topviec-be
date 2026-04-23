@@ -3,6 +3,8 @@ package com.topviec.topviec_be.controller;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.JobPostingService;
+import com.topviec.topviec_be.util.SecurityUtil;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -46,6 +48,21 @@ public class PublicJobPostingController {
                 keyword, companyId, industryId, levelId, workType,
                 isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
+    }
+
+    /**
+     * GET job-postings
+     * Lấy danh sách tin của công ty, hỗ trợ filter + phân trang.
+     * companyId tự động lấy từ JWT → chỉ trả về tin của công ty đang đăng nhập.
+     */
+    @GetMapping("company/{companyId}")
+    public ResponseEntity<ResultPaginationDTO> getList(
+            @PathVariable Long companyId,
+            @RequestParam(required = false) String keyword,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        return ResponseEntity.ok(jobPostingService.getPublicCompanyList(
+                keyword, companyId, pageable));
     }
 
     /**

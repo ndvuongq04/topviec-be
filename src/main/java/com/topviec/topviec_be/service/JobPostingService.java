@@ -33,6 +33,10 @@ public interface JobPostingService {
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
 
+        /** Lấy danh sách tin published của công ty, hỗ trợ filter + phân trang. */
+        ResultPaginationDTO getPublicCompanyList(String keyword, Long companyId,
+                        Pageable pageable);
+
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType,
@@ -85,7 +89,10 @@ public interface JobPostingService {
         // Employer — Soft Delete / Restore
         // -------------------------------------------------------------------------
 
-        /** Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở PUBLISHED). */
+        /**
+         * Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở
+         * PUBLISHED).
+         */
         void softDelete(Long id, Long companyId, Long deletedByUserId);
 
         /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */

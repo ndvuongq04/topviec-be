@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.service;
 
+import com.topviec.topviec_be.dto.request.ReqChangePasswordDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterCandidateDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 
@@ -27,4 +28,6 @@ public interface AuthService {
      * Dùng khi tạo JWT cho admin để đưa claim "adminRole" vào token.
      */
     String getAdminRoleByUserId(Long userId);
+
+    void changePassword(Long userId, ReqChangePasswordDTO request);
 }

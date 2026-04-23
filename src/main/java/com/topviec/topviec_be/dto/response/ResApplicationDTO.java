@@ -52,5 +52,6 @@ public class ResApplicationDTO {
         private Long id;
         private String name;
         private String logoUrl;
+        private Boolean isBrandVerified;
     }
 }

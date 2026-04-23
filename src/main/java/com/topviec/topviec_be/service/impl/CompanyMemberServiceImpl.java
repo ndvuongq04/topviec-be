@@ -3,7 +3,9 @@ package com.topviec.topviec_be.service.impl;
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.PermissionChangeLog;
 import com.topviec.topviec_be.entity.RoleDefault;
@@ -157,7 +159,9 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
         // 2. Fallback về default role permissions
         RoleDefault roleDefault = member.getRoleDefault();
-        return roleDefault != null && roleDefault.getActions().getOrDefault(action, false);
+        if (roleDefault == null || roleDefault.getActions() == null) return false;
+        return roleDefault.getActions().stream()
+                .anyMatch(a -> a.getCode().equals(action) && a.isEnabled());
     }
 
     @Override
@@ -302,6 +306,38 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
         companyMemberRepository.save(member);
         log.info(">>>>>>>>: Đã xóa thành viên userId [{}] khỏi công ty [{}] bởi userId [{}]", targetUserId, companyId,
                 inviterUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerProfileDTO getMyProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
+
+        CompanyMember member = companyMemberRepository
+                .findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active")
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin thành viên công ty"));
+
+        Company company = companyRepository.findById(member.getCompanyId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
+
+        RoleDefault roleDefault = member.getRoleDefault();
+
+        return ResEmployerProfileDTO.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .accountStatus(user.getStatus())
+                .emailVerifiedAt(user.getEmailVerifiedAt())
+                .lastLoginAt(user.getLastLoginAt())
+                .memberId(member.getId())
+                .roleName(roleDefault != null ? roleDefault.getRoleName() : null)
+                .memberStatus(member.getStatus())
+                .memberCreatedAt(member.getCreatedAt())
+                .companyId(company.getId())
+                .companyName(company.getName())
+                .companySlug(company.getSlug())
+                .companyLogoUrl(company.getLogoUrl())
+                .build();
     }
 
     // -------------------------------------------------------------------------

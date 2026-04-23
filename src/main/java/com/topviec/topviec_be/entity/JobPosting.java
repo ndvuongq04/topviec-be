@@ -143,9 +143,8 @@ public class JobPosting {
     @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<JobPostSkill> skills = new ArrayList<>();
 
-    // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
-    // = true, fetch = FetchType.LAZY)
-    // private List<JobPostLocation> locations = new ArrayList<>();
+    @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<JobPostLocation> locations = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
