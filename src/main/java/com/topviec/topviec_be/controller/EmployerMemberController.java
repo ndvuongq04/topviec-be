@@ -8,6 +8,7 @@ import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 
 import java.util.List;
+import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.CompanyService;
 import jakarta.validation.Valid;
@@ -91,6 +92,23 @@ public class EmployerMemberController {
 
         ResultPaginationDTO members = companyMemberService.getMembers(companyId, status, role, keyword, pageable);
         return ResponseEntity.ok(members);
+    }
+
+    @GetMapping("/me/permissions")
+    public ResponseEntity<ResMemberPermissionDetailDTO> getMyPermissions(
+            @AuthenticationPrincipal Jwt jwt) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        List<ResMemberPermissionDetailDTO> result =
+                companyMemberService.getBatchMemberPermissions(companyId, List.of(userId));
+
+        if (result.isEmpty()) {
+            throw AppException.notFound("Không tìm thấy thông tin quyền hạn của bạn trong công ty");
+        }
+
+        return ResponseEntity.ok(result.get(0));
     }
 
     @PostMapping("/permissions/batch")
