@@ -1,9 +1,13 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
+import com.topviec.topviec_be.dto.request.ReqBatchMemberPermissionDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+
+import java.util.List;
 import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.CompanyService;
 import jakarta.validation.Valid;
@@ -87,6 +91,20 @@ public class EmployerMemberController {
 
         ResultPaginationDTO members = companyMemberService.getMembers(companyId, status, role, keyword, pageable);
         return ResponseEntity.ok(members);
+    }
+
+    @PostMapping("/permissions/batch")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:view_activity')")
+    public ResponseEntity<List<ResMemberPermissionDetailDTO>> getBatchMemberPermissions(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ReqBatchMemberPermissionDTO request) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        List<ResMemberPermissionDetailDTO> result =
+                companyMemberService.getBatchMemberPermissions(companyId, request.getUserIds());
+        return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/{targetUserId}")

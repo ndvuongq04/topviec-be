@@ -4,8 +4,11 @@ import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
+import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 public interface CompanyMemberService {
 
@@ -56,4 +59,10 @@ public interface CompanyMemberService {
      * Lấy thông tin cá nhân của nhà tuyển dụng đang đăng nhập.
      */
     ResEmployerProfileDTO getMyProfile(Long userId);
+
+    /**
+     * Lấy quyền hạn chi tiết (effective permissions) của 1-5 thành viên trong công ty.
+     * Kết quả bao gồm toàn bộ action đã được tính toán từ role mặc định + custom grant/revoke.
+     */
+    List<ResMemberPermissionDetailDTO> getBatchMemberPermissions(Long companyId, List<Long> userIds);
 }
