@@ -6,6 +6,7 @@ import com.topviec.topviec_be.dto.request.ReqToggleActionDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
+import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 
 import java.util.List;
@@ -139,6 +140,30 @@ public class EmployerMemberController {
         ResMemberPermissionDetailDTO result = companyMemberService.toggleMemberActionPermission(
                 inviterUserId, companyId, targetUserId, actionCode, request.getEnabled());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{targetUserId}/permissions/history")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:view_activity')")
+    public ResponseEntity<List<ResPermissionChangeLogDTO>> getMemberPermissionHistory(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long targetUserId) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        return ResponseEntity.ok(companyMemberService.getMemberPermissionHistory(companyId, targetUserId));
+    }
+
+    @GetMapping("/permissions/history")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:view_activity')")
+    public ResponseEntity<ResultPaginationDTO> getCompanyPermissionHistory(
+            @AuthenticationPrincipal Jwt jwt,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        return ResponseEntity.ok(companyMemberService.getCompanyPermissionHistory(companyId, pageable));
     }
 
     @DeleteMapping("/{targetUserId}")

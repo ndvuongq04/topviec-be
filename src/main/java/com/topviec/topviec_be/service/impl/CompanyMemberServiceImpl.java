@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
+import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.ActionItem;
 import com.topviec.topviec_be.entity.Company;
@@ -441,6 +442,52 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
     }
 
     // -------------------------------------------------------------------------
+    // Lịch sử thay đổi quyền
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResPermissionChangeLogDTO> getMemberPermissionHistory(Long companyId, Long targetUserId) {
+        List<PermissionChangeLog> logs = permissionChangeLogRepository
+                .findByCompanyIdAndTargetUserIdOrderByCreatedAtDesc(companyId, targetUserId);
+
+        List<Long> userIds = logs.stream()
+                .flatMap(l -> java.util.stream.Stream.of(l.getTargetUserId(), l.getChangedBy()))
+                .distinct().toList();
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+
+        return logs.stream().map(l -> toLogResponse(l, emailMap)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getCompanyPermissionHistory(Long companyId, Pageable pageable) {
+        Page<PermissionChangeLog> page = permissionChangeLogRepository
+                .findByCompanyIdOrderByCreatedAtDesc(companyId, pageable);
+
+        List<Long> userIds = page.getContent().stream()
+                .flatMap(l -> java.util.stream.Stream.of(l.getTargetUserId(), l.getChangedBy()))
+                .distinct().toList();
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+
+        List<ResPermissionChangeLogDTO> items = page.getContent().stream()
+                .map(l -> toLogResponse(l, emailMap)).toList();
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(page.getNumber() + 1);
+        meta.setPageSize(page.getSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(items);
+        return result;
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
@@ -546,6 +593,23 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .actions(actionsMap)
                 .jobTitle(m.getJobTitle())
                 .createdAt(m.getCreatedAt())
+                .build();
+    }
+
+    private ResPermissionChangeLogDTO toLogResponse(PermissionChangeLog l, Map<Long, String> emailMap) {
+        return ResPermissionChangeLogDTO.builder()
+                .id(l.getId())
+                .targetUserId(l.getTargetUserId())
+                .targetEmail(emailMap.get(l.getTargetUserId()))
+                .changedBy(l.getChangedBy())
+                .changedByEmail(emailMap.get(l.getChangedBy()))
+                .changeType(l.getChangeType())
+                .oldRole(l.getOldRole())
+                .newRole(l.getNewRole())
+                .oldPermissions(l.getOldPermissions())
+                .newPermissions(l.getNewPermissions())
+                .reason(l.getReason())
+                .createdAt(l.getCreatedAt())
                 .build();
     }
 }

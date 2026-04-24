@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
+import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
@@ -72,4 +73,14 @@ public interface CompanyMemberService {
      */
     ResMemberPermissionDetailDTO toggleMemberActionPermission(Long inviterUserId, Long companyId, Long targetUserId,
             String actionCode, boolean enabled);
+
+    /**
+     * Lấy lịch sử thay đổi quyền của một member cụ thể trong công ty.
+     */
+    List<ResPermissionChangeLogDTO> getMemberPermissionHistory(Long companyId, Long targetUserId);
+
+    /**
+     * Lấy toàn bộ lịch sử thay đổi quyền trong công ty (phân trang).
+     */
+    ResultPaginationDTO getCompanyPermissionHistory(Long companyId, Pageable pageable);
 }
