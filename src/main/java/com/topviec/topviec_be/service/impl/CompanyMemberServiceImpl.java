@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
+import com.topviec.topviec_be.dto.response.ResActionSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
@@ -456,8 +457,9 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .distinct().toList();
         Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEmail));
+        Map<String, String> codeNameMap = buildActionCodeNameMap();
 
-        return logs.stream().map(l -> toLogResponse(l, emailMap)).toList();
+        return logs.stream().map(l -> toLogResponse(l, emailMap, codeNameMap)).toList();
     }
 
     @Override
@@ -471,9 +473,10 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .distinct().toList();
         Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEmail));
+        Map<String, String> codeNameMap = buildActionCodeNameMap();
 
         List<ResPermissionChangeLogDTO> items = page.getContent().stream()
-                .map(l -> toLogResponse(l, emailMap)).toList();
+                .map(l -> toLogResponse(l, emailMap, codeNameMap)).toList();
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(page.getNumber() + 1);
@@ -596,7 +599,34 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .build();
     }
 
-    private ResPermissionChangeLogDTO toLogResponse(PermissionChangeLog l, Map<Long, String> emailMap) {
+    private Map<String, String> buildActionCodeNameMap() {
+        return roleDefaultRepository.findAll().stream()
+                .filter(r -> r.getActions() != null)
+                .flatMap(r -> r.getActions().stream())
+                .collect(Collectors.toMap(
+                        ActionItem::getCode,
+                        ActionItem::getName,
+                        (existing, duplicate) -> existing));
+    }
+
+    private Map<String, List<ResActionSummaryDTO>> enrichPermissions(
+            Map<String, List<String>> raw, Map<String, String> codeNameMap) {
+        if (raw == null) return Map.of("grant", List.of(), "revoke", List.of());
+        Map<String, List<ResActionSummaryDTO>> result = new HashMap<>();
+        raw.forEach((key, codes) -> {
+            List<ResActionSummaryDTO> enriched = codes == null ? List.of() : codes.stream()
+                    .map(code -> ResActionSummaryDTO.builder()
+                            .code(code)
+                            .name(codeNameMap.getOrDefault(code, code))
+                            .build())
+                    .toList();
+            result.put(key, enriched);
+        });
+        return result;
+    }
+
+    private ResPermissionChangeLogDTO toLogResponse(PermissionChangeLog l, Map<Long, String> emailMap,
+            Map<String, String> codeNameMap) {
         return ResPermissionChangeLogDTO.builder()
                 .id(l.getId())
                 .targetUserId(l.getTargetUserId())
@@ -606,8 +636,8 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .changeType(l.getChangeType())
                 .oldRole(l.getOldRole())
                 .newRole(l.getNewRole())
-                .oldPermissions(l.getOldPermissions())
-                .newPermissions(l.getNewPermissions())
+                .oldPermissions(enrichPermissions(l.getOldPermissions(), codeNameMap))
+                .newPermissions(enrichPermissions(l.getNewPermissions(), codeNameMap))
                 .reason(l.getReason())
                 .createdAt(l.getCreatedAt())
                 .build();

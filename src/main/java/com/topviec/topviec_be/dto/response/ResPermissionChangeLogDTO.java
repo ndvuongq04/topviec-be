@@ -21,8 +21,8 @@ public class ResPermissionChangeLogDTO {
     private PermissionChangeType changeType;
     private MemberRole oldRole;
     private MemberRole newRole;
-    private Map<String, List<String>> oldPermissions;
-    private Map<String, List<String>> newPermissions;
+    private Map<String, List<ResActionSummaryDTO>> oldPermissions;
+    private Map<String, List<ResActionSummaryDTO>> newPermissions;
     private String reason;
     private LocalDateTime createdAt;
 }
