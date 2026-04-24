@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqBatchMemberPermissionDTO;
+import com.topviec.topviec_be.dto.request.ReqToggleActionDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
@@ -122,6 +123,21 @@ public class EmployerMemberController {
 
         List<ResMemberPermissionDetailDTO> result =
                 companyMemberService.getBatchMemberPermissions(companyId, request.getUserIds());
+        return ResponseEntity.ok(result);
+    }
+
+    @PatchMapping("/{targetUserId}/permissions/{actionCode}")
+    public ResponseEntity<ResMemberPermissionDetailDTO> toggleMemberActionPermission(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long targetUserId,
+            @PathVariable String actionCode,
+            @Valid @RequestBody ReqToggleActionDTO request) {
+
+        Long inviterUserId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(inviterUserId).getId();
+
+        ResMemberPermissionDetailDTO result = companyMemberService.toggleMemberActionPermission(
+                inviterUserId, companyId, targetUserId, actionCode, request.getEnabled());
         return ResponseEntity.ok(result);
     }
 

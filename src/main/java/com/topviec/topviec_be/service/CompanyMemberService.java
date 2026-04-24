@@ -65,4 +65,11 @@ public interface CompanyMemberService {
      * Kết quả bao gồm toàn bộ action đã được tính toán từ role mặc định + custom grant/revoke.
      */
     List<ResMemberPermissionDetailDTO> getBatchMemberPermissions(Long companyId, List<Long> userIds);
+
+    /**
+     * Bật/tắt một quyền cụ thể của member.
+     * Chỉ OWNER hoặc MANAGER mới được phép thực hiện.
+     */
+    ResMemberPermissionDetailDTO toggleMemberActionPermission(Long inviterUserId, Long companyId, Long targetUserId,
+            String actionCode, boolean enabled);
 }

@@ -32,6 +32,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,7 +163,8 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
         // 2. Fallback về default role permissions
         RoleDefault roleDefault = member.getRoleDefault();
-        if (roleDefault == null || roleDefault.getActions() == null) return false;
+        if (roleDefault == null || roleDefault.getActions() == null)
+            return false;
         return roleDefault.getActions().stream()
                 .anyMatch(a -> a.getCode().equals(action) && a.isEnabled());
     }
@@ -360,6 +363,84 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
     }
 
     // -------------------------------------------------------------------------
+    // Toggle single action permission (chỉ Owner / Manager)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResMemberPermissionDetailDTO toggleMemberActionPermission(Long inviterUserId, Long companyId,
+            Long targetUserId, String actionCode, boolean enabled) {
+
+        // 1. Xác minh inviter là OWNER hoặc MANAGER
+        CompanyMember inviterMember = companyMemberRepository.findByCompanyIdAndUserId(companyId, inviterUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin thành viên của bạn trong công ty"));
+
+        MemberRole inviterRole = inviterMember.getMemberRole();
+        if (inviterRole != MemberRole.OWNER && inviterRole != MemberRole.MANAGER) {
+            throw AppException.forbidden("Chỉ Owner và Manager mới có thể thay đổi quyền thành viên");
+        }
+
+        // 2. Lấy member cần thay đổi
+        CompanyMember targetMember = companyMemberRepository.findByCompanyIdAndUserId(companyId, targetUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thành viên này trong công ty"));
+
+        MemberRole targetRole = targetMember.getMemberRole();
+
+        // 3. Không thể thay đổi quyền của OWNER
+        if (targetRole == MemberRole.OWNER) {
+            throw AppException.badRequest("Không thể thay đổi quyền của Owner");
+        }
+
+        // 4. MANAGER không thể thay đổi quyền của MANAGER khác
+        if (inviterRole == MemberRole.MANAGER && targetRole == MemberRole.MANAGER) {
+            throw AppException.forbidden("Manager không thể thay đổi quyền của Manager khác");
+        }
+
+        // 5. Cập nhật grant/revoke cho actionCode
+        Map<String, List<String>> oldPermissions = targetMember.getPermissions();
+
+        List<String> grantList = new ArrayList<>(
+                oldPermissions != null && oldPermissions.get("grant") != null ? oldPermissions.get("grant")
+                        : List.of());
+        List<String> revokeList = new ArrayList<>(
+                oldPermissions != null && oldPermissions.get("revoke") != null ? oldPermissions.get("revoke")
+                        : List.of());
+
+        grantList.remove(actionCode);
+        revokeList.remove(actionCode);
+        if (enabled) {
+            grantList.add(actionCode);
+        } else {
+            revokeList.add(actionCode);
+        }
+
+        Map<String, List<String>> newPermissions = new java.util.HashMap<>();
+        newPermissions.put("grant", grantList);
+        newPermissions.put("revoke", revokeList);
+
+        targetMember.setPermissions(newPermissions);
+        targetMember.setUpdatedBy(inviterUserId);
+        CompanyMember savedMember = companyMemberRepository.save(targetMember);
+
+        // 6. Ghi log
+        PermissionChangeLog logEntry = PermissionChangeLog.builder()
+                .companyId(companyId)
+                .targetUserId(targetUserId)
+                .changedBy(inviterUserId)
+                .changeType(PermissionChangeType.PERMISSION_UPDATE)
+                .oldRole(targetRole)
+                .newRole(targetRole)
+                .oldPermissions(oldPermissions)
+                .newPermissions(newPermissions)
+                .reason("Toggle action [" + actionCode + "] -> " + (enabled ? "grant" : "revoke"))
+                .build();
+        permissionChangeLogRepository.save(logEntry);
+
+        String targetEmail = userRepository.findById(targetUserId).map(User::getEmail).orElse(null);
+        return toPermissionDetailResponse(savedMember, targetEmail);
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
@@ -393,9 +474,11 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
         Map<String, List<String>> permissions = m.getPermissions();
 
         List<String> grantList = permissions != null && permissions.get("grant") != null
-                ? permissions.get("grant") : List.of();
+                ? permissions.get("grant")
+                : List.of();
         List<String> revokeList = permissions != null && permissions.get("revoke") != null
-                ? permissions.get("revoke") : List.of();
+                ? permissions.get("revoke")
+                : List.of();
 
         // Quyền custom ghi đè (chỉ những action được tuỳ chỉnh riêng)
         Map<String, Boolean> customPermissions = new HashMap<>();
