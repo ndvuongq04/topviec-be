@@ -9,6 +9,7 @@ import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface CompanyMemberService {
@@ -82,5 +83,5 @@ public interface CompanyMemberService {
     /**
      * Lấy toàn bộ lịch sử thay đổi quyền trong công ty (phân trang).
      */
-    ResultPaginationDTO getCompanyPermissionHistory(Long companyId, Pageable pageable);
+    ResultPaginationDTO getCompanyPermissionHistory(Long companyId, LocalDate fromDate, LocalDate toDate, Pageable pageable);
 }

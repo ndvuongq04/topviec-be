@@ -35,6 +35,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -464,9 +467,13 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getCompanyPermissionHistory(Long companyId, Pageable pageable) {
+    public ResultPaginationDTO getCompanyPermissionHistory(Long companyId, LocalDate fromDate, LocalDate toDate,
+            Pageable pageable) {
+        LocalDateTime from = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime to = toDate != null ? toDate.atTime(LocalTime.MAX) : null;
+
         Page<PermissionChangeLog> page = permissionChangeLogRepository
-                .findByCompanyIdOrderByCreatedAtDesc(companyId, pageable);
+                .findByCompanyIdAndDateRange(companyId, from, to, pageable);
 
         List<Long> userIds = page.getContent().stream()
                 .flatMap(l -> java.util.stream.Stream.of(l.getTargetUserId(), l.getChangedBy()))
