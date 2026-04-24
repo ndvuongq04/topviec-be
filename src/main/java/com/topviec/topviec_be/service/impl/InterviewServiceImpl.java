@@ -1725,6 +1725,7 @@ public class InterviewServiceImpl implements InterviewService {
                 .roundId(interview.getRoundId())
                 .roundNumber(round != null ? round.getRoundNumber() : null)
                 .roundName(round != null ? round.getRoundName() : null)
+                .candidateUserId(application.getCandidateUserId())
                 .candidateName(candidateName)
                 .candidateEmail(user != null ? user.getEmail() : null)
                 .candidatePhone(profile != null ? profile.getPhoneDisplay() : null)

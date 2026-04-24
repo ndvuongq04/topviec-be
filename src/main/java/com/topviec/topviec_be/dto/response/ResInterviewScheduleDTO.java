@@ -18,6 +18,7 @@ public class ResInterviewScheduleDTO {
     private String roundName;
 
     // Thông tin UV
+    private Long candidateUserId;
     private String candidateName;
     private String candidateEmail;
     private String candidatePhone;
