@@ -44,6 +44,8 @@ public class ResCandidateProfileDTO {
     private Boolean isCvPublic;
     private Boolean hidePhone;
     private Boolean hideEmail;
+    private Boolean hideDateOfBirth;
+    private Boolean hideExpectedSalary;
 
     // Audit
     private LocalDateTime createdAt;

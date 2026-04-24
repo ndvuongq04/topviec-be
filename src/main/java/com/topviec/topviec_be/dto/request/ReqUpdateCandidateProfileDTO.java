@@ -56,4 +56,8 @@ public class ReqUpdateCandidateProfileDTO {
     private Boolean hidePhone;
 
     private Boolean hideEmail;
+
+    private Boolean hideDateOfBirth;
+
+    private Boolean hideExpectedSalary;
 }

@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateCandidateProfileDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileVisibilityDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateProfileDTO;
 import com.topviec.topviec_be.entity.CandidateProfile;
 import com.topviec.topviec_be.enums.candidateProfile.PreferredWorkType;
@@ -74,6 +75,8 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
                 .cvPublic(Boolean.TRUE.equals(request.getIsCvPublic()) || request.getIsCvPublic() == null)
                 .hidePhone(Boolean.TRUE.equals(request.getHidePhone()))
                 .hideEmail(Boolean.TRUE.equals(request.getHideEmail()))
+                .hideDateOfBirth(Boolean.TRUE.equals(request.getHideDateOfBirth()))
+                .hideExpectedSalary(Boolean.TRUE.equals(request.getHideExpectedSalary()))
                 .createdBy(userId)
                 .build();
 
@@ -166,6 +169,10 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
             profile.setHidePhone(request.getHidePhone());
         if (request.getHideEmail() != null)
             profile.setHideEmail(request.getHideEmail());
+        if (request.getHideDateOfBirth() != null)
+            profile.setHideDateOfBirth(request.getHideDateOfBirth());
+        if (request.getHideExpectedSalary() != null)
+            profile.setHideExpectedSalary(request.getHideExpectedSalary());
 
         profile.setUpdatedBy(userId);
 
@@ -176,6 +183,21 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         candidateProfileRepository.updateProfileCompletionPct(userId, pct);
         profile.setProfileCompletionPct(pct);
 
+        return toResponse(profile);
+    }
+
+    @Override
+    @Transactional
+    public ResCandidateProfileDTO updateVisibility(Long userId, ReqUpdateCandidateProfileVisibilityDTO request) {
+        CandidateProfile profile = findByUserIdOrThrow(userId);
+
+        profile.setHidePhone(request.getHidePhone());
+        profile.setHideEmail(request.getHideEmail());
+        profile.setHideDateOfBirth(request.getHideDateOfBirth());
+        profile.setHideExpectedSalary(request.getHideExpectedSalary());
+        profile.setUpdatedBy(userId);
+
+        profile = candidateProfileRepository.save(profile);
         return toResponse(profile);
     }
 
@@ -281,6 +303,8 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
                 .isCvPublic(p.getCvPublic())
                 .hidePhone(p.getHidePhone())
                 .hideEmail(p.getHideEmail())
+                .hideDateOfBirth(p.getHideDateOfBirth())
+                .hideExpectedSalary(p.getHideExpectedSalary())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

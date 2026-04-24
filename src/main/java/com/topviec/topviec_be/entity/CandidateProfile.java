@@ -85,6 +85,14 @@ public class CandidateProfile {
     @Builder.Default
     private Boolean hideEmail = false;
 
+    @Column(name = "hide_date_of_birth", nullable = false)
+    @Builder.Default
+    private Boolean hideDateOfBirth = false;
+
+    @Column(name = "hide_expected_salary", nullable = false)
+    @Builder.Default
+    private Boolean hideExpectedSalary = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -58,4 +58,8 @@ public class ReqCreateCandidateProfileDTO {
     private Boolean hidePhone = false;
 
     private Boolean hideEmail = false;
+
+    private Boolean hideDateOfBirth = false;
+
+    private Boolean hideExpectedSalary = false;
 }
