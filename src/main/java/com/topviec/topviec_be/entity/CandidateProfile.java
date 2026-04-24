@@ -63,6 +63,9 @@ public class CandidateProfile {
     @Builder.Default
     private String jobSeekingStatus = "active";
 
+    @Column(name = "preferred_job_title", length = 255)
+    private String preferredJobTitle;
+
     @Column(name = "preferred_work_type", length = 100)
     private String preferredWorkType;
 

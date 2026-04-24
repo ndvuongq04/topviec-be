@@ -37,6 +37,7 @@ public class ResCandidateProfileDTO {
     // Trạng thái & hình thức
     private JobSeekingStatus jobSeekingStatus;
     private PreferredWorkType preferredWorkType;
+    private String preferredJobTitle;
     private Integer preferredLocationId;
 
     // Hồ sơ

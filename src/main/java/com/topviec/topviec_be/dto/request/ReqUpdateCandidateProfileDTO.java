@@ -49,6 +49,9 @@ public class ReqUpdateCandidateProfileDTO {
 
     private PreferredWorkType preferredWorkType;
 
+    @Size(max = 255, message = "Vị trí mong muốn tối đa 255 ký tự")
+    private String preferredJobTitle;
+
     private Integer preferredLocationId;
 
     private Boolean cvPublic;

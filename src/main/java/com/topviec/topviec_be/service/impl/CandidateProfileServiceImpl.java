@@ -70,6 +70,7 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
                 .preferredWorkType(request.getPreferredWorkType() != null
                         ? request.getPreferredWorkType().getValue()
                         : null)
+                .preferredJobTitle(request.getPreferredJobTitle())
                 .preferredLocationId(request.getPreferredLocationId())
                 .profileCompletionPct(0)
                 .cvPublic(Boolean.TRUE.equals(request.getIsCvPublic()) || request.getIsCvPublic() == null)
@@ -161,6 +162,8 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
             profile.setJobSeekingStatus(request.getJobSeekingStatus().getValue());
         if (request.getPreferredWorkType() != null)
             profile.setPreferredWorkType(request.getPreferredWorkType().getValue());
+        if (request.getPreferredJobTitle() != null)
+            profile.setPreferredJobTitle(request.getPreferredJobTitle());
         if (request.getPreferredLocationId() != null)
             profile.setPreferredLocationId(request.getPreferredLocationId());
         if (request.getCvPublic() != null)
@@ -298,6 +301,7 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
                         : null)
                 .preferredWorkType(
                         p.getPreferredWorkType() != null ? PreferredWorkType.fromValue(p.getPreferredWorkType()) : null)
+                .preferredJobTitle(p.getPreferredJobTitle())
                 .preferredLocationId(p.getPreferredLocationId())
                 .profileCompletionPct(p.getProfileCompletionPct())
                 .isCvPublic(p.getCvPublic())
