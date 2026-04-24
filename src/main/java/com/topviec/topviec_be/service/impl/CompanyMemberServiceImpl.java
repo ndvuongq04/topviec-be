@@ -4,7 +4,9 @@ import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
+import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.ActionItem;
 import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.PermissionChangeLog;
@@ -341,6 +343,23 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
     }
 
     // -------------------------------------------------------------------------
+    // Batch permission detail (max 5 users)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResMemberPermissionDetailDTO> getBatchMemberPermissions(Long companyId, List<Long> userIds) {
+        List<CompanyMember> members = companyMemberRepository.findByCompanyIdAndUserIds(companyId, userIds);
+
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+
+        return members.stream()
+                .map(m -> toPermissionDetailResponse(m, emailMap.get(m.getUserId())))
+                .toList();
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
@@ -367,6 +386,51 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
         return Map.of(
                 "grant", grantList,
                 "revoke", revokeList);
+    }
+
+    private ResMemberPermissionDetailDTO toPermissionDetailResponse(CompanyMember m, String email) {
+        RoleDefault roleDefault = m.getRoleDefault();
+        Map<String, List<String>> permissions = m.getPermissions();
+
+        List<String> grantList = permissions != null && permissions.get("grant") != null
+                ? permissions.get("grant") : List.of();
+        List<String> revokeList = permissions != null && permissions.get("revoke") != null
+                ? permissions.get("revoke") : List.of();
+
+        // Quyền custom ghi đè (chỉ những action được tuỳ chỉnh riêng)
+        Map<String, Boolean> customPermissions = new HashMap<>();
+        grantList.forEach(a -> customPermissions.put(a, true));
+        revokeList.forEach(a -> customPermissions.put(a, false));
+
+        // Effective permissions: role default + áp dụng grant/revoke override
+        List<ActionItem> effectivePermissions = List.of();
+        if (roleDefault != null && roleDefault.getActions() != null) {
+            effectivePermissions = roleDefault.getActions().stream()
+                    .map(a -> {
+                        boolean effective;
+                        if (grantList.contains(a.getCode())) {
+                            effective = true;
+                        } else if (revokeList.contains(a.getCode())) {
+                            effective = false;
+                        } else {
+                            effective = a.isEnabled();
+                        }
+                        return new ActionItem(a.getName(), a.getCode(), effective);
+                    })
+                    .toList();
+        }
+
+        return ResMemberPermissionDetailDTO.builder()
+                .userId(m.getUserId())
+                .email(email)
+                .roleId(roleDefault != null ? roleDefault.getId() : null)
+                .roleName(roleDefault != null ? roleDefault.getRoleName() : null)
+                .status(m.getStatus())
+                .jobTitle(m.getJobTitle())
+                .createdAt(m.getCreatedAt())
+                .customPermissions(customPermissions)
+                .effectivePermissions(effectivePermissions)
+                .build();
     }
 
     private ResCompanyMemberDTO toResponse(CompanyMember m, String email) {
