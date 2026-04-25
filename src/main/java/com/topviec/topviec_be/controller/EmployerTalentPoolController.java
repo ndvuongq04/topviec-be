@@ -2,11 +2,14 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.TalentPoolService;
 import com.topviec.topviec_be.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +27,18 @@ public class EmployerTalentPoolController {
     private final TalentPoolService talentPoolService;
     private final CompanyService companyService;
 
+    @GetMapping
+    public ResponseEntity<ResultPaginationDTO> getTalentPool(
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.getTalentPool(companyId, source, search, pageable));
+    }
+
     @PostMapping
     public ResponseEntity<ResTalentPoolDTO> addToTalentPool(
             @Valid @RequestBody ReqAddToTalentPoolDTO request) {
@@ -31,7 +46,7 @@ public class EmployerTalentPoolController {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
-        ResTalentPoolDTO response = talentPoolService.addToTalentPool(userId, companyId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(talentPoolService.addToTalentPool(userId, companyId, request));
     }
 }
