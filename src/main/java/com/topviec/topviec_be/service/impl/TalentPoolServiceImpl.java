@@ -206,6 +206,24 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     }
 
     // -------------------------------------------------------------------------
+    // PATCH — cập nhật note cho UV trong talent pool
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void updateNote(Long companyId, Long talentPoolId, String note) {
+        TalentPool talentPool = talentPoolRepository.findById(talentPoolId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy ứng viên trong talent pool"));
+
+        if (!talentPool.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền chỉnh sửa thông tin này");
+        }
+
+        talentPool.setNote(note);
+        talentPoolRepository.save(talentPool);
+    }
+
+    // -------------------------------------------------------------------------
     // DELETE — xóa UV khỏi talent pool
     // -------------------------------------------------------------------------
 

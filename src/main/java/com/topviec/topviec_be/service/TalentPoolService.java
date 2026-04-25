@@ -14,4 +14,6 @@ public interface TalentPoolService {
     ResTalentPoolCandidateDetailDTO getTalentPoolCandidateDetail(Long companyId, Long talentPoolId);
 
     void removeFromTalentPool(Long companyId, Long talentPoolId);
+
+    void updateNote(Long companyId, Long talentPoolId, String note);
 }

@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateTalentPoolNoteDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -48,6 +49,18 @@ public class EmployerTalentPoolController {
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
         return ResponseEntity.ok(talentPoolService.getTalentPoolCandidateDetail(companyId, talentPoolId));
+    }
+
+    @PatchMapping("/{talentPoolId}/note")
+    public ResponseEntity<Void> updateNote(
+            @PathVariable Long talentPoolId,
+            @RequestBody ReqUpdateTalentPoolNoteDTO request) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        talentPoolService.updateNote(companyId, talentPoolId, request.getNote());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{talentPoolId}")
