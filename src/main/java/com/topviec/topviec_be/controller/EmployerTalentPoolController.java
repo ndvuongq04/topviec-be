@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
+import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.CompanyService;
@@ -37,6 +38,25 @@ public class EmployerTalentPoolController {
         Long companyId = companyService.getCompanyIdByUserId(userId);
 
         return ResponseEntity.ok(talentPoolService.getTalentPool(companyId, source, search, pageable));
+    }
+
+    @GetMapping("/{talentPoolId}")
+    public ResponseEntity<ResTalentPoolCandidateDetailDTO> getTalentPoolCandidateDetail(
+            @PathVariable Long talentPoolId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.getTalentPoolCandidateDetail(companyId, talentPoolId));
+    }
+
+    @DeleteMapping("/{talentPoolId}")
+    public ResponseEntity<Void> removeFromTalentPool(@PathVariable Long talentPoolId) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        talentPoolService.removeFromTalentPool(companyId, talentPoolId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping

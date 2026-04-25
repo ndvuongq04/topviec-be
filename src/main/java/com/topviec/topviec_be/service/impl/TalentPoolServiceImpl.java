@@ -2,14 +2,17 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDTO;
+import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.CandidateProfile;
+import com.topviec.topviec_be.entity.Cvs;
 import com.topviec.topviec_be.entity.Location;
 import com.topviec.topviec_be.entity.TalentPool;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
+import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.TalentPoolRepository;
 import com.topviec.topviec_be.repository.UserRepository;
@@ -33,6 +36,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
+    private final CvsRepository cvsRepository;
 
     // -------------------------------------------------------------------------
     // POST — thêm UV vào talent pool
@@ -126,8 +130,114 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     }
 
     // -------------------------------------------------------------------------
+    // GET — chi tiết ứng viên trong talent pool
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResTalentPoolCandidateDetailDTO getTalentPoolCandidateDetail(Long companyId, Long talentPoolId) {
+        TalentPool talentPool = talentPoolRepository.findById(talentPoolId)
+                .filter(tp -> tp.getDeletedAt() == null)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy ứng viên trong talent pool"));
+
+        if (!talentPool.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xem thông tin này");
+        }
+
+        Long candidateUserId = talentPool.getCandidateUserId();
+
+        CandidateProfile profile = candidateProfileRepository.findByUserId(candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy hồ sơ ứng viên"));
+
+        User candidateUser = userRepository.findById(candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản ứng viên"));
+
+        String addedByName = userRepository.findById(talentPool.getAddedBy())
+                .map(User::getEmail)
+                .orElse(null);
+
+        String locationName = null;
+        if (profile.getPreferredLocationId() != null) {
+            locationName = locationRepository.findById(profile.getPreferredLocationId().longValue())
+                    .map(Location::getName)
+                    .orElse(null);
+        }
+
+        Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId).orElse(null);
+
+        return ResTalentPoolCandidateDetailDTO.builder()
+                // talent pool entry
+                .talentPoolId(talentPool.getId())
+                .source(talentPool.getSource())
+                .note(talentPool.getNote())
+                .addedAt(talentPool.getCreatedAt())
+                .addedBy(talentPool.getAddedBy())
+                .addedByName(addedByName)
+                // thông tin cơ bản
+                .candidateUserId(candidateUserId)
+                .fullName(profile.getFullName())
+                .avatarUrl(profile.getAvatarUrl())
+                .bio(profile.getBio())
+                .gender(profile.getGender())
+                .linkedinUrl(profile.getLinkedinUrl())
+                .githubUrl(profile.getGithubUrl())
+                .personalWebsite(profile.getPersonalWebsite())
+                .profileCompletionPct(profile.getProfileCompletionPct())
+                .jobSeekingStatus(profile.getJobSeekingStatus())
+                // thông tin có thể ẩn
+                .phone(profile.getHidePhone() ? null : profile.getPhoneDisplay())
+                .phoneHidden(profile.getHidePhone())
+                .email(profile.getHideEmail() ? null : candidateUser.getEmail())
+                .emailHidden(profile.getHideEmail())
+                .dateOfBirth(profile.getHideDateOfBirth() ? null : profile.getDateOfBirth())
+                .dateOfBirthHidden(profile.getHideDateOfBirth())
+                // mong muốn công việc
+                .preferredJobTitle(profile.getPreferredJobTitle())
+                .preferredWorkType(profile.getPreferredWorkType())
+                .preferredLocationId(profile.getPreferredLocationId())
+                .preferredLocationName(locationName)
+                .expectedSalaryMin(profile.getHideExpectedSalary() ? null : profile.getExpectedSalaryMin())
+                .expectedSalaryMax(profile.getHideExpectedSalary() ? null : profile.getExpectedSalaryMax())
+                .salaryNegotiable(profile.getHideExpectedSalary() ? null : profile.getSalaryNegotiable())
+                .salaryHidden(profile.getHideExpectedSalary())
+                // CV mặc định
+                .defaultCv(defaultCv != null ? toDefaultCvDTO(defaultCv) : null)
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // DELETE — xóa UV khỏi talent pool
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public void removeFromTalentPool(Long companyId, Long talentPoolId) {
+        TalentPool talentPool = talentPoolRepository.findById(talentPoolId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy ứng viên trong talent pool"));
+
+        if (!talentPool.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xóa ứng viên này khỏi talent pool");
+        }
+
+        talentPoolRepository.delete(talentPool);
+    }
+
+    // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
+
+    private ResTalentPoolCandidateDetailDTO.DefaultCvDTO toDefaultCvDTO(Cvs cv) {
+        return ResTalentPoolCandidateDetailDTO.DefaultCvDTO.builder()
+                .cvId(cv.getId())
+                .title(cv.getTitle())
+                .cvType(cv.getCvType())
+                .fileUrl(cv.getFileUrl())
+                .pdfUrl(cv.getPdfUrl())
+                .visibility(cv.getVisibility())
+                .viewCount(cv.getViewCount())
+                .createdAt(cv.getCreatedAt())
+                .build();
+    }
 
     private ResTalentPoolCandidateDTO toListResponse(
             TalentPool tp,
