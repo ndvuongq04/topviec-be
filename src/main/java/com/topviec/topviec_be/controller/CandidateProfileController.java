@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqCreateCandidateProfileDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileVisibilityDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateProfileDTO;
 import com.topviec.topviec_be.service.CandidateProfileService;
 import jakarta.validation.Valid;
@@ -54,6 +55,19 @@ public class CandidateProfileController {
             @Valid @RequestBody ReqUpdateCandidateProfileDTO request) {
 
         ResCandidateProfileDTO data = candidateProfileService.updateProfile(extractUserId(jwt), request);
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * PATCH /api/v1/candidate/profile/visibility
+     * Cập nhật trạng thái ẩn/hiện các thông tin nhạy cảm trong hồ sơ ứng viên.
+     */
+    @PatchMapping("/visibility")
+    public ResponseEntity<ResCandidateProfileDTO> updateVisibility(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ReqUpdateCandidateProfileVisibilityDTO request) {
+
+        ResCandidateProfileDTO data = candidateProfileService.updateVisibility(extractUserId(jwt), request);
         return ResponseEntity.ok(data);
     }
 

@@ -2,9 +2,11 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqBatchMemberPermissionDTO;
+import com.topviec.topviec_be.dto.request.ReqToggleActionDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
+import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 
 import java.util.List;
@@ -15,6 +17,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -123,6 +128,47 @@ public class EmployerMemberController {
         List<ResMemberPermissionDetailDTO> result =
                 companyMemberService.getBatchMemberPermissions(companyId, request.getUserIds());
         return ResponseEntity.ok(result);
+    }
+
+    @PatchMapping("/{targetUserId}/permissions/{actionCode}")
+    public ResponseEntity<ResMemberPermissionDetailDTO> toggleMemberActionPermission(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long targetUserId,
+            @PathVariable String actionCode,
+            @Valid @RequestBody ReqToggleActionDTO request) {
+
+        Long inviterUserId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(inviterUserId).getId();
+
+        ResMemberPermissionDetailDTO result = companyMemberService.toggleMemberActionPermission(
+                inviterUserId, companyId, targetUserId, actionCode, request.getEnabled());
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{targetUserId}/permissions/history")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:view_activity')")
+    public ResponseEntity<List<ResPermissionChangeLogDTO>> getMemberPermissionHistory(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long targetUserId) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        return ResponseEntity.ok(companyMemberService.getMemberPermissionHistory(companyId, targetUserId));
+    }
+
+    @GetMapping("/permissions/history")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:view_activity')")
+    public ResponseEntity<ResultPaginationDTO> getCompanyPermissionHistory(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+
+        Long userId = extractUserId(jwt);
+        Long companyId = companyService.getMyCompany(userId).getId();
+
+        return ResponseEntity.ok(companyMemberService.getCompanyPermissionHistory(companyId, fromDate, toDate, pageable));
     }
 
     @DeleteMapping("/{targetUserId}")

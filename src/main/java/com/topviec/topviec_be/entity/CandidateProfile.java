@@ -63,6 +63,9 @@ public class CandidateProfile {
     @Builder.Default
     private String jobSeekingStatus = "active";
 
+    @Column(name = "preferred_job_title", length = 255)
+    private String preferredJobTitle;
+
     @Column(name = "preferred_work_type", length = 100)
     private String preferredWorkType;
 
@@ -84,6 +87,14 @@ public class CandidateProfile {
     @Column(name = "hide_email", nullable = false)
     @Builder.Default
     private Boolean hideEmail = false;
+
+    @Column(name = "hide_date_of_birth", nullable = false)
+    @Builder.Default
+    private Boolean hideDateOfBirth = false;
+
+    @Column(name = "hide_expected_salary", nullable = false)
+    @Builder.Default
+    private Boolean hideExpectedSalary = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

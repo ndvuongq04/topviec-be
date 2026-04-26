@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.response.ResRoleDefaultDTO;
+import com.topviec.topviec_be.dto.response.ResRoleSummaryDTO;
 import com.topviec.topviec_be.entity.ActionItem;
 import com.topviec.topviec_be.entity.RoleDefault;
 import com.topviec.topviec_be.enums.companyMember.MemberRole;
@@ -86,6 +87,16 @@ public class RoleServiceImpl implements RoleService {
 
         target.setName(newName);
         return toDTO(roleDefaultRepository.save(role));
+    }
+
+    @Override
+    public List<ResRoleSummaryDTO> getRoleSummaries() {
+        return roleDefaultRepository.findAll().stream()
+                .map(r -> ResRoleSummaryDTO.builder()
+                        .id(r.getId())
+                        .roleName(r.getRoleName())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     private ResRoleDefaultDTO toDTO(RoleDefault role) {

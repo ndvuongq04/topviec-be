@@ -18,16 +18,20 @@ public class TalentPool {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "company_id", nullable = false)
+    private Long companyId;
+
+    @Column(name = "candidate_user_id", nullable = false)
+    private Long candidateUserId;
+
     @Column(name = "added_by", nullable = false)
     private Long addedBy;
 
+    @Column(name = "source", nullable = false, length = 100)
+    private String source;
+
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
-
-    // Giá trị hợp lệ: hot_candidate | watching | future | rejected_but_promising
-    // (TalentPoolCategory enum)
-    @Column(name = "category")
-    private String category;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

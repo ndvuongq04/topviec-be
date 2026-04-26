@@ -51,6 +51,9 @@ public class ReqCreateCandidateProfileDTO {
 
     private PreferredWorkType preferredWorkType;
 
+    @Size(max = 255, message = "Vị trí mong muốn tối đa 255 ký tự")
+    private String preferredJobTitle;
+
     private Integer preferredLocationId;
 
     private Boolean isCvPublic = true;
@@ -58,4 +61,8 @@ public class ReqCreateCandidateProfileDTO {
     private Boolean hidePhone = false;
 
     private Boolean hideEmail = false;
+
+    private Boolean hideDateOfBirth = false;
+
+    private Boolean hideExpectedSalary = false;
 }
