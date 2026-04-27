@@ -1,6 +1,9 @@
 package com.topviec.topviec_be.job;
 
 import com.topviec.topviec_be.entity.*;
+import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
+import com.topviec.topviec_be.service.activation.BrandingActivationService;
+import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.repository.*;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.TokenService;
@@ -31,7 +34,9 @@ public class RecruitmentSchedulerJob {
     private final UserRepository userRepository;
     private final CandidateProfileRepository candidateProfileRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final JobPostAddonRepository jobPostAddonRepository;
     private final CompanyRepository companyRepository;
+    private final CompanyBrandingRepository companyBrandingRepository;
     private final TokenService tokenService;
     private final EmailService emailService;
 
@@ -63,7 +68,7 @@ public class RecruitmentSchedulerJob {
      *
      * Logic:
      * 1. Tìm các invitation có deadline trong khoảng [now, now + 1 ngày]
-     *    mà application vẫn ở trạng thái SCHEDULE_PENDING (UV chưa chọn).
+     * mà application vẫn ở trạng thái SCHEDULE_PENDING (UV chưa chọn).
      * 2. Kiểm tra reminderInfo trong Redis: nếu chưa nhắc lần nào thì gửi email.
      * 3. Tạo token mới với TTL = thời gian còn lại đến deadline.
      * 4. Gửi lại email chọn slot + cập nhật reminderCount trong Redis.
@@ -102,16 +107,19 @@ public class RecruitmentSchedulerJob {
                 }
 
                 Application application = invitation.getApplication();
-                if (application == null) continue;
+                if (application == null)
+                    continue;
 
                 User candidateUser = userRepository.findById(application.getCandidateUserId()).orElse(null);
-                if (candidateUser == null) continue;
+                if (candidateUser == null)
+                    continue;
 
                 String candidateName = getCandidateName(application.getCandidateUserId());
                 String candidateEmail = candidateUser.getEmail();
 
                 InterviewRound round = roundRepository.findByIdAndDeletedAtIsNull(roundId).orElse(null);
-                if (round == null) continue;
+                if (round == null)
+                    continue;
 
                 String jobTitle = "Vị trí ứng tuyển";
                 String companyName = "Nhà tuyển dụng";
@@ -119,7 +127,8 @@ public class RecruitmentSchedulerJob {
                 if (jobPosting != null) {
                     jobTitle = jobPosting.getTitle();
                     Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
-                    if (company != null) companyName = company.getName();
+                    if (company != null)
+                        companyName = company.getName();
                 }
 
                 String roundName = "Vòng " + round.getRoundNumber() + " - " + round.getRoundName();
@@ -147,6 +156,101 @@ public class RecruitmentSchedulerJob {
 
         if (sentCount > 0) {
             log.info("[Scheduler] remindApproachingDeadline: đã gửi {} email nhắc nhở", sentCount);
+        }
+    }
+
+    /**
+     * Tự động gỡ cờ HOT và đánh dấu EXPIRED cho các gói dịch vụ HOT đã hết thời hạn.
+     * Chạy mỗi 5 phút.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireHotJobPosts() {
+        LocalDateTime now = LocalDateTime.now();
+        List<JobPostAddon> expiredAddons = jobPostAddonRepository.findExpiredAddons("JOB_POSTING_HOT", now);
+
+        if (expiredAddons.isEmpty()) {
+            return;
+        }
+
+        log.info("[Scheduler] expireHotJobPosts chạy lúc: {}, tìm thấy {} tin HOT hết hạn", now, expiredAddons.size());
+
+        for (JobPostAddon addon : expiredAddons) {
+            addon.setStatus(JobPostAddonStatus.EXPIRED);
+            jobPostAddonRepository.save(addon);
+
+            JobPosting jobPosting = addon.getJobPosting();
+            if (jobPosting != null) {
+                jobPosting.setIsHot(false);
+                jobPostingRepository.save(jobPosting);
+            }
+        }
+
+        log.info("[Scheduler] Đã gỡ cờ HOT cho {} tin tuyển dụng", expiredAddons.size());
+    }
+
+    /**
+     * Tự động gỡ cờ URGENT và đánh dấu EXPIRED cho các gói dịch vụ TUYỂN GẤP đã hết thời hạn.
+     * Chạy mỗi 5 phút.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireUrgentJobPosts() {
+        LocalDateTime now = LocalDateTime.now();
+        List<JobPostAddon> expiredAddons = jobPostAddonRepository.findExpiredAddons("JOB_POSTING_URGENT", now);
+
+        if (expiredAddons.isEmpty()) {
+            return;
+        }
+
+        log.info("[Scheduler] expireUrgentJobPosts chạy lúc: {}, tìm thấy {} tin TUYỂN GẤP hết hạn", now, expiredAddons.size());
+
+        for (JobPostAddon addon : expiredAddons) {
+            addon.setStatus(JobPostAddonStatus.EXPIRED);
+            jobPostAddonRepository.save(addon);
+
+            JobPosting jobPosting = addon.getJobPosting();
+            if (jobPosting != null) {
+                jobPosting.setIsUrgent(false);
+                jobPostingRepository.save(jobPosting);
+            }
+        }
+
+        log.info("[Scheduler] Đã gỡ cờ URGENT cho {} tin tuyển dụng", expiredAddons.size());
+    }
+
+    /**
+     * Tự động gỡ các dịch vụ BRANDING đã hết hạn và reset cờ tương ứng trên Company.
+     * Chạy mỗi 5 phút.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireBrandingServices() {
+        LocalDateTime now = LocalDateTime.now();
+        expireBrandingByCode(BrandingActivationService.CODE_BANNER_HOME, now,
+                company -> company.setIsBanner(false));
+        expireBrandingByCode(BrandingActivationService.CODE_TOP_EMPLOYER, now,
+                company -> company.setIsTopEmployer(false));
+        expireBrandingByCode(BrandingActivationService.CODE_VERIFIED, now,
+                company -> company.setIsBrandVerified(false));
+    }
+
+    private void expireBrandingByCode(String serviceCode, LocalDateTime now,
+            java.util.function.Consumer<Company> flagResetter) {
+        List<CompanyBranding> expired = companyBrandingRepository
+                .findByServiceCodeAndStatusAndExpiredAtBefore(serviceCode, BrandingAddonStatus.ACTIVE, now);
+
+        if (expired.isEmpty()) return;
+
+        log.info("[Scheduler] Expire {} — {} bản ghi hết hạn", serviceCode, expired.size());
+
+        for (CompanyBranding record : expired) {
+            record.setStatus(BrandingAddonStatus.EXPIRED);
+            companyBrandingRepository.save(record);
+            companyRepository.findById(record.getCompanyId()).ifPresent(company -> {
+                flagResetter.accept(company);
+                companyRepository.save(company);
+            });
         }
     }
 

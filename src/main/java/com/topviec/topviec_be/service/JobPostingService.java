@@ -16,7 +16,7 @@ public interface JobPostingService {
          */
         ResultPaginationDTO getList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType, String status,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
@@ -28,15 +28,19 @@ public interface JobPostingService {
          */
         ResultPaginationDTO getEmployerList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType, String status,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
+                        Pageable pageable);
+
+        /** Lấy danh sách tin published của công ty, hỗ trợ filter + phân trang. */
+        ResultPaginationDTO getPublicCompanyList(String keyword, Long companyId,
                         Pageable pageable);
 
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
                         Long levelId, String workType,
-                        Boolean isFeatured, Boolean isUrgent,
+                        Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,
                         Pageable pageable);
@@ -85,7 +89,10 @@ public interface JobPostingService {
         // Employer — Soft Delete / Restore
         // -------------------------------------------------------------------------
 
-        /** Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở PUBLISHED). */
+        /**
+         * Employer xóa mềm tin tuyển dụng của mình (chỉ xóa được khi không ở
+         * PUBLISHED).
+         */
         void softDelete(Long id, Long companyId, Long deletedByUserId);
 
         /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */

@@ -78,3 +78,4 @@ app:
       cv: ${CLOUDINARY_FOLDER_CV:cvs}
       avatar: ${CLOUDINARY_FOLDER_AVATAR:avatars}
       company-cover: ${CLOUDINARY_FOLDER_COMPANY_COVER:company-covers}
+

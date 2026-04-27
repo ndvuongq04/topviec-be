@@ -109,6 +109,10 @@ public class JobPosting {
     @Column(name = "refreshed_at")
     private LocalDateTime refreshedAt;
 
+    @Builder.Default
+    @Column(name = "is_hot")
+    private Boolean isHot = false;
+
     @Column(name = "moderation_note", columnDefinition = "TEXT")
     private String moderationNote;
 
@@ -135,12 +139,12 @@ public class JobPosting {
     // @JdbcTypeCode(SqlTypes.VECTOR)
     // private float[] embedding;
 
+    @Builder.Default
     @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<JobPostSkill> skills = new ArrayList();
+    private List<JobPostSkill> skills = new ArrayList<>();
 
-    // @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval
-    // = true, fetch = FetchType.LAZY)
-    // private List<JobPostLocation> locations = new ArrayList<>();
+    @OneToMany(mappedBy = "jobPosting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<JobPostLocation> locations = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

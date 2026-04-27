@@ -21,6 +21,8 @@ public class ResCompanyDTO {
     private String coverUrl;
     private String description;
     private Long industryId;
+    private String industryName;
+    private Integer jobCount;
     private CompanySize companySize;
     private Integer foundedYear;
 
@@ -45,6 +47,11 @@ public class ResCompanyDTO {
     private LocalDateTime verifiedAt;
     private Long verifiedBy;
     private String rejectionReason;
+
+    // Dịch vụ Branding đang active
+    private Boolean isBanner;
+    private Boolean isTopEmployer;
+    private Boolean isBrandVerified;
 
     // Trạng thái
     private CompanyStatus status;

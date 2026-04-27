@@ -7,7 +7,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.List;
 
 @Entity
 @Table(name = "role_defaults")
@@ -28,7 +28,7 @@ public class RoleDefault {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "json")
-    private Map<String, Boolean> actions;
+    private List<ActionItem> actions;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

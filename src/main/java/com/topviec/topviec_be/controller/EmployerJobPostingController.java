@@ -59,6 +59,7 @@ public class EmployerJobPostingController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean isFeatured,
             @RequestParam(required = false) Boolean isUrgent,
+            @RequestParam(required = false) Boolean isHot,
             @RequestParam(required = false) Long salaryMin,
             @RequestParam(required = false) Long salaryMax,
             @RequestParam(required = false) Integer experienceYearsMin,
@@ -70,7 +71,7 @@ public class EmployerJobPostingController {
 
         return ResponseEntity.ok(jobPostingService.getEmployerList(
                 keyword, companyId, industryId, levelId, workType, status,
-                isFeatured, isUrgent, salaryMin, salaryMax,
+                isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
     }
 

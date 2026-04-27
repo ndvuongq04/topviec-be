@@ -8,7 +8,11 @@ import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Entity lưu trữ thông tin hồ sơ công ty trên hệ thống TopViec.
@@ -178,8 +182,24 @@ public class Company {
     @Column(name = "updated_by")
     private Long updatedBy;
 
+    @Builder.Default
+    @Column(name = "is_banner")
+    private Boolean isBanner = false;
+
+    @Builder.Default
+    @Column(name = "is_top_employer")
+    private Boolean isTopEmployer = false;
+
+    @Builder.Default
+    @Column(name = "is_brand_verified")
+    private Boolean isBrandVerified = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> orders = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

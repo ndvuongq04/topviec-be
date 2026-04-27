@@ -2,8 +2,14 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
+import com.topviec.topviec_be.dto.response.ResActionSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
+import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
+import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.ActionItem;
+import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.PermissionChangeLog;
 import com.topviec.topviec_be.entity.RoleDefault;
@@ -28,6 +34,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -157,7 +168,10 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
         // 2. Fallback về default role permissions
         RoleDefault roleDefault = member.getRoleDefault();
-        return roleDefault != null && roleDefault.getActions().getOrDefault(action, false);
+        if (roleDefault == null || roleDefault.getActions() == null)
+            return false;
+        return roleDefault.getActions().stream()
+                .anyMatch(a -> a.getCode().equals(action) && a.isEnabled());
     }
 
     @Override
@@ -304,6 +318,185 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 inviterUserId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerProfileDTO getMyProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
+
+        CompanyMember member = companyMemberRepository
+                .findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active")
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin thành viên công ty"));
+
+        Company company = companyRepository.findById(member.getCompanyId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
+
+        RoleDefault roleDefault = member.getRoleDefault();
+
+        return ResEmployerProfileDTO.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .accountStatus(user.getStatus())
+                .emailVerifiedAt(user.getEmailVerifiedAt())
+                .lastLoginAt(user.getLastLoginAt())
+                .memberId(member.getId())
+                .roleName(roleDefault != null ? roleDefault.getRoleName() : null)
+                .memberStatus(member.getStatus())
+                .memberCreatedAt(member.getCreatedAt())
+                .companyId(company.getId())
+                .companyName(company.getName())
+                .companySlug(company.getSlug())
+                .companyLogoUrl(company.getLogoUrl())
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Batch permission detail (max 5 users)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResMemberPermissionDetailDTO> getBatchMemberPermissions(Long companyId, List<Long> userIds) {
+        List<CompanyMember> members = companyMemberRepository.findByCompanyIdAndUserIds(companyId, userIds);
+
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+
+        return members.stream()
+                .map(m -> toPermissionDetailResponse(m, emailMap.get(m.getUserId())))
+                .toList();
+    }
+
+    // -------------------------------------------------------------------------
+    // Toggle single action permission (chỉ Owner / Manager)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResMemberPermissionDetailDTO toggleMemberActionPermission(Long inviterUserId, Long companyId,
+            Long targetUserId, String actionCode, boolean enabled) {
+
+        // 1. Xác minh inviter là OWNER hoặc MANAGER
+        CompanyMember inviterMember = companyMemberRepository.findByCompanyIdAndUserId(companyId, inviterUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin thành viên của bạn trong công ty"));
+
+        MemberRole inviterRole = inviterMember.getMemberRole();
+        if (inviterRole != MemberRole.OWNER && inviterRole != MemberRole.MANAGER) {
+            throw AppException.forbidden("Chỉ Owner và Manager mới có thể thay đổi quyền thành viên");
+        }
+
+        // 2. Lấy member cần thay đổi
+        CompanyMember targetMember = companyMemberRepository.findByCompanyIdAndUserId(companyId, targetUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy thành viên này trong công ty"));
+
+        MemberRole targetRole = targetMember.getMemberRole();
+
+        // 3. Không thể thay đổi quyền của OWNER
+        if (targetRole == MemberRole.OWNER) {
+            throw AppException.badRequest("Không thể thay đổi quyền của Owner");
+        }
+
+        // 4. MANAGER không thể thay đổi quyền của MANAGER khác
+        if (inviterRole == MemberRole.MANAGER && targetRole == MemberRole.MANAGER) {
+            throw AppException.forbidden("Manager không thể thay đổi quyền của Manager khác");
+        }
+
+        // 5. Cập nhật grant/revoke cho actionCode
+        Map<String, List<String>> oldPermissions = targetMember.getPermissions();
+
+        List<String> grantList = new ArrayList<>(
+                oldPermissions != null && oldPermissions.get("grant") != null ? oldPermissions.get("grant")
+                        : List.of());
+        List<String> revokeList = new ArrayList<>(
+                oldPermissions != null && oldPermissions.get("revoke") != null ? oldPermissions.get("revoke")
+                        : List.of());
+
+        grantList.remove(actionCode);
+        revokeList.remove(actionCode);
+        if (enabled) {
+            grantList.add(actionCode);
+        } else {
+            revokeList.add(actionCode);
+        }
+
+        Map<String, List<String>> newPermissions = new java.util.HashMap<>();
+        newPermissions.put("grant", grantList);
+        newPermissions.put("revoke", revokeList);
+
+        targetMember.setPermissions(newPermissions);
+        targetMember.setUpdatedBy(inviterUserId);
+        CompanyMember savedMember = companyMemberRepository.save(targetMember);
+
+        // 6. Ghi log
+        PermissionChangeLog logEntry = PermissionChangeLog.builder()
+                .companyId(companyId)
+                .targetUserId(targetUserId)
+                .changedBy(inviterUserId)
+                .changeType(PermissionChangeType.PERMISSION_UPDATE)
+                .oldRole(targetRole)
+                .newRole(targetRole)
+                .oldPermissions(oldPermissions)
+                .newPermissions(newPermissions)
+                .reason("Toggle action [" + actionCode + "] -> " + (enabled ? "grant" : "revoke"))
+                .build();
+        permissionChangeLogRepository.save(logEntry);
+
+        String targetEmail = userRepository.findById(targetUserId).map(User::getEmail).orElse(null);
+        return toPermissionDetailResponse(savedMember, targetEmail);
+    }
+
+    // -------------------------------------------------------------------------
+    // Lịch sử thay đổi quyền
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResPermissionChangeLogDTO> getMemberPermissionHistory(Long companyId, Long targetUserId) {
+        List<PermissionChangeLog> logs = permissionChangeLogRepository
+                .findByCompanyIdAndTargetUserIdOrderByCreatedAtDesc(companyId, targetUserId);
+
+        List<Long> userIds = logs.stream()
+                .flatMap(l -> java.util.stream.Stream.of(l.getTargetUserId(), l.getChangedBy()))
+                .distinct().toList();
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+        Map<String, String> codeNameMap = buildActionCodeNameMap();
+
+        return logs.stream().map(l -> toLogResponse(l, emailMap, codeNameMap)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getCompanyPermissionHistory(Long companyId, LocalDate fromDate, LocalDate toDate,
+            Pageable pageable) {
+        LocalDateTime from = fromDate != null ? fromDate.atStartOfDay() : null;
+        LocalDateTime to = toDate != null ? toDate.atTime(LocalTime.MAX) : null;
+
+        Page<PermissionChangeLog> page = permissionChangeLogRepository
+                .findByCompanyIdAndDateRange(companyId, from, to, pageable);
+
+        List<Long> userIds = page.getContent().stream()
+                .flatMap(l -> java.util.stream.Stream.of(l.getTargetUserId(), l.getChangedBy()))
+                .distinct().toList();
+        Map<Long, String> emailMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getEmail));
+        Map<String, String> codeNameMap = buildActionCodeNameMap();
+
+        List<ResPermissionChangeLogDTO> items = page.getContent().stream()
+                .map(l -> toLogResponse(l, emailMap, codeNameMap)).toList();
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(page.getNumber() + 1);
+        meta.setPageSize(page.getSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(items);
+        return result;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -331,6 +524,53 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
         return Map.of(
                 "grant", grantList,
                 "revoke", revokeList);
+    }
+
+    private ResMemberPermissionDetailDTO toPermissionDetailResponse(CompanyMember m, String email) {
+        RoleDefault roleDefault = m.getRoleDefault();
+        Map<String, List<String>> permissions = m.getPermissions();
+
+        List<String> grantList = permissions != null && permissions.get("grant") != null
+                ? permissions.get("grant")
+                : List.of();
+        List<String> revokeList = permissions != null && permissions.get("revoke") != null
+                ? permissions.get("revoke")
+                : List.of();
+
+        // Quyền custom ghi đè (chỉ những action được tuỳ chỉnh riêng)
+        Map<String, Boolean> customPermissions = new HashMap<>();
+        grantList.forEach(a -> customPermissions.put(a, true));
+        revokeList.forEach(a -> customPermissions.put(a, false));
+
+        // Effective permissions: role default + áp dụng grant/revoke override
+        List<ActionItem> effectivePermissions = List.of();
+        if (roleDefault != null && roleDefault.getActions() != null) {
+            effectivePermissions = roleDefault.getActions().stream()
+                    .map(a -> {
+                        boolean effective;
+                        if (grantList.contains(a.getCode())) {
+                            effective = true;
+                        } else if (revokeList.contains(a.getCode())) {
+                            effective = false;
+                        } else {
+                            effective = a.isEnabled();
+                        }
+                        return new ActionItem(a.getName(), a.getCode(), effective);
+                    })
+                    .toList();
+        }
+
+        return ResMemberPermissionDetailDTO.builder()
+                .userId(m.getUserId())
+                .email(email)
+                .roleId(roleDefault != null ? roleDefault.getId() : null)
+                .roleName(roleDefault != null ? roleDefault.getRoleName() : null)
+                .status(m.getStatus())
+                .jobTitle(m.getJobTitle())
+                .createdAt(m.getCreatedAt())
+                .customPermissions(customPermissions)
+                .effectivePermissions(effectivePermissions)
+                .build();
     }
 
     private ResCompanyMemberDTO toResponse(CompanyMember m, String email) {
@@ -363,6 +603,50 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .actions(actionsMap)
                 .jobTitle(m.getJobTitle())
                 .createdAt(m.getCreatedAt())
+                .build();
+    }
+
+    private Map<String, String> buildActionCodeNameMap() {
+        return roleDefaultRepository.findAll().stream()
+                .filter(r -> r.getActions() != null)
+                .flatMap(r -> r.getActions().stream())
+                .collect(Collectors.toMap(
+                        ActionItem::getCode,
+                        ActionItem::getName,
+                        (existing, duplicate) -> existing));
+    }
+
+    private Map<String, List<ResActionSummaryDTO>> enrichPermissions(
+            Map<String, List<String>> raw, Map<String, String> codeNameMap) {
+        if (raw == null) return Map.of("grant", List.of(), "revoke", List.of());
+        Map<String, List<ResActionSummaryDTO>> result = new HashMap<>();
+        raw.forEach((key, codes) -> {
+            List<ResActionSummaryDTO> enriched = codes == null ? List.of() : codes.stream()
+                    .map(code -> ResActionSummaryDTO.builder()
+                            .code(code)
+                            .name(codeNameMap.getOrDefault(code, code))
+                            .build())
+                    .toList();
+            result.put(key, enriched);
+        });
+        return result;
+    }
+
+    private ResPermissionChangeLogDTO toLogResponse(PermissionChangeLog l, Map<Long, String> emailMap,
+            Map<String, String> codeNameMap) {
+        return ResPermissionChangeLogDTO.builder()
+                .id(l.getId())
+                .targetUserId(l.getTargetUserId())
+                .targetEmail(emailMap.get(l.getTargetUserId()))
+                .changedBy(l.getChangedBy())
+                .changedByEmail(emailMap.get(l.getChangedBy()))
+                .changeType(l.getChangeType())
+                .oldRole(l.getOldRole())
+                .newRole(l.getNewRole())
+                .oldPermissions(enrichPermissions(l.getOldPermissions(), codeNameMap))
+                .newPermissions(enrichPermissions(l.getNewPermissions(), codeNameMap))
+                .reason(l.getReason())
+                .createdAt(l.getCreatedAt())
                 .build();
     }
 }

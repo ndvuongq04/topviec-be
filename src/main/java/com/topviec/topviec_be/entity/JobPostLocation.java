@@ -30,12 +30,11 @@ public class JobPostLocation {
     @Column(name = "is_remote", nullable = false)
     private Boolean isRemote;
 
-    // Relationships (comment để mở sau khi có đủ các entity liên quan)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "job_post_id", insertable = false, updatable = false)
     private JobPosting jobPosting;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "province_id", insertable = false, updatable = false)
-    // private Location province;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "province_id", insertable = false, updatable = false)
+    private Location province;
 }
