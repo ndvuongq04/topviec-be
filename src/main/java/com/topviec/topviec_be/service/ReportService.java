@@ -35,7 +35,7 @@ public interface ReportService {
     // ── NTD xem khiếu nại bị báo cáo ─────────────────────────────────────────
 
     /** Danh sách khiếu nại nhắm vào tin của NTD (ẩn danh người báo cáo) */
-    ResultPaginationDTO getEmployerReports(Long employerUserId, String status, Pageable pageable);
+    ResultPaginationDTO getEmployerReports(Long employerUserId, String search, String status, String group, String complaintType, Pageable pageable);
 
     /** Chi tiết một khiếu nại — chỉ cho phép nếu tin thuộc công ty của NTD */
     ResEmployerComplaintDetailDTO getEmployerReportDetail(Long employerUserId, Long reportId);

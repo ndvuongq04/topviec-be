@@ -21,16 +21,40 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     long countByReporterUserIdAndCreatedAtBetween(Long reporterUserId, LocalDateTime start, LocalDateTime end);
 
-    @Query("""
+    @Query(value = """
             SELECT c FROM Complaint c
+            JOIN JobPosting j ON c.jobPostId = j.id
             WHERE c.jobPostId IN :jobPostIds
             AND c.deletedAt IS NULL
             AND (:status IS NULL OR c.status = :status)
+            AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
+            AND (:complaintType IS NULL OR c.complaintType = :complaintType)
+            AND (
+                :search IS NULL
+                OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR CAST(c.id AS string) LIKE CONCAT('%', :search, '%')
+            )
             ORDER BY c.createdAt DESC
+            """, countQuery = """
+            SELECT COUNT(c) FROM Complaint c
+            JOIN JobPosting j ON c.jobPostId = j.id
+            WHERE c.jobPostId IN :jobPostIds
+            AND c.deletedAt IS NULL
+            AND (:status IS NULL OR c.status = :status)
+            AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
+            AND (:complaintType IS NULL OR c.complaintType = :complaintType)
+            AND (
+                :search IS NULL
+                OR LOWER(j.title) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR CAST(c.id AS string) LIKE CONCAT('%', :search, '%')
+            )
             """)
-    Page<Complaint> findByJobPostIdsAndStatus(
+    Page<Complaint> findEmployerReports(
             @Param("jobPostIds") List<Long> jobPostIds,
+            @Param("search") String search,
             @Param("status") String status,
+            @Param("groupValue") String groupValue,
+            @Param("complaintType") String complaintType,
             Pageable pageable);
 
     @Query("""

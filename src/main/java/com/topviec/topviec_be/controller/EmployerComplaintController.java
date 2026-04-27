@@ -35,14 +35,22 @@ public class EmployerComplaintController {
     /**
      * GET /employer/me/reports
      * Danh sách khiếu nại nhắm vào tin của NTD (ẩn danh người báo cáo).
+     * search: mã báo cáo (VD: RP000001) hoặc tên tin tuyển dụng.
+     * group: A | B
+     * complaintType: wrong_info | spam | inappropriate | fraudulent | payment_issue | other
+     * status: pending | processing | waiting_employer | resolved | rejected | auto_closed
      */
     @GetMapping("/reports")
     public ResponseEntity<ResultPaginationDTO> getMyReports(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String search,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String group,
+            @RequestParam(required = false) String complaintType,
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
-        return ResponseEntity.ok(reportService.getEmployerReports(extractUserId(jwt), status, pageable));
+        return ResponseEntity.ok(reportService.getEmployerReports(
+                extractUserId(jwt), search, status, group, complaintType, pageable));
     }
 
     /**
