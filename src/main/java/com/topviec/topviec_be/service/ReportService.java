@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.service;
 
+import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
@@ -26,6 +27,8 @@ public interface ReportService {
             Pageable pageable);
 
     ResReportDetailDTO getDetail(Long reportId);
+
+    ResReportDetailDTO confirm(Long adminUserId, Long reportId, ReqConfirmReportDTO request);
 
     ResReportDetailDTO process(Long adminUserId, Long reportId, ReqProcessReportDTO request);
 

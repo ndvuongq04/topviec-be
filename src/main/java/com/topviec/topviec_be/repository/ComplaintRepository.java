@@ -26,6 +26,7 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             JOIN JobPosting j ON c.jobPostId = j.id
             WHERE c.jobPostId IN :jobPostIds
             AND c.deletedAt IS NULL
+            AND c.status IN :visibleStatuses
             AND (:status IS NULL OR c.status = :status)
             AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
             AND (:complaintType IS NULL OR c.complaintType = :complaintType)
@@ -40,6 +41,7 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             JOIN JobPosting j ON c.jobPostId = j.id
             WHERE c.jobPostId IN :jobPostIds
             AND c.deletedAt IS NULL
+            AND c.status IN :visibleStatuses
             AND (:status IS NULL OR c.status = :status)
             AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
             AND (:complaintType IS NULL OR c.complaintType = :complaintType)
@@ -51,6 +53,7 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             """)
     Page<Complaint> findEmployerReports(
             @Param("jobPostIds") List<Long> jobPostIds,
+            @Param("visibleStatuses") List<String> visibleStatuses,
             @Param("search") String search,
             @Param("status") String status,
             @Param("groupValue") String groupValue,
