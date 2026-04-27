@@ -37,6 +37,7 @@ import com.topviec.topviec_be.repository.EmployerViolationScoreRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.repository.ViolationLogRepository;
+import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -47,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,7 @@ public class ReportServiceImpl implements ReportService {
     private static final long GROUP_B_SLA_HOURS = 72;
     private static final int GROUP_A_POINTS = 10;
     private static final int GROUP_B_POINTS = 30;
+    private static final DateTimeFormatter EMAIL_DEADLINE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final String DECISION_APPROVE = "approve";
     private static final String DECISION_REJECT = "reject";
     private static final List<String> EMPLOYER_VISIBLE_STATUSES = List.of(
@@ -79,6 +82,7 @@ public class ReportServiceImpl implements ReportService {
     private final AdminUserRepository adminUserRepository;
     private final ViolationLogRepository violationLogRepository;
     private final EmployerViolationScoreRepository employerViolationScoreRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -242,6 +246,7 @@ public class ReportServiceImpl implements ReportService {
             complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
             complaint.setEmailSentAt(LocalDateTime.now());
             complaint.setEmployerDeadline(LocalDateTime.now().plusHours(GROUP_A_SLA_HOURS));
+            sendComplaintGroupAEmail(complaint);
         } else {
             // Nhóm B: 30 điểm + ẩn tin + kết thúc ngay
             JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
@@ -260,6 +265,7 @@ public class ReportServiceImpl implements ReportService {
 
             complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
             complaint.setResolvedAt(LocalDateTime.now());
+            sendComplaintGroupBEmail(jobPosting, company, complaint);
         }
 
         complaintRepository.save(complaint);
@@ -319,8 +325,10 @@ public class ReportServiceImpl implements ReportService {
         List<Complaint> expired = complaintRepository.findExpiredGroupAComplaints(LocalDateTime.now());
         for (Complaint complaint : expired) {
             jobPostingRepository.findById(complaint.getJobPostId()).ifPresent(job -> {
-                companyRepository.findById(job.getCompanyId()).ifPresent(company ->
-                        addViolationScoreSystem(company, job.getId(), complaint, GROUP_A_POINTS));
+                companyRepository.findById(job.getCompanyId()).ifPresent(company -> {
+                    addViolationScoreSystem(company, job.getId(), complaint, GROUP_A_POINTS);
+                    sendComplaintAutoClosedEmail(job, company, complaint);
+                });
                 job.setStatus(JobPostStatus.REJECTED.getValue());
                 job.setRejectionReason(complaint.getComplaintType());
                 jobPostingRepository.save(job);
@@ -705,6 +713,79 @@ public class ReportServiceImpl implements ReportService {
 
     // ── NTD xem khiếu nại bị báo cáo ─────────────────────────────────────────
 
+    private void sendComplaintGroupAEmail(Complaint complaint) {
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        if (jobPosting == null) {
+            return;
+        }
+
+        Company company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+        String employerEmail = resolveEmployerEmail(company);
+        if (employerEmail == null) {
+            return;
+        }
+
+        emailService.sendComplaintGroupAEmail(
+                employerEmail,
+                jobPosting.getTitle(),
+                complaint.getComplaintType(),
+                buildReportCode(complaint.getId()),
+                formatDeadline(complaint.getEmployerDeadline()));
+    }
+
+    private void sendComplaintGroupBEmail(JobPosting jobPosting, Company company, Complaint complaint) {
+        String employerEmail = resolveEmployerEmail(company);
+        if (employerEmail == null) {
+            return;
+        }
+
+        emailService.sendComplaintGroupBEmail(
+                employerEmail,
+                jobPosting.getTitle(),
+                complaint.getComplaintType(),
+                buildReportCode(complaint.getId()));
+    }
+
+    private void sendComplaintAutoClosedEmail(JobPosting jobPosting, Company company, Complaint complaint) {
+        String employerEmail = resolveEmployerEmail(company);
+        if (employerEmail == null) {
+            return;
+        }
+
+        emailService.sendComplaintAutoClosedEmail(
+                employerEmail,
+                jobPosting.getTitle(),
+                complaint.getComplaintType(),
+                buildReportCode(complaint.getId()));
+    }
+
+    private String resolveEmployerEmail(Company company) {
+        if (company == null) {
+            return null;
+        }
+        if (company.getEmail() != null && !company.getEmail().isBlank()) {
+            return company.getEmail().trim();
+        }
+
+        Long employerUserId = company.getUserId() != null ? company.getUserId() : company.getCreatedBy();
+        if (employerUserId == null) {
+            return null;
+        }
+
+        return userRepository.findById(employerUserId)
+                .map(User::getEmail)
+                .map(String::trim)
+                .filter(email -> !email.isBlank())
+                .orElse(null);
+    }
+
+    private String formatDeadline(LocalDateTime deadline) {
+        if (deadline == null) {
+            return "";
+        }
+        return deadline.format(EMAIL_DEADLINE_FORMATTER);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ResultPaginationDTO getEmployerReports(
@@ -799,13 +880,24 @@ public class ReportServiceImpl implements ReportService {
                     "Bao cao phai o trang thai processing moi duoc xac nhan da sua");
         }
 
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        // Kiểm tra NTD có thực sự chỉnh sửa tin sau khi nhận thông báo không
+        LocalDateTime emailSentAt = complaint.getEmailSentAt();
+        if (emailSentAt != null
+                && (jobPosting.getUpdatedAt() == null
+                    || !jobPosting.getUpdatedAt().isAfter(emailSentAt))) {
+            throw AppException.badRequest(
+                    "Ban chua chinh sua tin tuyen dung. Vui long cap nhat tin truoc khi xac nhan da sua.");
+        }
+
         complaint.setStatus(ComplaintStatus.AUTO_CLOSED.getValue());
         complaint.setEmployerRespondedAt(LocalDateTime.now());
         complaint.setResolvedAt(LocalDateTime.now());
         complaint.setUpdatedBy(employerUserId);
         complaintRepository.save(complaint);
 
-        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
         return toEmployerDetail(complaint, jobPosting, calculateProcessingInfo(complaint));
     }
 
