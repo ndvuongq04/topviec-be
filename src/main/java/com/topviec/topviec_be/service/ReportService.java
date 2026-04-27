@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;

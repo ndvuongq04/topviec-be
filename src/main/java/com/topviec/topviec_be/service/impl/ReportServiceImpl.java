@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
@@ -267,7 +268,60 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getMyReports(Long reporterUserId, String status, Pageable pageable) {
         Page<Complaint> page = complaintRepository.findMyReports(reporterUserId, normalizeValue(status), pageable);
-        return toPagination(page, pageable);
+
+        List<Complaint> complaints = page.getContent();
+        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
+
+        Map<Long, JobPosting> jobMap = jobIds.isEmpty()
+                ? Collections.emptyMap()
+                : jobPostingRepository.findAllById(jobIds).stream()
+                        .collect(Collectors.toMap(JobPosting::getId, j -> j));
+
+        List<Long> companyIds = jobMap.values().stream()
+                .map(JobPosting::getCompanyId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Company> companyMap = companyIds.isEmpty()
+                ? Collections.emptyMap()
+                : companyRepository.findAllById(companyIds).stream()
+                        .collect(Collectors.toMap(Company::getId, c -> c));
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(complaints.stream()
+                .map(c -> toCandidateSummary(c, jobMap, companyMap))
+                .toList());
+        return result;
+    }
+
+    private ResCandidateReportSummaryDTO toCandidateSummary(
+            Complaint complaint,
+            Map<Long, JobPosting> jobMap,
+            Map<Long, Company> companyMap) {
+
+        JobPosting jobPosting = jobMap.get(complaint.getJobPostId());
+        Company company = jobPosting != null ? companyMap.get(jobPosting.getCompanyId()) : null;
+
+        return ResCandidateReportSummaryDTO.builder()
+                .id(complaint.getId())
+                .reportCode(buildReportCode(complaint.getId()))
+                .jobPost(jobPosting == null ? null : ResCandidateReportSummaryDTO.JobPostInfo.builder()
+                        .id(jobPosting.getId())
+                        .title(jobPosting.getTitle())
+                        .build())
+                .company(company == null ? null : ResCandidateReportSummaryDTO.CompanyInfo.builder()
+                        .id(company.getId())
+                        .name(company.getName())
+                        .logoUrl(company.getLogoUrl())
+                        .build())
+                .complaintType(complaint.getComplaintType())
+                .status(complaint.getStatus())
+                .createdAt(complaint.getCreatedAt())
+                .build();
     }
 
     private void validateCreateRequest(User reporter, Long jobPostId, ReqCreateReportDTO request) {
