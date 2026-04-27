@@ -48,7 +48,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,15 +61,12 @@ public class ReportServiceImpl implements ReportService {
     private static final int MIN_ACCOUNT_AGE_DAYS = 7;
     private static final long GROUP_A_SLA_HOURS = 48;
     private static final long GROUP_B_SLA_HOURS = 72;
+    private static final int GROUP_A_POINTS = 10;
+    private static final int GROUP_B_POINTS = 30;
     private static final String DECISION_APPROVE = "approve";
     private static final String DECISION_REJECT = "reject";
-    private static final String ACTION_REQUEST_EMPLOYER_FIX = "request_employer_fix";
-    private static final String ACTION_HIDE_JOB = "hide_job";
-    private static final String ACTION_SUSPEND_COMPANY = "suspend_company";
-    private static final String ACTION_RESOLVE = "resolve";
     private static final List<String> EMPLOYER_VISIBLE_STATUSES = List.of(
             ComplaintStatus.PROCESSING.getValue(),
-            ComplaintStatus.WAITING_EMPLOYER.getValue(),
             ComplaintStatus.RESOLVED.getValue(),
             ComplaintStatus.AUTO_CLOSED.getValue());
 
@@ -234,11 +230,35 @@ public class ReportServiceImpl implements ReportService {
         complaint.setUpdatedBy(adminUserId);
         complaint.setResolutionNote(trimToNull(request.getResolutionNote()));
 
-        if (Boolean.TRUE.equals(request.getApproved())) {
-            complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
-            complaint.setResolvedAt(null);
-        } else {
+        if (Boolean.FALSE.equals(request.getApproved())) {
             complaint.setStatus(ComplaintStatus.REJECTED.getValue());
+            complaint.setResolvedAt(LocalDateTime.now());
+            complaintRepository.save(complaint);
+            return getDetail(complaint.getId());
+        }
+
+        if (ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
+            // Nhóm A: NTD có 48h sửa tin, chưa cộng điểm — scheduler xử lý nếu quá hạn
+            complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
+            complaint.setEmailSentAt(LocalDateTime.now());
+            complaint.setEmployerDeadline(LocalDateTime.now().plusHours(GROUP_A_SLA_HOURS));
+        } else {
+            // Nhóm B: 30 điểm + ẩn tin + kết thúc ngay
+            JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
+            Company company = companyRepository.findById(jobPosting.getCompanyId())
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
+            String note = trimToNull(request.getResolutionNote());
+
+            addViolationScore(company, jobPosting, complaint, adminUser, GROUP_B_POINTS, note);
+
+            jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
+            jobPosting.setRejectionReason(complaint.getComplaintType());
+            jobPosting.setModerationNote(note);
+            jobPosting.setUpdatedBy(adminUser.getUser().getId());
+            jobPostingRepository.save(jobPosting);
+
+            complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
             complaint.setResolvedAt(LocalDateTime.now());
         }
 
@@ -253,26 +273,11 @@ public class ReportServiceImpl implements ReportService {
         AdminUser adminUser = adminUserRepository.findActiveByUserId(adminUserId)
                 .orElseThrow(() -> AppException.forbidden("Không tìm thấy tài khoản admin hợp lệ"));
 
+        if (!ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())) {
+            throw AppException.badRequest("Báo cáo phải ở trạng thái processing mới được xử lý thủ công");
+        }
+
         String decision = normalizeValue(request.getDecision());
-        if (!DECISION_APPROVE.equals(decision) && !DECISION_REJECT.equals(decision)) {
-            throw AppException.badRequest("decision không hợp lệ. Chỉ chấp nhận: approve | reject");
-        }
-
-        if (!ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())
-                && !ComplaintStatus.WAITING_EMPLOYER.getValue().equals(complaint.getStatus())) {
-            throw AppException.badRequest(
-                    "Báo cáo phải được admin xác nhận trước và ở trạng thái processing hoặc waiting_employer");
-        }
-
-        if (request.getComplaintType() != null) {
-            complaint.setComplaintType(request.getComplaintType().getValue());
-        }
-        if (request.getViolationGroup() != null) {
-            complaint.setViolationGroup(request.getViolationGroup().getValue());
-        } else if (request.getComplaintType() != null) {
-            complaint.setViolationGroup(determineGroup(request.getComplaintType()).getValue());
-        }
-
         complaint.setAssignedTo(adminUser.getAdminUsersId());
         complaint.setUpdatedBy(adminUserId);
         complaint.setResolutionNote(trimToNull(request.getResolutionNote()));
@@ -284,9 +289,46 @@ public class ReportServiceImpl implements ReportService {
             return getDetail(complaint.getId());
         }
 
-        applyApproveDecision(complaint, adminUser, request);
+        if (!DECISION_APPROVE.equals(decision)) {
+            throw AppException.badRequest("decision khong hop le. Chi chap nhan: approve | reject");
+        }
+
+        // Admin chủ động xử lý trước deadline (tương tự scheduler)
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
+        Company company = companyRepository.findById(jobPosting.getCompanyId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
+        String note = trimToNull(request.getResolutionNote());
+
+        addViolationScore(company, jobPosting, complaint, adminUser, GROUP_A_POINTS, note);
+        jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
+        jobPosting.setRejectionReason(complaint.getComplaintType());
+        jobPosting.setModerationNote(note);
+        jobPosting.setUpdatedBy(adminUser.getUser().getId());
+        jobPostingRepository.save(jobPosting);
+
+        complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+        complaint.setResolvedAt(LocalDateTime.now());
         complaintRepository.save(complaint);
         return getDetail(complaint.getId());
+    }
+
+    @Override
+    @Transactional
+    public void autoCloseExpiredGroupAComplaints() {
+        List<Complaint> expired = complaintRepository.findExpiredGroupAComplaints(LocalDateTime.now());
+        for (Complaint complaint : expired) {
+            jobPostingRepository.findById(complaint.getJobPostId()).ifPresent(job -> {
+                companyRepository.findById(job.getCompanyId()).ifPresent(company ->
+                        addViolationScoreSystem(company, job.getId(), complaint, GROUP_A_POINTS));
+                job.setStatus(JobPostStatus.REJECTED.getValue());
+                job.setRejectionReason(complaint.getComplaintType());
+                jobPostingRepository.save(job);
+            });
+            complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+            complaint.setResolvedAt(LocalDateTime.now());
+            complaintRepository.save(complaint);
+        }
     }
 
     @Override
@@ -392,54 +434,30 @@ public class ReportServiceImpl implements ReportService {
         }
     }
 
-    private void applyApproveDecision(Complaint complaint, AdminUser adminUser, ReqProcessReportDTO request) {
-        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
-        Company company = companyRepository.findById(jobPosting.getCompanyId())
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty của tin bị báo cáo"));
+    private void addViolationScoreSystem(Company company, Long jobPostId, Complaint complaint, int points) {
+        Long employerUserId = company.getUserId() != null ? company.getUserId() : company.getCreatedBy();
+        if (employerUserId == null) return;
 
-        String action = normalizeValue(request.getAction());
-        if (action == null) {
-            action = ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())
-                    ? ACTION_REQUEST_EMPLOYER_FIX
-                    : ACTION_RESOLVE;
-        }
+        violationLogRepository.save(ViolationLog.builder()
+                .employerId(employerUserId)
+                .jobPostId(jobPostId)
+                .violationType(complaint.getComplaintType())
+                .points(points)
+                .source(ViolationSource.SYSTEM.getValue())
+                .complaintId(complaint.getId())
+                .createdBy(null)
+                .build());
 
-        switch (action) {
-            case ACTION_REQUEST_EMPLOYER_FIX -> {
-                complaint.setStatus(ComplaintStatus.WAITING_EMPLOYER.getValue());
-                complaint.setEmailSentAt(LocalDateTime.now());
-                complaint.setEmployerDeadline(LocalDateTime.now().plusHours(GROUP_A_SLA_HOURS));
-                complaint.setResolvedAt(null);
-            }
-            case ACTION_HIDE_JOB -> {
-                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
-                complaint.setResolvedAt(LocalDateTime.now());
-                jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
-                jobPosting.setModerationNote(trimToNull(request.getResolutionNote()));
-                jobPosting.setRejectionReason(complaint.getComplaintType());
-                jobPosting.setUpdatedBy(adminUser.getUser().getId());
-                jobPostingRepository.save(jobPosting);
-            }
-            case ACTION_SUSPEND_COMPANY -> {
-                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
-                complaint.setResolvedAt(LocalDateTime.now());
-                suspendCompany(company, adminUser.getUser().getId(), trimToNull(request.getResolutionNote()));
-            }
-            case ACTION_RESOLVE -> {
-                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
-                complaint.setResolvedAt(LocalDateTime.now());
-            }
-            default -> throw AppException.badRequest(
-                    "action không hợp lệ. Chỉ chấp nhận: request_employer_fix | hide_job | suspend_company | resolve");
-        }
+        EmployerViolationScore score = employerViolationScoreRepository.findByEmployerId(employerUserId)
+                .orElseGet(() -> EmployerViolationScore.builder()
+                        .employerId(employerUserId)
+                        .totalScore(0)
+                        .build());
+        score.setTotalScore((score.getTotalScore() == null ? 0 : score.getTotalScore()) + points);
+        employerViolationScoreRepository.save(score);
 
-        if (ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
-            int points = request.getPoints() != null ? request.getPoints()
-                    : defaultPoints(complaint.getComplaintType());
-            addViolationScore(company, jobPosting, complaint, adminUser, points,
-                    trimToNull(request.getResolutionNote()));
-        }
+        company.setViolationScore(score.getTotalScore());
+        companyRepository.save(company);
     }
 
     private void addViolationScore(
@@ -473,7 +491,10 @@ public class ReportServiceImpl implements ReportService {
                         .build());
 
         score.setTotalScore((score.getTotalScore() == null ? 0 : score.getTotalScore()) + points);
-        score.setLastGroupBViolationAt(LocalDateTime.now());
+        // lastGroupBViolationAt chỉ track nhóm B (dùng cho điều kiện reset điểm)
+        if (ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
+            score.setLastGroupBViolationAt(LocalDateTime.now());
+        }
         employerViolationScoreRepository.save(score);
 
         company.setViolationScore(score.getTotalScore());
@@ -481,7 +502,7 @@ public class ReportServiceImpl implements ReportService {
 
         if (score.getTotalScore() >= 50 && !CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
             suspendCompany(company, adminUser.getUser().getId(),
-                    note != null ? note : "Tạm khóa công ty do điểm vi phạm đạt ngưỡng");
+                    note != null ? note : "Tam khoa cong ty do diem vi pham dat nguong");
         } else {
             companyRepository.save(company);
         }
@@ -625,21 +646,6 @@ public class ReportServiceImpl implements ReportService {
         return switch (complaintType) {
             case FRAUDULENT, PAYMENT_ISSUE -> ViolationGroup.B;
             case SPAM, WRONG_INFO, INAPPROPRIATE, OTHER -> ViolationGroup.A;
-        };
-    }
-
-    private int defaultPoints(String complaintType) {
-        return defaultPoints(ComplaintType.fromValue(complaintType));
-    }
-
-    private int defaultPoints(ComplaintType complaintType) {
-        return switch (complaintType) {
-            case FRAUDULENT -> 30;
-            case PAYMENT_ISSUE -> 25;
-            case SPAM -> 10;
-            case INAPPROPRIATE -> 10;
-            case WRONG_INFO -> 5;
-            case OTHER -> 5;
         };
     }
 
@@ -788,9 +794,9 @@ public class ReportServiceImpl implements ReportService {
         if (!ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
             throw AppException.badRequest("Chỉ có thể xác nhận sửa với báo cáo thuộc nhóm A");
         }
-        if (!ComplaintStatus.WAITING_EMPLOYER.getValue().equals(complaint.getStatus())) {
+        if (!ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())) {
             throw AppException.badRequest(
-                    "Báo cáo phải ở trạng thái waiting_employer mới được xác nhận đã sửa");
+                    "Bao cao phai o trang thai processing moi duoc xac nhan da sua");
         }
 
         complaint.setStatus(ComplaintStatus.AUTO_CLOSED.getValue());

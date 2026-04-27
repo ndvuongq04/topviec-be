@@ -62,6 +62,15 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     @Query("""
             SELECT c FROM Complaint c
+            WHERE c.violationGroup = 'a'
+            AND c.status = 'processing'
+            AND c.employerDeadline < :now
+            AND c.deletedAt IS NULL
+            """)
+    List<Complaint> findExpiredGroupAComplaints(@Param("now") LocalDateTime now);
+
+    @Query("""
+            SELECT c FROM Complaint c
             WHERE c.reporterUserId = :userId
             AND c.deletedAt IS NULL
             AND (:status IS NULL OR c.status = :status)
