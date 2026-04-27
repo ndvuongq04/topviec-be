@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.service.impl;
 
+import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
@@ -67,6 +68,11 @@ public class ReportServiceImpl implements ReportService {
     private static final String ACTION_HIDE_JOB = "hide_job";
     private static final String ACTION_SUSPEND_COMPANY = "suspend_company";
     private static final String ACTION_RESOLVE = "resolve";
+    private static final List<String> EMPLOYER_VISIBLE_STATUSES = List.of(
+            ComplaintStatus.PROCESSING.getValue(),
+            ComplaintStatus.WAITING_EMPLOYER.getValue(),
+            ComplaintStatus.RESOLVED.getValue(),
+            ComplaintStatus.AUTO_CLOSED.getValue());
 
     private final ComplaintRepository complaintRepository;
     private final ComplaintEvidenceRepository complaintEvidenceRepository;
@@ -148,7 +154,8 @@ public class ReportServiceImpl implements ReportService {
         Complaint complaint = findComplaintOrThrow(reportId);
 
         JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
-        Company company = jobPosting != null ? companyRepository.findById(jobPosting.getCompanyId()).orElse(null) : null;
+        Company company = jobPosting != null ? companyRepository.findById(jobPosting.getCompanyId()).orElse(null)
+                : null;
         User reporter = userRepository.findById(complaint.getReporterUserId()).orElse(null);
         CandidateProfile reporterProfile = reporter != null
                 ? candidateProfileRepository.findByUserId(reporter.getId()).orElse(null)
@@ -181,23 +188,26 @@ public class ReportServiceImpl implements ReportService {
                         .fullName(resolveReporterName(reporterProfile, reporter))
                         .email(reporter != null ? reporter.getEmail() : null)
                         .build())
-                .jobPosting(jobPosting == null ? null : ResReportDetailDTO.JobInfo.builder()
-                        .id(jobPosting.getId())
-                        .title(jobPosting.getTitle())
-                        .status(jobPosting.getStatus())
-                        .company(company == null ? null : ResReportDetailDTO.CompanyInfo.builder()
-                                .id(company.getId())
-                                .name(company.getName())
-                                .logoUrl(company.getLogoUrl())
-                                .status(company.getStatus())
-                                .violationScore(company.getViolationScore())
+                .jobPosting(jobPosting == null ? null
+                        : ResReportDetailDTO.JobInfo.builder()
+                                .id(jobPosting.getId())
+                                .title(jobPosting.getTitle())
+                                .status(jobPosting.getStatus())
+                                .company(company == null ? null
+                                        : ResReportDetailDTO.CompanyInfo.builder()
+                                                .id(company.getId())
+                                                .name(company.getName())
+                                                .logoUrl(company.getLogoUrl())
+                                                .status(company.getStatus())
+                                                .violationScore(company.getViolationScore())
+                                                .build())
                                 .build())
-                        .build())
-                .assignedAdmin(assignedAdmin == null ? null : ResReportDetailDTO.AssignedAdminInfo.builder()
-                        .adminUserId(assignedAdmin.getAdminUsersId())
-                        .fullName(assignedAdmin.getFullName())
-                        .adminRole(assignedAdmin.getAdminRole())
-                        .build())
+                .assignedAdmin(assignedAdmin == null ? null
+                        : ResReportDetailDTO.AssignedAdminInfo.builder()
+                                .adminUserId(assignedAdmin.getAdminUsersId())
+                                .fullName(assignedAdmin.getFullName())
+                                .adminRole(assignedAdmin.getAdminRole())
+                                .build())
                 .evidences(evidences.stream()
                         .map(item -> ResReportDetailDTO.EvidenceInfo.builder()
                                 .id(item.getId())
@@ -207,6 +217,33 @@ public class ReportServiceImpl implements ReportService {
                                 .build())
                         .toList())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public ResReportDetailDTO confirm(Long adminUserId, Long reportId, ReqConfirmReportDTO request) {
+        Complaint complaint = findComplaintOrThrow(reportId);
+        AdminUser adminUser = adminUserRepository.findActiveByUserId(adminUserId)
+                .orElseThrow(() -> AppException.forbidden("Không tìm thấy tài khoản admin hợp lệ"));
+
+        if (!ComplaintStatus.PENDING.getValue().equals(complaint.getStatus())) {
+            throw AppException.badRequest("Báo cáo phải ở trạng thái pending mới được xác nhận");
+        }
+
+        complaint.setAssignedTo(adminUser.getAdminUsersId());
+        complaint.setUpdatedBy(adminUserId);
+        complaint.setResolutionNote(trimToNull(request.getResolutionNote()));
+
+        if (Boolean.TRUE.equals(request.getApproved())) {
+            complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
+            complaint.setResolvedAt(null);
+        } else {
+            complaint.setStatus(ComplaintStatus.REJECTED.getValue());
+            complaint.setResolvedAt(LocalDateTime.now());
+        }
+
+        complaintRepository.save(complaint);
+        return getDetail(complaint.getId());
     }
 
     @Override
@@ -221,10 +258,10 @@ public class ReportServiceImpl implements ReportService {
             throw AppException.badRequest("decision không hợp lệ. Chỉ chấp nhận: approve | reject");
         }
 
-        if (!ComplaintStatus.PENDING.getValue().equals(complaint.getStatus())
-                && !ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())
+        if (!ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())
                 && !ComplaintStatus.WAITING_EMPLOYER.getValue().equals(complaint.getStatus())) {
-            throw AppException.badRequest("Báo cáo này đã được xử lý hoặc không còn ở trạng thái cho phép");
+            throw AppException.badRequest(
+                    "Báo cáo phải được admin xác nhận trước và ở trạng thái processing hoặc waiting_employer");
         }
 
         if (request.getComplaintType() != null) {
@@ -257,10 +294,13 @@ public class ReportServiceImpl implements ReportService {
     public List<ResViolationReasonDTO> getViolationReasons() {
         return List.of(
                 toReason(ComplaintType.FRAUDULENT, "Lừa đảo", ViolationGroup.B, true, ComplaintPriority.IMPORTANT),
-                toReason(ComplaintType.PAYMENT_ISSUE, "Thu phí / yêu cầu thanh toán", ViolationGroup.B, true, ComplaintPriority.IMPORTANT),
+                toReason(ComplaintType.PAYMENT_ISSUE, "Thu phí / yêu cầu thanh toán", ViolationGroup.B, true,
+                        ComplaintPriority.IMPORTANT),
                 toReason(ComplaintType.SPAM, "Spam / đăng lặp lại", ViolationGroup.A, false, ComplaintPriority.NORMAL),
-                toReason(ComplaintType.WRONG_INFO, "Thông tin sai lệch", ViolationGroup.A, false, ComplaintPriority.NORMAL),
-                toReason(ComplaintType.INAPPROPRIATE, "Nội dung không phù hợp", ViolationGroup.A, false, ComplaintPriority.NORMAL),
+                toReason(ComplaintType.WRONG_INFO, "Thông tin sai lệch", ViolationGroup.A, false,
+                        ComplaintPriority.NORMAL),
+                toReason(ComplaintType.INAPPROPRIATE, "Nội dung không phù hợp", ViolationGroup.A, false,
+                        ComplaintPriority.NORMAL),
                 toReason(ComplaintType.OTHER, "Lý do khác", ViolationGroup.A, false, ComplaintPriority.NORMAL));
     }
 
@@ -270,7 +310,8 @@ public class ReportServiceImpl implements ReportService {
         Page<Complaint> page = complaintRepository.findMyReports(reporterUserId, normalizeValue(status), pageable);
 
         List<Complaint> complaints = page.getContent();
-        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
+        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct()
+                .toList();
 
         Map<Long, JobPosting> jobMap = jobIds.isEmpty()
                 ? Collections.emptyMap()
@@ -309,15 +350,17 @@ public class ReportServiceImpl implements ReportService {
         return ResCandidateReportSummaryDTO.builder()
                 .id(complaint.getId())
                 .reportCode(buildReportCode(complaint.getId()))
-                .jobPost(jobPosting == null ? null : ResCandidateReportSummaryDTO.JobPostInfo.builder()
-                        .id(jobPosting.getId())
-                        .title(jobPosting.getTitle())
-                        .build())
-                .company(company == null ? null : ResCandidateReportSummaryDTO.CompanyInfo.builder()
-                        .id(company.getId())
-                        .name(company.getName())
-                        .logoUrl(company.getLogoUrl())
-                        .build())
+                .jobPost(jobPosting == null ? null
+                        : ResCandidateReportSummaryDTO.JobPostInfo.builder()
+                                .id(jobPosting.getId())
+                                .title(jobPosting.getTitle())
+                                .build())
+                .company(company == null ? null
+                        : ResCandidateReportSummaryDTO.CompanyInfo.builder()
+                                .id(company.getId())
+                                .name(company.getName())
+                                .logoUrl(company.getLogoUrl())
+                                .build())
                 .complaintType(complaint.getComplaintType())
                 .status(complaint.getStatus())
                 .createdAt(complaint.getCreatedAt())
@@ -392,8 +435,10 @@ public class ReportServiceImpl implements ReportService {
         }
 
         if (ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
-            int points = request.getPoints() != null ? request.getPoints() : defaultPoints(complaint.getComplaintType());
-            addViolationScore(company, jobPosting, complaint, adminUser, points, trimToNull(request.getResolutionNote()));
+            int points = request.getPoints() != null ? request.getPoints()
+                    : defaultPoints(complaint.getComplaintType());
+            addViolationScore(company, jobPosting, complaint, adminUser, points,
+                    trimToNull(request.getResolutionNote()));
         }
     }
 
@@ -457,16 +502,20 @@ public class ReportServiceImpl implements ReportService {
 
     private ResultPaginationDTO toPagination(Page<Complaint> page, Pageable pageable) {
         List<Complaint> complaints = page.getContent();
-        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
-        List<Long> reporterIds = complaints.stream().map(Complaint::getReporterUserId).filter(Objects::nonNull).distinct().toList();
-        List<Long> adminIds = complaints.stream().map(Complaint::getAssignedTo).filter(Objects::nonNull).distinct().toList();
+        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct()
+                .toList();
+        List<Long> reporterIds = complaints.stream().map(Complaint::getReporterUserId).filter(Objects::nonNull)
+                .distinct().toList();
+        List<Long> adminIds = complaints.stream().map(Complaint::getAssignedTo).filter(Objects::nonNull).distinct()
+                .toList();
 
         Map<Long, JobPosting> jobMap = jobIds.isEmpty()
                 ? Collections.emptyMap()
                 : jobPostingRepository.findAllById(jobIds).stream()
                         .collect(Collectors.toMap(JobPosting::getId, item -> item));
 
-        List<Long> companyIds = jobMap.values().stream().map(JobPosting::getCompanyId).filter(Objects::nonNull).distinct().toList();
+        List<Long> companyIds = jobMap.values().stream().map(JobPosting::getCompanyId).filter(Objects::nonNull)
+                .distinct().toList();
         Map<Long, Company> companyMap = companyIds.isEmpty()
                 ? Collections.emptyMap()
                 : companyRepository.findAllById(companyIds).stream()
@@ -690,6 +739,7 @@ public class ReportServiceImpl implements ReportService {
 
         Page<Complaint> page = complaintRepository.findEmployerReports(
                 jobPostIds,
+                EMPLOYER_VISIBLE_STATUSES,
                 normalizeReportCodeSearch(search),
                 normalizeValue(status),
                 normalizeValue(group),
@@ -721,7 +771,7 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public ResEmployerComplaintDetailDTO getEmployerReportDetail(Long employerUserId, Long reportId) {
         Complaint complaint = findComplaintOrThrow(reportId);
-        validateEmployerOwnsComplaint(employerUserId, complaint);
+        validateEmployerCanViewComplaint(employerUserId, complaint);
 
         JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
         ProcessingInfo info = calculateProcessingInfo(complaint);
@@ -733,7 +783,7 @@ public class ReportServiceImpl implements ReportService {
     @Transactional
     public ResEmployerComplaintDetailDTO respondToReport(Long employerUserId, Long reportId) {
         Complaint complaint = findComplaintOrThrow(reportId);
-        validateEmployerOwnsComplaint(employerUserId, complaint);
+        validateEmployerCanViewComplaint(employerUserId, complaint);
 
         if (!ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
             throw AppException.badRequest("Chỉ có thể xác nhận sửa với báo cáo thuộc nhóm A");
@@ -765,6 +815,13 @@ public class ReportServiceImpl implements ReportService {
         }
     }
 
+    private void validateEmployerCanViewComplaint(Long employerUserId, Complaint complaint) {
+        validateEmployerOwnsComplaint(employerUserId, complaint);
+        if (!EMPLOYER_VISIBLE_STATUSES.contains(complaint.getStatus())) {
+            throw AppException.forbidden("Bạn chưa thể xem báo cáo này");
+        }
+    }
+
     private ResEmployerComplaintSummaryDTO toEmployerSummary(
             Complaint complaint,
             Map<Long, JobPosting> jobMap) {
@@ -775,11 +832,12 @@ public class ReportServiceImpl implements ReportService {
         return ResEmployerComplaintSummaryDTO.builder()
                 .id(complaint.getId())
                 .reportCode(buildReportCode(complaint.getId()))
-                .jobPost(jobPosting == null ? null : ResEmployerComplaintSummaryDTO.JobPostInfo.builder()
-                        .id(jobPosting.getId())
-                        .title(jobPosting.getTitle())
-                        .status(jobPosting.getStatus())
-                        .build())
+                .jobPost(jobPosting == null ? null
+                        : ResEmployerComplaintSummaryDTO.JobPostInfo.builder()
+                                .id(jobPosting.getId())
+                                .title(jobPosting.getTitle())
+                                .status(jobPosting.getStatus())
+                                .build())
                 .complaintType(complaint.getComplaintType())
                 .violationGroup(complaint.getViolationGroup())
                 .priority(complaint.getPriority())
@@ -798,11 +856,12 @@ public class ReportServiceImpl implements ReportService {
         return ResEmployerComplaintDetailDTO.builder()
                 .id(complaint.getId())
                 .reportCode(buildReportCode(complaint.getId()))
-                .jobPost(jobPosting == null ? null : ResEmployerComplaintDetailDTO.JobPostInfo.builder()
-                        .id(jobPosting.getId())
-                        .title(jobPosting.getTitle())
-                        .status(jobPosting.getStatus())
-                        .build())
+                .jobPost(jobPosting == null ? null
+                        : ResEmployerComplaintDetailDTO.JobPostInfo.builder()
+                                .id(jobPosting.getId())
+                                .title(jobPosting.getTitle())
+                                .status(jobPosting.getStatus())
+                                .build())
                 .complaintType(complaint.getComplaintType())
                 .violationGroup(complaint.getViolationGroup())
                 .priority(complaint.getPriority())

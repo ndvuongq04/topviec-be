@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -56,6 +57,18 @@ public class AdminReportController {
             + AdminRoleConstants.SUPPORT_ADMIN + "')")
     public ResponseEntity<ResReportDetailDTO> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(reportService.getDetail(id));
+    }
+
+    @PatchMapping("/{id}/confirm")
+    @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "')")
+    public ResponseEntity<ResReportDetailDTO> confirm(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id,
+            @Valid @RequestBody ReqConfirmReportDTO request) {
+
+        return ResponseEntity.ok(reportService.confirm(extractUserId(jwt), id, request));
     }
 
     @PatchMapping("/{id}/process")
