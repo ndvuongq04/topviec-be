@@ -9,6 +9,7 @@ import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.EmployerViolationScore;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.entity.ViolationLog;
+import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.complaints.ViolationSource;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
@@ -31,6 +32,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ViolationScoreServiceImpl implements ViolationScoreService {
+
+    private static final int LIMITED_SCORE_THRESHOLD = 20;
+    private static final int SUSPENDED_SCORE_THRESHOLD = 50;
 
     private final EmployerViolationScoreRepository violationScoreRepository;
     private final ViolationLogRepository violationLogRepository;
@@ -220,6 +224,50 @@ public class ViolationScoreServiceImpl implements ViolationScoreService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public void autoResetEligibleScores() {
+        List<EmployerViolationScore> scores = violationScoreRepository.findByTotalScoreGreaterThan(0);
+        LocalDateTime now = LocalDateTime.now();
+
+        for (EmployerViolationScore score : scores) {
+            if (!canResetScore(score.getLastGroupBViolationAt())) {
+                continue;
+            }
+
+            int currentScore = score.getTotalScore() != null ? score.getTotalScore() : 0;
+            if (currentScore <= 0) {
+                continue;
+            }
+
+            score.setTotalScore(0);
+            score.setLastGroupBViolationAt(null);
+            score.setLastResetAt(now);
+            score.setResetBy(null);
+            violationScoreRepository.save(score);
+
+            violationLogRepository.save(ViolationLog.builder()
+                    .employerId(score.getEmployerId())
+                    .jobPostId(0L)
+                    .violationType("score_reset")
+                    .points(-currentScore)
+                    .source(ViolationSource.SYSTEM.getValue())
+                    .note("Tự động reset điểm định kỳ do không tái phạm nhóm B")
+                    .build());
+
+            companyRepository.findByUserId(score.getEmployerId()).ifPresent(company -> {
+                company.setViolationScore(0);
+                if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
+                    company.setStatus(CompanyStatus.ACTIVE.getValue());
+                    company.setSuspendedAt(null);
+                    company.setSuspendedReason(null);
+                }
+                company.setUpdatedBy(null);
+                companyRepository.save(company);
+            });
+        }
+    }
+
     private String buildRestrictionDescription(String level) {
         return switch (level) {
             case "limited" -> "Chỉ được đăng tối đa 3 tin/tuần. Tin mới cần Admin duyệt trước khi hiển thị.";
@@ -229,8 +277,8 @@ public class ViolationScoreServiceImpl implements ViolationScoreService {
     }
 
     private String calculateScoreLevel(int totalScore) {
-        if (totalScore >= 50) return "suspended";
-        if (totalScore >= 20) return "limited";
+        if (totalScore >= SUSPENDED_SCORE_THRESHOLD) return "suspended";
+        if (totalScore >= LIMITED_SCORE_THRESHOLD) return "limited";
         return "normal";
     }
 
