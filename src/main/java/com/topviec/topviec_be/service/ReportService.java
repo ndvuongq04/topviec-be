@@ -3,7 +3,6 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
-import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
@@ -28,9 +27,13 @@ public interface ReportService {
 
     ResReportDetailDTO getDetail(Long reportId);
 
+    /** Admin xác nhận báo cáo hợp lệ hay không */
     ResReportDetailDTO confirm(Long adminUserId, Long reportId, ReqConfirmReportDTO request);
 
+    /** Admin chủ động xử lý thủ công (override trước khi scheduler chạy) */
     ResReportDetailDTO process(Long adminUserId, Long reportId, ReqProcessReportDTO request);
+
+    void autoCloseExpiredGroupAComplaints();
 
     List<ResViolationReasonDTO> getViolationReasons();
 

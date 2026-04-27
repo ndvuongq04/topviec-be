@@ -136,6 +136,46 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Chọn lịch phỏng vấn - " + companyName, htmlBody);
     }
 
+    @Override
+    public void sendComplaintGroupAEmail(String toEmail, String jobPostTitle, String complaintType,
+                                         String reportCode, String deadline) {
+        Context context = new Context();
+        context.setVariable("jobPostTitle", jobPostTitle);
+        context.setVariable("complaintType", complaintType);
+        context.setVariable("reportCode", reportCode);
+        context.setVariable("deadline", deadline);
+        context.setVariable("dashboardLink", baseUrl + "/employer/complaints");
+
+        String htmlBody = templateEngine.process("email/complaint-group-a", context);
+        sendHtmlEmail(toEmail, "[Topviec] Tin tuyển dụng của bạn bị khiếu nại - Vui lòng xử lý trong 48h", htmlBody);
+    }
+
+    @Override
+    public void sendComplaintGroupBEmail(String toEmail, String jobPostTitle, String complaintType,
+                                         String reportCode) {
+        Context context = new Context();
+        context.setVariable("jobPostTitle", jobPostTitle);
+        context.setVariable("complaintType", complaintType);
+        context.setVariable("reportCode", reportCode);
+        context.setVariable("dashboardLink", baseUrl + "/employer/complaints");
+
+        String htmlBody = templateEngine.process("email/complaint-group-b", context);
+        sendHtmlEmail(toEmail, "[Topviec] Tin tuyển dụng của bạn đã bị xử lý vi phạm", htmlBody);
+    }
+
+    @Override
+    public void sendComplaintAutoClosedEmail(String toEmail, String jobPostTitle, String complaintType,
+                                             String reportCode) {
+        Context context = new Context();
+        context.setVariable("jobPostTitle", jobPostTitle);
+        context.setVariable("complaintType", complaintType);
+        context.setVariable("reportCode", reportCode);
+        context.setVariable("dashboardLink", baseUrl + "/employer/complaints");
+
+        String htmlBody = templateEngine.process("email/complaint-auto-closed", context);
+        sendHtmlEmail(toEmail, "[Topviec] Tin tuyển dụng của bạn đã bị ẩn do không xử lý khiếu nại", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {
