@@ -1,0 +1,579 @@
+package com.topviec.topviec_be.service.impl;
+
+import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
+import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
+import com.topviec.topviec_be.dto.response.ResReportSummaryDTO;
+import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
+import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.AdminUser;
+import com.topviec.topviec_be.entity.CandidateProfile;
+import com.topviec.topviec_be.entity.Complaint;
+import com.topviec.topviec_be.entity.ComplaintEvidence;
+import com.topviec.topviec_be.entity.Company;
+import com.topviec.topviec_be.entity.EmployerViolationScore;
+import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.entity.ViolationLog;
+import com.topviec.topviec_be.enums.company.CompanyStatus;
+import com.topviec.topviec_be.enums.complaints.ComplaintPriority;
+import com.topviec.topviec_be.enums.complaints.ComplaintStatus;
+import com.topviec.topviec_be.enums.complaints.ComplaintType;
+import com.topviec.topviec_be.enums.complaints.ViolationGroup;
+import com.topviec.topviec_be.enums.complaints.ViolationSource;
+import com.topviec.topviec_be.enums.jobs.JobPostStatus;
+import com.topviec.topviec_be.enums.users.UserType;
+import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.AdminUserRepository;
+import com.topviec.topviec_be.repository.CandidateProfileRepository;
+import com.topviec.topviec_be.repository.ComplaintEvidenceRepository;
+import com.topviec.topviec_be.repository.ComplaintRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.EmployerViolationScoreRepository;
+import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.repository.ViolationLogRepository;
+import com.topviec.topviec_be.service.ReportService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ReportServiceImpl implements ReportService {
+
+    private static final int MAX_REPORTS_PER_DAY = 3;
+    private static final int MIN_ACCOUNT_AGE_DAYS = 7;
+    private static final long GROUP_A_SLA_HOURS = 48;
+    private static final long GROUP_B_SLA_HOURS = 72;
+    private static final String DECISION_APPROVE = "approve";
+    private static final String DECISION_REJECT = "reject";
+    private static final String ACTION_REQUEST_EMPLOYER_FIX = "request_employer_fix";
+    private static final String ACTION_HIDE_JOB = "hide_job";
+    private static final String ACTION_SUSPEND_COMPANY = "suspend_company";
+    private static final String ACTION_RESOLVE = "resolve";
+
+    private final ComplaintRepository complaintRepository;
+    private final ComplaintEvidenceRepository complaintEvidenceRepository;
+    private final JobPostingRepository jobPostingRepository;
+    private final CompanyRepository companyRepository;
+    private final UserRepository userRepository;
+    private final CandidateProfileRepository candidateProfileRepository;
+    private final AdminUserRepository adminUserRepository;
+    private final ViolationLogRepository violationLogRepository;
+    private final EmployerViolationScoreRepository employerViolationScoreRepository;
+
+    @Override
+    @Transactional
+    public ResReportDetailDTO create(Long reporterUserId, ReqCreateReportDTO request) {
+        User reporter = userRepository.findById(reporterUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người báo cáo"));
+        if (reporter.getUserType() != UserType.CANDIDATE) {
+            throw AppException.forbidden("Chỉ ứng viên mới được tạo báo cáo");
+        }
+
+        JobPosting jobPosting = jobPostingRepository.findByIdAndDeletedAtIsNull(request.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
+
+        validateCreateRequest(reporter, jobPosting.getId(), request);
+
+        ComplaintType complaintType = request.getComplaintType();
+        ViolationGroup violationGroup = determineGroup(complaintType);
+
+        Complaint complaint = complaintRepository.save(Complaint.builder()
+                .jobPostId(jobPosting.getId())
+                .reporterUserId(reporterUserId)
+                .complaintType(complaintType.getValue())
+                .violationGroup(violationGroup.getValue())
+                .description(trimToNull(request.getDescription()))
+                .priority(defaultPriority(violationGroup).getValue())
+                .status(ComplaintStatus.PENDING.getValue())
+                .updatedBy(reporterUserId)
+                .build());
+
+        if (request.getEvidences() != null && !request.getEvidences().isEmpty()) {
+            complaintEvidenceRepository.saveAll(request.getEvidences().stream()
+                    .map(item -> ComplaintEvidence.builder()
+                            .complaintId(complaint.getId())
+                            .fileUrl(item.getFileUrl().trim())
+                            .fileType(item.getFileType().getValue())
+                            .build())
+                    .toList());
+        }
+
+        return getDetail(complaint.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getReports(
+            String search,
+            String status,
+            String group,
+            String complaintType,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Pageable pageable) {
+
+        Page<Complaint> page = complaintRepository.findAdminReports(
+                normalizeKeyword(search),
+                normalizeValue(status),
+                normalizeValue(group),
+                normalizeValue(complaintType),
+                fromDate != null ? fromDate.atStartOfDay() : null,
+                toDate != null ? toDate.plusDays(1).atStartOfDay() : null,
+                pageable);
+
+        return toPagination(page, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResReportDetailDTO getDetail(Long reportId) {
+        Complaint complaint = findComplaintOrThrow(reportId);
+
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        Company company = jobPosting != null ? companyRepository.findById(jobPosting.getCompanyId()).orElse(null) : null;
+        User reporter = userRepository.findById(complaint.getReporterUserId()).orElse(null);
+        CandidateProfile reporterProfile = reporter != null
+                ? candidateProfileRepository.findByUserId(reporter.getId()).orElse(null)
+                : null;
+        AdminUser assignedAdmin = complaint.getAssignedTo() != null
+                ? adminUserRepository.findById(complaint.getAssignedTo()).orElse(null)
+                : null;
+        List<ComplaintEvidence> evidences = complaintEvidenceRepository.findByComplaintId(complaint.getId());
+        ProcessingInfo processingInfo = calculateProcessingInfo(complaint);
+
+        return ResReportDetailDTO.builder()
+                .id(complaint.getId())
+                .reportCode(buildReportCode(complaint.getId()))
+                .complaintType(complaint.getComplaintType())
+                .violationGroup(complaint.getViolationGroup())
+                .priority(complaint.getPriority())
+                .status(complaint.getStatus())
+                .description(complaint.getDescription())
+                .resolutionNote(complaint.getResolutionNote())
+                .createdAt(complaint.getCreatedAt())
+                .updatedAt(complaint.getUpdatedAt())
+                .resolvedAt(complaint.getResolvedAt())
+                .emailSentAt(complaint.getEmailSentAt())
+                .employerDeadline(complaint.getEmployerDeadline())
+                .employerRespondedAt(complaint.getEmployerRespondedAt())
+                .remainingProcessingHours(processingInfo.remainingHours())
+                .totalAllowedProcessingHours(processingInfo.totalHours())
+                .reporter(ResReportDetailDTO.ReporterInfo.builder()
+                        .userId(complaint.getReporterUserId())
+                        .fullName(resolveReporterName(reporterProfile, reporter))
+                        .email(reporter != null ? reporter.getEmail() : null)
+                        .build())
+                .jobPosting(jobPosting == null ? null : ResReportDetailDTO.JobInfo.builder()
+                        .id(jobPosting.getId())
+                        .title(jobPosting.getTitle())
+                        .status(jobPosting.getStatus())
+                        .company(company == null ? null : ResReportDetailDTO.CompanyInfo.builder()
+                                .id(company.getId())
+                                .name(company.getName())
+                                .logoUrl(company.getLogoUrl())
+                                .status(company.getStatus())
+                                .violationScore(company.getViolationScore())
+                                .build())
+                        .build())
+                .assignedAdmin(assignedAdmin == null ? null : ResReportDetailDTO.AssignedAdminInfo.builder()
+                        .adminUserId(assignedAdmin.getAdminUsersId())
+                        .fullName(assignedAdmin.getFullName())
+                        .adminRole(assignedAdmin.getAdminRole())
+                        .build())
+                .evidences(evidences.stream()
+                        .map(item -> ResReportDetailDTO.EvidenceInfo.builder()
+                                .id(item.getId())
+                                .fileUrl(item.getFileUrl())
+                                .fileType(item.getFileType())
+                                .createdAt(item.getCreatedAt())
+                                .build())
+                        .toList())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public ResReportDetailDTO process(Long adminUserId, Long reportId, ReqProcessReportDTO request) {
+        Complaint complaint = findComplaintOrThrow(reportId);
+        AdminUser adminUser = adminUserRepository.findActiveByUserId(adminUserId)
+                .orElseThrow(() -> AppException.forbidden("Không tìm thấy tài khoản admin hợp lệ"));
+
+        String decision = normalizeValue(request.getDecision());
+        if (!DECISION_APPROVE.equals(decision) && !DECISION_REJECT.equals(decision)) {
+            throw AppException.badRequest("decision không hợp lệ. Chỉ chấp nhận: approve | reject");
+        }
+
+        if (!ComplaintStatus.PENDING.getValue().equals(complaint.getStatus())
+                && !ComplaintStatus.PROCESSING.getValue().equals(complaint.getStatus())
+                && !ComplaintStatus.WAITING_EMPLOYER.getValue().equals(complaint.getStatus())) {
+            throw AppException.badRequest("Báo cáo này đã được xử lý hoặc không còn ở trạng thái cho phép");
+        }
+
+        if (request.getComplaintType() != null) {
+            complaint.setComplaintType(request.getComplaintType().getValue());
+        }
+        if (request.getViolationGroup() != null) {
+            complaint.setViolationGroup(request.getViolationGroup().getValue());
+        } else if (request.getComplaintType() != null) {
+            complaint.setViolationGroup(determineGroup(request.getComplaintType()).getValue());
+        }
+
+        complaint.setAssignedTo(adminUser.getAdminUsersId());
+        complaint.setUpdatedBy(adminUserId);
+        complaint.setResolutionNote(trimToNull(request.getResolutionNote()));
+
+        if (DECISION_REJECT.equals(decision)) {
+            complaint.setStatus(ComplaintStatus.REJECTED.getValue());
+            complaint.setResolvedAt(LocalDateTime.now());
+            complaintRepository.save(complaint);
+            return getDetail(complaint.getId());
+        }
+
+        applyApproveDecision(complaint, adminUser, request);
+        complaintRepository.save(complaint);
+        return getDetail(complaint.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResViolationReasonDTO> getViolationReasons() {
+        return List.of(
+                toReason(ComplaintType.FRAUDULENT, "Lừa đảo", ViolationGroup.B, true, ComplaintPriority.IMPORTANT),
+                toReason(ComplaintType.PAYMENT_ISSUE, "Thu phí / yêu cầu thanh toán", ViolationGroup.B, true, ComplaintPriority.IMPORTANT),
+                toReason(ComplaintType.SPAM, "Spam / đăng lặp lại", ViolationGroup.A, false, ComplaintPriority.NORMAL),
+                toReason(ComplaintType.WRONG_INFO, "Thông tin sai lệch", ViolationGroup.A, false, ComplaintPriority.NORMAL),
+                toReason(ComplaintType.INAPPROPRIATE, "Nội dung không phù hợp", ViolationGroup.A, false, ComplaintPriority.NORMAL),
+                toReason(ComplaintType.OTHER, "Lý do khác", ViolationGroup.A, false, ComplaintPriority.NORMAL));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMyReports(Long reporterUserId, String status, Pageable pageable) {
+        Page<Complaint> page = complaintRepository.findMyReports(reporterUserId, normalizeValue(status), pageable);
+        return toPagination(page, pageable);
+    }
+
+    private void validateCreateRequest(User reporter, Long jobPostId, ReqCreateReportDTO request) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+
+        if (reporter.getCreatedAt() != null
+                && reporter.getCreatedAt().isAfter(now.minusDays(MIN_ACCOUNT_AGE_DAYS))) {
+            throw AppException.badRequest("Tài khoản phải hoạt động tối thiểu 7 ngày mới được báo cáo");
+        }
+
+        long dailyCount = complaintRepository.countByReporterUserIdAndCreatedAtBetween(
+                reporter.getId(), startOfDay, startOfDay.plusDays(1));
+        if (dailyCount >= MAX_REPORTS_PER_DAY) {
+            throw AppException.badRequest("Bạn đã dùng hết giới hạn 3 báo cáo trong ngày");
+        }
+
+        if (complaintRepository.existsByJobPostIdAndReporterUserIdAndDeletedAtIsNull(jobPostId, reporter.getId())) {
+            throw AppException.conflict("Bạn đã báo cáo tin tuyển dụng này trước đó");
+        }
+
+        if (determineGroup(request.getComplaintType()) == ViolationGroup.B
+                && (request.getEvidences() == null || request.getEvidences().isEmpty())) {
+            throw AppException.badRequest("Nhóm vi phạm B bắt buộc phải có ít nhất 1 bằng chứng");
+        }
+    }
+
+    private void applyApproveDecision(Complaint complaint, AdminUser adminUser, ReqProcessReportDTO request) {
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
+        Company company = companyRepository.findById(jobPosting.getCompanyId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty của tin bị báo cáo"));
+
+        String action = normalizeValue(request.getAction());
+        if (action == null) {
+            action = ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())
+                    ? ACTION_REQUEST_EMPLOYER_FIX
+                    : ACTION_RESOLVE;
+        }
+
+        switch (action) {
+            case ACTION_REQUEST_EMPLOYER_FIX -> {
+                complaint.setStatus(ComplaintStatus.WAITING_EMPLOYER.getValue());
+                complaint.setEmailSentAt(LocalDateTime.now());
+                complaint.setEmployerDeadline(LocalDateTime.now().plusHours(GROUP_A_SLA_HOURS));
+                complaint.setResolvedAt(null);
+            }
+            case ACTION_HIDE_JOB -> {
+                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+                complaint.setResolvedAt(LocalDateTime.now());
+                jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
+                jobPosting.setModerationNote(trimToNull(request.getResolutionNote()));
+                jobPosting.setRejectionReason(complaint.getComplaintType());
+                jobPosting.setUpdatedBy(adminUser.getUser().getId());
+                jobPostingRepository.save(jobPosting);
+            }
+            case ACTION_SUSPEND_COMPANY -> {
+                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+                complaint.setResolvedAt(LocalDateTime.now());
+                suspendCompany(company, adminUser.getUser().getId(), trimToNull(request.getResolutionNote()));
+            }
+            case ACTION_RESOLVE -> {
+                complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+                complaint.setResolvedAt(LocalDateTime.now());
+            }
+            default -> throw AppException.badRequest(
+                    "action không hợp lệ. Chỉ chấp nhận: request_employer_fix | hide_job | suspend_company | resolve");
+        }
+
+        if (ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
+            int points = request.getPoints() != null ? request.getPoints() : defaultPoints(complaint.getComplaintType());
+            addViolationScore(company, jobPosting, complaint, adminUser, points, trimToNull(request.getResolutionNote()));
+        }
+    }
+
+    private void addViolationScore(
+            Company company,
+            JobPosting jobPosting,
+            Complaint complaint,
+            AdminUser adminUser,
+            int points,
+            String note) {
+
+        Long employerUserId = company.getUserId() != null ? company.getUserId() : company.getCreatedBy();
+        if (employerUserId == null) {
+            return;
+        }
+
+        violationLogRepository.save(ViolationLog.builder()
+                .employerId(employerUserId)
+                .jobPostId(jobPosting.getId())
+                .violationType(complaint.getComplaintType())
+                .points(points)
+                .source(ViolationSource.COMPLAINT.getValue())
+                .complaintId(complaint.getId())
+                .note(note)
+                .createdBy(adminUser.getAdminUsersId())
+                .build());
+
+        EmployerViolationScore score = employerViolationScoreRepository.findByEmployerId(employerUserId)
+                .orElseGet(() -> EmployerViolationScore.builder()
+                        .employerId(employerUserId)
+                        .totalScore(0)
+                        .build());
+
+        score.setTotalScore((score.getTotalScore() == null ? 0 : score.getTotalScore()) + points);
+        score.setLastGroupBViolationAt(LocalDateTime.now());
+        employerViolationScoreRepository.save(score);
+
+        company.setViolationScore(score.getTotalScore());
+        company.setUpdatedBy(adminUser.getUser().getId());
+
+        if (score.getTotalScore() >= 50 && !CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
+            suspendCompany(company, adminUser.getUser().getId(),
+                    note != null ? note : "Tạm khóa công ty do điểm vi phạm đạt ngưỡng");
+        } else {
+            companyRepository.save(company);
+        }
+    }
+
+    private void suspendCompany(Company company, Long adminUserId, String reason) {
+        company.setStatus(CompanyStatus.SUSPENDED.getValue());
+        company.setSuspendedAt(LocalDateTime.now());
+        company.setSuspendedReason(reason);
+        company.setUpdatedBy(adminUserId);
+        companyRepository.save(company);
+    }
+
+    private Complaint findComplaintOrThrow(Long reportId) {
+        return complaintRepository.findByIdAndDeletedAtIsNull(reportId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo"));
+    }
+
+    private ResultPaginationDTO toPagination(Page<Complaint> page, Pageable pageable) {
+        List<Complaint> complaints = page.getContent();
+        List<Long> jobIds = complaints.stream().map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
+        List<Long> reporterIds = complaints.stream().map(Complaint::getReporterUserId).filter(Objects::nonNull).distinct().toList();
+        List<Long> adminIds = complaints.stream().map(Complaint::getAssignedTo).filter(Objects::nonNull).distinct().toList();
+
+        Map<Long, JobPosting> jobMap = jobIds.isEmpty()
+                ? Collections.emptyMap()
+                : jobPostingRepository.findAllById(jobIds).stream()
+                        .collect(Collectors.toMap(JobPosting::getId, item -> item));
+
+        List<Long> companyIds = jobMap.values().stream().map(JobPosting::getCompanyId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Company> companyMap = companyIds.isEmpty()
+                ? Collections.emptyMap()
+                : companyRepository.findAllById(companyIds).stream()
+                        .collect(Collectors.toMap(Company::getId, item -> item));
+
+        Map<Long, User> userMap = reporterIds.isEmpty()
+                ? Collections.emptyMap()
+                : userRepository.findAllById(reporterIds).stream()
+                        .collect(Collectors.toMap(User::getId, item -> item));
+
+        Map<Long, CandidateProfile> profileMap = reporterIds.isEmpty()
+                ? Collections.emptyMap()
+                : candidateProfileRepository.findByUserIdIn(reporterIds).stream()
+                        .collect(Collectors.toMap(CandidateProfile::getUserId, item -> item));
+
+        Map<Long, AdminUser> adminMap = adminIds.isEmpty()
+                ? Collections.emptyMap()
+                : adminUserRepository.findAllById(adminIds).stream()
+                        .collect(Collectors.toMap(AdminUser::getAdminUsersId, item -> item));
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(complaints.stream()
+                .map(complaint -> toSummary(complaint, jobMap, companyMap, userMap, profileMap, adminMap))
+                .toList());
+        return result;
+    }
+
+    private ResReportSummaryDTO toSummary(
+            Complaint complaint,
+            Map<Long, JobPosting> jobMap,
+            Map<Long, Company> companyMap,
+            Map<Long, User> userMap,
+            Map<Long, CandidateProfile> profileMap,
+            Map<Long, AdminUser> adminMap) {
+
+        JobPosting jobPosting = jobMap.get(complaint.getJobPostId());
+        Company company = jobPosting != null ? companyMap.get(jobPosting.getCompanyId()) : null;
+        User reporter = userMap.get(complaint.getReporterUserId());
+        CandidateProfile candidateProfile = profileMap.get(complaint.getReporterUserId());
+        AdminUser adminUser = adminMap.get(complaint.getAssignedTo());
+        ProcessingInfo processingInfo = calculateProcessingInfo(complaint);
+
+        return ResReportSummaryDTO.builder()
+                .id(complaint.getId())
+                .reportCode(buildReportCode(complaint.getId()))
+                .reporterUserId(complaint.getReporterUserId())
+                .reporterName(resolveReporterName(candidateProfile, reporter))
+                .jobPostId(complaint.getJobPostId())
+                .jobPostTitle(jobPosting != null ? jobPosting.getTitle() : null)
+                .companyId(company != null ? company.getId() : null)
+                .companyName(company != null ? company.getName() : null)
+                .complaintType(complaint.getComplaintType())
+                .violationGroup(complaint.getViolationGroup())
+                .priority(complaint.getPriority())
+                .status(complaint.getStatus())
+                .createdAt(complaint.getCreatedAt())
+                .processingDeadline(processingInfo.deadline())
+                .remainingProcessingHours(processingInfo.remainingHours())
+                .totalAllowedProcessingHours(processingInfo.totalHours())
+                .assignedAdminName(adminUser != null ? adminUser.getFullName() : null)
+                .build();
+    }
+
+    private ProcessingInfo calculateProcessingInfo(Complaint complaint) {
+        long totalHours = ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())
+                ? GROUP_B_SLA_HOURS
+                : GROUP_A_SLA_HOURS;
+
+        LocalDateTime deadline = complaint.getEmployerDeadline() != null
+                ? complaint.getEmployerDeadline()
+                : complaint.getCreatedAt().plusHours(totalHours);
+
+        long remainingHours = 0;
+        if (!List.of(
+                ComplaintStatus.RESOLVED.getValue(),
+                ComplaintStatus.REJECTED.getValue(),
+                ComplaintStatus.AUTO_CLOSED.getValue()).contains(complaint.getStatus())) {
+            remainingHours = Math.max(0, Duration.between(LocalDateTime.now(), deadline).toHours());
+        }
+
+        return new ProcessingInfo(deadline, remainingHours, totalHours);
+    }
+
+    private String resolveReporterName(CandidateProfile profile, User user) {
+        if (profile != null && profile.getFullName() != null && !profile.getFullName().isBlank()) {
+            return profile.getFullName();
+        }
+        return user != null ? user.getEmail() : null;
+    }
+
+    private String buildReportCode(Long id) {
+        return String.format("RP%06d", id);
+    }
+
+    private ComplaintPriority defaultPriority(ViolationGroup group) {
+        return group == ViolationGroup.B ? ComplaintPriority.IMPORTANT : ComplaintPriority.NORMAL;
+    }
+
+    private ViolationGroup determineGroup(ComplaintType complaintType) {
+        return switch (complaintType) {
+            case FRAUDULENT, PAYMENT_ISSUE -> ViolationGroup.B;
+            case SPAM, WRONG_INFO, INAPPROPRIATE, OTHER -> ViolationGroup.A;
+        };
+    }
+
+    private int defaultPoints(String complaintType) {
+        return defaultPoints(ComplaintType.fromValue(complaintType));
+    }
+
+    private int defaultPoints(ComplaintType complaintType) {
+        return switch (complaintType) {
+            case FRAUDULENT -> 30;
+            case PAYMENT_ISSUE -> 25;
+            case SPAM -> 10;
+            case INAPPROPRIATE -> 10;
+            case WRONG_INFO -> 5;
+            case OTHER -> 5;
+        };
+    }
+
+    private ResViolationReasonDTO toReason(
+            ComplaintType type,
+            String name,
+            ViolationGroup group,
+            boolean requiresEvidence,
+            ComplaintPriority priority) {
+        return ResViolationReasonDTO.builder()
+                .code(type.getValue())
+                .name(name)
+                .group(group.getValue())
+                .requiresEvidence(requiresEvidence)
+                .priority(priority.getValue())
+                .build();
+    }
+
+    private String normalizeValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toLowerCase();
+    }
+
+    private String normalizeKeyword(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private record ProcessingInfo(LocalDateTime deadline, long remainingHours, long totalHours) {
+    }
+}

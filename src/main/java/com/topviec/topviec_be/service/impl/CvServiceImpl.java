@@ -17,6 +17,7 @@ import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,7 +33,7 @@ public class CvServiceImpl implements CvService {
     private final CvsRepository cvsRepository;
     private final CloudinaryService cloudinaryService;
     private final FileValidator fileValidator;
-    private final org.springframework.data.redis.core.RedisTemplate<String, String> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     private static final int MAX_CV_PER_USER = 5;
 

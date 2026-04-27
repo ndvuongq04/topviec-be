@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.topviec.topviec_be.dto.response.ReminderInfo;
@@ -30,7 +30,7 @@ public class TokenServiceImpl implements TokenService {
     @Value("${app.token.interview-reminder-prefix:interview:reminder:}")
     private String INTERVIEW_REMINDER_PREFIX;
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public String generateVerifyEmailToken(String email) {
