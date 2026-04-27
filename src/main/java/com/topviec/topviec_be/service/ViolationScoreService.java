@@ -18,4 +18,7 @@ public interface ViolationScoreService {
 
     /** NTD xem điểm vi phạm của chính mình (không bao gồm lịch sử chi tiết) */
     ResMyViolationScoreDTO getMyScore(Long employerUserId);
+
+    /** Cron hàng tháng: tự động reset điểm cho NTD đủ điều kiện không tái phạm nhóm B */
+    void autoResetEligibleScores();
 }
