@@ -569,6 +569,24 @@ public class ReportServiceImpl implements ReportService {
         return value.trim();
     }
 
+    /**
+     * Xử lý search mã báo cáo: "RP000001" → "1" để LIKE so với CAST(id AS string).
+     * Nếu không phải dạng RP prefix thì giữ nguyên keyword.
+     */
+    private String normalizeReportCodeSearch(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.toLowerCase().startsWith("rp")) {
+            String numeric = trimmed.substring(2).replaceAll("[^0-9]", "");
+            if (!numeric.isBlank()) {
+                return String.valueOf(Long.parseLong(numeric));
+            }
+        }
+        return trimmed;
+    }
+
     private String trimToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -580,7 +598,14 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getEmployerReports(Long employerUserId, String status, Pageable pageable) {
+    public ResultPaginationDTO getEmployerReports(
+            Long employerUserId,
+            String search,
+            String status,
+            String group,
+            String complaintType,
+            Pageable pageable) {
+
         Company company = companyRepository.findByUserId(employerUserId)
                 .orElseGet(() -> companyRepository.findByCreatedBy(employerUserId).orElse(null));
 
@@ -609,8 +634,13 @@ public class ReportServiceImpl implements ReportService {
             return empty;
         }
 
-        Page<Complaint> page = complaintRepository.findByJobPostIdsAndStatus(
-                jobPostIds, normalizeValue(status), pageable);
+        Page<Complaint> page = complaintRepository.findEmployerReports(
+                jobPostIds,
+                normalizeReportCodeSearch(search),
+                normalizeValue(status),
+                normalizeValue(group),
+                normalizeValue(complaintType),
+                pageable);
 
         List<Long> jobIds = page.getContent().stream()
                 .map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
