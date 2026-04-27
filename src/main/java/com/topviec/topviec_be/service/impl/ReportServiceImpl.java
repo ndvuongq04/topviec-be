@@ -2,6 +2,8 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerComplaintSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResReportSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
@@ -572,6 +574,165 @@ public class ReportServiceImpl implements ReportService {
             return null;
         }
         return value.trim();
+    }
+
+    // ── NTD xem khiếu nại bị báo cáo ─────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getEmployerReports(Long employerUserId, String status, Pageable pageable) {
+        Company company = companyRepository.findByUserId(employerUserId)
+                .orElseGet(() -> companyRepository.findByCreatedBy(employerUserId).orElse(null));
+
+        if (company == null) {
+            ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+            meta.setPage(pageable.getPageNumber());
+            meta.setPageSize(pageable.getPageSize());
+            meta.setPages(0);
+            meta.setTotals(0);
+            ResultPaginationDTO empty = new ResultPaginationDTO();
+            empty.setMeta(meta);
+            empty.setResult(List.of());
+            return empty;
+        }
+
+        List<Long> jobPostIds = jobPostingRepository.findIdsByCompanyId(company.getId());
+        if (jobPostIds.isEmpty()) {
+            ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+            meta.setPage(pageable.getPageNumber());
+            meta.setPageSize(pageable.getPageSize());
+            meta.setPages(0);
+            meta.setTotals(0);
+            ResultPaginationDTO empty = new ResultPaginationDTO();
+            empty.setMeta(meta);
+            empty.setResult(List.of());
+            return empty;
+        }
+
+        Page<Complaint> page = complaintRepository.findByJobPostIdsAndStatus(
+                jobPostIds, normalizeValue(status), pageable);
+
+        List<Long> jobIds = page.getContent().stream()
+                .map(Complaint::getJobPostId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, JobPosting> jobMap = jobIds.isEmpty()
+                ? Collections.emptyMap()
+                : jobPostingRepository.findAllById(jobIds).stream()
+                        .collect(Collectors.toMap(JobPosting::getId, j -> j));
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(c -> toEmployerSummary(c, jobMap))
+                .toList());
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerComplaintDetailDTO getEmployerReportDetail(Long employerUserId, Long reportId) {
+        Complaint complaint = findComplaintOrThrow(reportId);
+        validateEmployerOwnsComplaint(employerUserId, complaint);
+
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        ProcessingInfo info = calculateProcessingInfo(complaint);
+
+        return toEmployerDetail(complaint, jobPosting, info);
+    }
+
+    @Override
+    @Transactional
+    public ResEmployerComplaintDetailDTO respondToReport(Long employerUserId, Long reportId) {
+        Complaint complaint = findComplaintOrThrow(reportId);
+        validateEmployerOwnsComplaint(employerUserId, complaint);
+
+        if (!ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
+            throw AppException.badRequest("Chỉ có thể xác nhận sửa với báo cáo thuộc nhóm A");
+        }
+        if (!ComplaintStatus.WAITING_EMPLOYER.getValue().equals(complaint.getStatus())) {
+            throw AppException.badRequest(
+                    "Báo cáo phải ở trạng thái waiting_employer mới được xác nhận đã sửa");
+        }
+
+        complaint.setStatus(ComplaintStatus.AUTO_CLOSED.getValue());
+        complaint.setEmployerRespondedAt(LocalDateTime.now());
+        complaint.setResolvedAt(LocalDateTime.now());
+        complaint.setUpdatedBy(employerUserId);
+        complaintRepository.save(complaint);
+
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        return toEmployerDetail(complaint, jobPosting, calculateProcessingInfo(complaint));
+    }
+
+    private void validateEmployerOwnsComplaint(Long employerUserId, Complaint complaint) {
+        Company company = companyRepository.findByUserId(employerUserId)
+                .orElseGet(() -> companyRepository.findByCreatedBy(employerUserId).orElse(null));
+        if (company == null) {
+            throw AppException.forbidden("Bạn không có công ty trên hệ thống");
+        }
+        List<Long> jobPostIds = jobPostingRepository.findIdsByCompanyId(company.getId());
+        if (!jobPostIds.contains(complaint.getJobPostId())) {
+            throw AppException.forbidden("Bạn không có quyền xem báo cáo này");
+        }
+    }
+
+    private ResEmployerComplaintSummaryDTO toEmployerSummary(
+            Complaint complaint,
+            Map<Long, JobPosting> jobMap) {
+
+        JobPosting jobPosting = jobMap.get(complaint.getJobPostId());
+        ProcessingInfo info = calculateProcessingInfo(complaint);
+
+        return ResEmployerComplaintSummaryDTO.builder()
+                .id(complaint.getId())
+                .reportCode(buildReportCode(complaint.getId()))
+                .jobPost(jobPosting == null ? null : ResEmployerComplaintSummaryDTO.JobPostInfo.builder()
+                        .id(jobPosting.getId())
+                        .title(jobPosting.getTitle())
+                        .status(jobPosting.getStatus())
+                        .build())
+                .complaintType(complaint.getComplaintType())
+                .violationGroup(complaint.getViolationGroup())
+                .priority(complaint.getPriority())
+                .status(complaint.getStatus())
+                .employerDeadline(complaint.getEmployerDeadline())
+                .remainingHours(info.remainingHours())
+                .createdAt(complaint.getCreatedAt())
+                .build();
+    }
+
+    private ResEmployerComplaintDetailDTO toEmployerDetail(
+            Complaint complaint,
+            JobPosting jobPosting,
+            ProcessingInfo info) {
+
+        return ResEmployerComplaintDetailDTO.builder()
+                .id(complaint.getId())
+                .reportCode(buildReportCode(complaint.getId()))
+                .jobPost(jobPosting == null ? null : ResEmployerComplaintDetailDTO.JobPostInfo.builder()
+                        .id(jobPosting.getId())
+                        .title(jobPosting.getTitle())
+                        .status(jobPosting.getStatus())
+                        .build())
+                .complaintType(complaint.getComplaintType())
+                .violationGroup(complaint.getViolationGroup())
+                .priority(complaint.getPriority())
+                .status(complaint.getStatus())
+                .description(complaint.getDescription())
+                .emailSentAt(complaint.getEmailSentAt())
+                .employerDeadline(complaint.getEmployerDeadline())
+                .remainingHours(info.remainingHours())
+                .employerRespondedAt(complaint.getEmployerRespondedAt())
+                .resolutionNote(complaint.getResolutionNote())
+                .resolvedAt(complaint.getResolvedAt())
+                .createdAt(complaint.getCreatedAt())
+                .updatedAt(complaint.getUpdatedAt())
+                .build();
     }
 
     private record ProcessingInfo(LocalDateTime deadline, long remainingHours, long totalHours) {

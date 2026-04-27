@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -19,6 +20,18 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
     boolean existsByJobPostIdAndReporterUserIdAndDeletedAtIsNull(Long jobPostId, Long reporterUserId);
 
     long countByReporterUserIdAndCreatedAtBetween(Long reporterUserId, LocalDateTime start, LocalDateTime end);
+
+    @Query("""
+            SELECT c FROM Complaint c
+            WHERE c.jobPostId IN :jobPostIds
+            AND c.deletedAt IS NULL
+            AND (:status IS NULL OR c.status = :status)
+            ORDER BY c.createdAt DESC
+            """)
+    Page<Complaint> findByJobPostIdsAndStatus(
+            @Param("jobPostIds") List<Long> jobPostIds,
+            @Param("status") String status,
+            Pageable pageable);
 
     @Query("""
             SELECT c FROM Complaint c

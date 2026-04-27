@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAdjustViolationScoreDTO;
 import com.topviec.topviec_be.dto.request.ReqResetViolationScoreDTO;
+import com.topviec.topviec_be.dto.response.ResMyViolationScoreDTO;
 import com.topviec.topviec_be.dto.response.ResViolationScoreDTO;
 import com.topviec.topviec_be.entity.AdminUser;
 import com.topviec.topviec_be.entity.Company;
@@ -191,6 +192,40 @@ public class ViolationScoreServiceImpl implements ViolationScoreService {
         });
 
         return getScore(employerId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResMyViolationScoreDTO getMyScore(Long employerUserId) {
+        userRepository.findById(employerUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
+
+        EmployerViolationScore score = violationScoreRepository.findByEmployerId(employerUserId)
+                .orElseGet(() -> EmployerViolationScore.builder()
+                        .employerId(employerUserId)
+                        .totalScore(0)
+                        .build());
+
+        Company company = companyRepository.findByUserId(employerUserId).orElse(null);
+        int totalScore = score.getTotalScore() != null ? score.getTotalScore() : 0;
+        String level = calculateScoreLevel(totalScore);
+
+        return ResMyViolationScoreDTO.builder()
+                .totalScore(totalScore)
+                .scoreLevel(level)
+                .restrictionDescription(buildRestrictionDescription(level))
+                .lastGroupBViolationAt(score.getLastGroupBViolationAt())
+                .canRequestReset(canResetScore(score.getLastGroupBViolationAt()))
+                .companyStatus(company != null ? company.getStatus() : null)
+                .build();
+    }
+
+    private String buildRestrictionDescription(String level) {
+        return switch (level) {
+            case "limited" -> "Chỉ được đăng tối đa 3 tin/tuần. Tin mới cần Admin duyệt trước khi hiển thị.";
+            case "suspended" -> "Tài khoản bị tạm khóa 30 ngày. Toàn bộ tin hiện tại bị ẩn.";
+            default -> "Hoạt động bình thường.";
+        };
     }
 
     private String calculateScoreLevel(int totalScore) {

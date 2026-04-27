@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqAdjustViolationScoreDTO;
 import com.topviec.topviec_be.dto.request.ReqResetViolationScoreDTO;
+import com.topviec.topviec_be.dto.response.ResMyViolationScoreDTO;
 import com.topviec.topviec_be.dto.response.ResViolationScoreDTO;
 
 public interface ViolationScoreService {
@@ -14,4 +15,7 @@ public interface ViolationScoreService {
 
     /** Admin giảm điểm thủ công khi NTD chủ động khắc phục */
     ResViolationScoreDTO adjustScore(Long adminUserId, Long employerId, ReqAdjustViolationScoreDTO request);
+
+    /** NTD xem điểm vi phạm của chính mình (không bao gồm lịch sử chi tiết) */
+    ResMyViolationScoreDTO getMyScore(Long employerUserId);
 }

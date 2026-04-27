@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -30,4 +31,15 @@ public interface ReportService {
     List<ResViolationReasonDTO> getViolationReasons();
 
     ResultPaginationDTO getMyReports(Long reporterUserId, String status, Pageable pageable);
+
+    // ── NTD xem khiếu nại bị báo cáo ─────────────────────────────────────────
+
+    /** Danh sách khiếu nại nhắm vào tin của NTD (ẩn danh người báo cáo) */
+    ResultPaginationDTO getEmployerReports(Long employerUserId, String status, Pageable pageable);
+
+    /** Chi tiết một khiếu nại — chỉ cho phép nếu tin thuộc công ty của NTD */
+    ResEmployerComplaintDetailDTO getEmployerReportDetail(Long employerUserId, Long reportId);
+
+    /** NTD xác nhận đã sửa tin → tự đóng báo cáo nhóm A */
+    ResEmployerComplaintDetailDTO respondToReport(Long employerUserId, Long reportId);
 }
