@@ -59,8 +59,8 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Value("${app.base-url}")
-    private String baseUrl;
+    @Value("${app.talent-pool-invite-url}")
+    private String talentPoolInviteUrl;
 
     // -------------------------------------------------------------------------
     // POST — thêm UV vào talent pool
@@ -349,7 +349,9 @@ public class TalentPoolServiceImpl implements TalentPoolService {
 
     private void publishInviteEvent(String email, String candidateName, String companyName,
             JobPosting job, Long applicationId) {
-        String jobLink = baseUrl + "/jobs/" + job.getSlug() + "?applicationId=" + applicationId;
+        String jobLink = talentPoolInviteUrl
+                + "?applicationId=" + applicationId
+                + "&jobSlug=" + job.getSlug();
         eventPublisher.publishEvent(new TalentPoolInviteEvent(email, candidateName, companyName, job.getTitle(), jobLink));
     }
 
