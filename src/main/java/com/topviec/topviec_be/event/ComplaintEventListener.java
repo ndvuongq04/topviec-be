@@ -26,4 +26,18 @@ public class ComplaintEventListener {
             log.error("Failed to send auto-close email to {}: {}", event.employerEmail(), e.getMessage(), e);
         }
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onTalentPoolInvite(TalentPoolInviteEvent event) {
+        try {
+            emailService.sendTalentPoolInviteEmail(
+                    event.candidateEmail(),
+                    event.candidateName(),
+                    event.companyName(),
+                    event.jobTitle(),
+                    event.jobLink());
+        } catch (Exception e) {
+            log.error("Failed to send talent pool invite email to {}: {}", event.candidateEmail(), e.getMessage(), e);
+        }
+    }
 }
