@@ -65,7 +65,7 @@ public class ReportServiceImpl implements ReportService {
 
     private static final int MAX_REPORTS_PER_DAY = 3;
     private static final int MIN_ACCOUNT_AGE_DAYS = 7;
-    private static final long GROUP_A_SLA_HOURS = 48;
+    private static final long GROUP_A_SLA_HOURS = 42;
     private static final long GROUP_B_SLA_HOURS = 72;
     private static final int GROUP_A_POINTS = 10;
     private static final int GROUP_B_POINTS = 30;
@@ -262,7 +262,7 @@ public class ReportServiceImpl implements ReportService {
 
             addViolationScore(company, jobPosting, complaint, adminUser, GROUP_B_POINTS, note);
 
-            jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
+            jobPosting.setStatus(JobPostStatus.HIDDEN.getValue());
             jobPosting.setRejectionReason(complaint.getComplaintType());
             jobPosting.setModerationNote(note);
             jobPosting.setUpdatedBy(adminUser.getUser().getId());

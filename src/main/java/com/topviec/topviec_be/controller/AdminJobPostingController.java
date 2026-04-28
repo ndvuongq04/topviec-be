@@ -90,4 +90,14 @@ public class AdminJobPostingController {
         return ResponseEntity.ok(jobPostingService.takedown(id, adminId, request));
     }
 
+    /**
+     * PATCH /admin/job-postings/{id}/restore
+     * Admin khôi phục tin đang bị ẩn (HIDDEN) do khiếu nại về PUBLISHED.
+     */
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ResJobPostingDetail> restore(@PathVariable Long id) {
+        Long adminId = SecurityUtil.getCurrentUserId();
+        return ResponseEntity.ok(jobPostingService.restore(id, adminId));
+    }
+
 }
