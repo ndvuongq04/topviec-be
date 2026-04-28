@@ -1,27 +1,35 @@
 package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateAppealDTO;
+import com.topviec.topviec_be.dto.request.ReqUnsuspendDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.entity.AdminUser;
 import com.topviec.topviec_be.entity.Complaint;
 import com.topviec.topviec_be.entity.ComplaintAppeal;
 import com.topviec.topviec_be.entity.Company;
+import com.topviec.topviec_be.entity.EmployerViolationScore;
 import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.entity.ViolationLog;
+import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.complaints.AppealStatus;
 import com.topviec.topviec_be.enums.complaints.ViolationGroup;
+import com.topviec.topviec_be.enums.complaints.ViolationSource;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.ComplaintAppealRepository;
 import com.topviec.topviec_be.repository.ComplaintRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.EmployerViolationScoreRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.repository.ViolationLogRepository;
 import com.topviec.topviec_be.service.AppealService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +46,8 @@ public class AppealServiceImpl implements AppealService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final AdminUserRepository adminUserRepository;
+    private final ViolationLogRepository violationLogRepository;
+    private final EmployerViolationScoreRepository violationScoreRepository;
 
     @Override
     @Transactional
@@ -147,6 +157,91 @@ public class AppealServiceImpl implements AppealService {
                     return toResponse(appeal, complaint, jobPosting, company, reviewer);
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public ResAppealDTO unsuspend(Long adminUserId, Long employerId, ReqUnsuspendDTO request) {
+        AdminUser adminUser = adminUserRepository.findActiveByUserId(adminUserId)
+                .orElseThrow(() -> AppException.forbidden("Không tìm thấy tài khoản admin hợp lệ"));
+
+        userRepository.findById(employerId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
+
+        ComplaintAppeal appeal = appealRepository.findById(request.getAppealId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy kháng cáo"));
+
+        if (!employerId.equals(appeal.getEmployerId())) {
+            throw AppException.badRequest("Kháng cáo này không thuộc về NTD được chỉ định");
+        }
+
+        if (!AppealStatus.PENDING.getValue().equals(appeal.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể duyệt kháng cáo ở trạng thái pending");
+        }
+
+        Complaint complaint = complaintRepository.findByIdAndDeletedAtIsNull(appeal.getComplaintId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy khiếu nại liên quan"));
+
+        // Tính tổng điểm cần gỡ từ các violation log gắn với complaint này
+        List<ViolationLog> logsToReverse = violationLogRepository.findByComplaintId(complaint.getId())
+                .stream()
+                .filter(log -> log.getPoints() != null && log.getPoints() > 0)
+                .toList();
+
+        int pointsToReverse = logsToReverse.stream().mapToInt(ViolationLog::getPoints).sum();
+
+        // Trừ điểm vi phạm
+        EmployerViolationScore score = violationScoreRepository.findByEmployerId(employerId)
+                .orElseGet(() -> EmployerViolationScore.builder().employerId(employerId).totalScore(0).build());
+
+        int newScore = Math.max(0, (score.getTotalScore() != null ? score.getTotalScore() : 0) - pointsToReverse);
+        score.setTotalScore(newScore);
+        violationScoreRepository.save(score);
+
+        // Ghi log đảo điểm
+        if (pointsToReverse > 0) {
+            String logNote = request.getNote() != null && !request.getNote().isBlank()
+                    ? request.getNote().trim()
+                    : "Kháng cáo được chấp thuận — gỡ điểm vi phạm";
+            violationLogRepository.save(ViolationLog.builder()
+                    .employerId(employerId)
+                    .jobPostId(complaint.getJobPostId())
+                    .violationType("appeal_approved")
+                    .points(-pointsToReverse)
+                    .source(ViolationSource.ADMIN.getValue())
+                    .complaintId(complaint.getId())
+                    .note(logNote)
+                    .createdBy(adminUser.getAdminUsersId())
+                    .build());
+        }
+
+        // Mở khóa công ty và đồng bộ điểm
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        Company company = null;
+        if (jobPosting != null) {
+            company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+        }
+        if (company != null) {
+            company.setViolationScore(newScore);
+            if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
+                company.setStatus(CompanyStatus.ACTIVE.getValue());
+                company.setSuspendedAt(null);
+                company.setSuspendedReason(null);
+            }
+            company.setUpdatedBy(adminUser.getUser().getId());
+            companyRepository.save(company);
+        }
+
+        // Cập nhật trạng thái kháng cáo
+        String adminNote = request.getNote() != null && !request.getNote().isBlank()
+                ? request.getNote().trim() : null;
+        appeal.setStatus(AppealStatus.APPROVED.getValue());
+        appeal.setReviewedBy(adminUser.getAdminUsersId());
+        appeal.setReviewedAt(LocalDateTime.now());
+        appeal.setAdminNote(adminNote);
+        appealRepository.save(appeal);
+
+        return toResponse(appeal, complaint, jobPosting, company, adminUser);
     }
 
     private ResAppealDTO toResponse(
