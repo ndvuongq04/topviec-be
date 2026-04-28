@@ -12,6 +12,7 @@ import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.ViolationLog;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.complaints.AppealStatus;
+import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.enums.complaints.ViolationGroup;
 import com.topviec.topviec_be.enums.complaints.ViolationSource;
 import com.topviec.topviec_be.enums.users.UserType;
@@ -230,6 +231,12 @@ public class AppealServiceImpl implements AppealService {
             }
             company.setUpdatedBy(adminUser.getUser().getId());
             companyRepository.save(company);
+        }
+
+        if (jobPosting != null && JobPostStatus.HIDDEN.getValue().equals(jobPosting.getStatus())) {
+            jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
+            jobPosting.setUpdatedBy(adminUser.getUser().getId());
+            jobPostingRepository.save(jobPosting);
         }
 
         // Cập nhật trạng thái kháng cáo
