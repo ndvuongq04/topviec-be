@@ -43,4 +43,8 @@ public interface ApplicationService {
     ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId);
 
     ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request);
+
+    ResApplicationDTO acceptInvite(Long candidateUserId, Long applicationId);
+
+    ResApplicationDTO declineInvite(Long candidateUserId, Long applicationId);
 }

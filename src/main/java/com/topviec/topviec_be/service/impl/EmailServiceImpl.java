@@ -176,6 +176,19 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Tin tuyển dụng của bạn đã bị ẩn do không xử lý khiếu nại", htmlBody);
     }
 
+    @Override
+    public void sendTalentPoolInviteEmail(String toEmail, String candidateName, String companyName,
+                                          String jobTitle, String jobLink) {
+        Context context = new Context();
+        context.setVariable("candidateName", candidateName);
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("jobLink", jobLink);
+
+        String htmlBody = templateEngine.process("email/talent-pool-invite", context);
+        sendHtmlEmail(toEmail, "[Topviec] " + companyName + " mời bạn ứng tuyển vào vị trí " + jobTitle, htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {

@@ -1,23 +1,38 @@
 package com.topviec.topviec_be.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
+import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
+import com.topviec.topviec_be.event.TalentPoolInviteEvent;
+import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.Application;
 import com.topviec.topviec_be.entity.CandidateProfile;
+import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.Cvs;
+import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.Location;
 import com.topviec.topviec_be.entity.TalentPool;
 import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.enums.application.ApplicationStatus;
+import com.topviec.topviec_be.enums.application.ApplyMethod;
+import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.CvsRepository;
+import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.TalentPoolRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.TalentPoolService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,6 +53,14 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
     private final CvsRepository cvsRepository;
+    private final ApplicationRepository applicationRepository;
+    private final JobPostingRepository jobPostingRepository;
+    private final CompanyRepository companyRepository;
+    private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
 
     // -------------------------------------------------------------------------
     // POST — thêm UV vào talent pool
@@ -241,6 +265,95 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     }
 
     // -------------------------------------------------------------------------
+    // POST — mời UV trong talent pool ứng tuyển vào tin tuyển dụng
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ResApplicationDTO invite(Long employerUserId, Long companyId, Long talentPoolId,
+            ReqInviteFromTalentPoolDTO request) {
+
+        TalentPool talentPool = talentPoolRepository.findById(talentPoolId)
+                .filter(tp -> tp.getDeletedAt() == null)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy ứng viên trong talent pool"));
+
+        if (!talentPool.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền thực hiện thao tác này");
+        }
+
+        JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(request.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!job.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Tin tuyển dụng không thuộc về công ty của bạn");
+        }
+
+        if (!JobPostStatus.PUBLISHED.getValue().equals(job.getStatus())
+                && !JobPostStatus.INTERVIEWING.getValue().equals(job.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể mời ứng viên vào tin đang tuyển dụng");
+        }
+
+        Long candidateUserId = talentPool.getCandidateUserId();
+
+        User candidateUser = userRepository.findById(candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản ứng viên"));
+        CandidateProfile candidateProfile = candidateProfileRepository.findByUserId(candidateUserId).orElse(null);
+        String candidateName = candidateProfile != null ? candidateProfile.getFullName() : candidateUser.getEmail();
+        Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
+        String companyName = company != null ? company.getName() : "";
+
+        // Kiểm tra nếu UV đã có đơn không phải WITHDRAWN
+        Optional<Application> existing = applicationRepository
+                .findByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(request.getJobPostId(), candidateUserId);
+        if (existing.isPresent()) {
+            Application ex = existing.get();
+            if (!ApplicationStatus.WITHDRAWN.getValue().equals(ex.getStatus())) {
+                throw AppException.conflict("Ứng viên đã có đơn ứng tuyển vào tin tuyển dụng này rồi");
+            }
+            ex.setStatus(ApplicationStatus.INVITED.getValue());
+            ex.setApplyMethod(ApplyMethod.INVITED.getValue());
+            ex.setWithdrawnAt(null);
+            ex.setWithdrawalReason(null);
+            try {
+                ex.setCvSnapshot(objectMapper.writeValueAsString(job));
+            } catch (Exception e) {
+                ex.setCvSnapshot("{}");
+            }
+            Application saved = applicationRepository.save(ex);
+            publishInviteEvent(candidateUser.getEmail(), candidateName, companyName, job, saved.getId());
+            return toApplicationResponse(saved, job, company);
+        }
+
+        Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId)
+                .orElseThrow(() -> AppException.badRequest("Ứng viên chưa có CV mặc định"));
+
+        String cvSnapshot;
+        try {
+            cvSnapshot = objectMapper.writeValueAsString(job);
+        } catch (Exception e) {
+            cvSnapshot = "{}";
+        }
+
+        Application application = applicationRepository.save(Application.builder()
+                .candidateUserId(candidateUserId)
+                .jobPostId(job.getId())
+                .cvId(defaultCv.getId())
+                .cvSnapshot(cvSnapshot)
+                .status(ApplicationStatus.INVITED.getValue())
+                .applyMethod(ApplyMethod.INVITED.getValue())
+                .build());
+
+        publishInviteEvent(candidateUser.getEmail(), candidateName, companyName, job, application.getId());
+        return toApplicationResponse(application, job, company);
+    }
+
+    private void publishInviteEvent(String email, String candidateName, String companyName,
+            JobPosting job, Long applicationId) {
+        String jobLink = baseUrl + "/jobs/" + job.getSlug() + "?applicationId=" + applicationId;
+        eventPublisher.publishEvent(new TalentPoolInviteEvent(email, candidateName, companyName, job.getTitle(), jobLink));
+    }
+
+    // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------
 
@@ -254,6 +367,34 @@ public class TalentPoolServiceImpl implements TalentPoolService {
                 .visibility(cv.getVisibility())
                 .viewCount(cv.getViewCount())
                 .createdAt(cv.getCreatedAt())
+                .build();
+    }
+
+    private ResApplicationDTO toApplicationResponse(Application a, JobPosting job, Company company) {
+        return ResApplicationDTO.builder()
+                .id(a.getId())
+                .jobPostId(a.getJobPostId())
+                .candidateUserId(a.getCandidateUserId())
+                .cvId(a.getCvId())
+                .status(a.getStatus())
+                .applyMethod(a.getApplyMethod())
+                .createdAt(a.getCreatedAt())
+                .updatedAt(a.getUpdatedAt())
+                .jobPosting(job == null ? null
+                        : ResApplicationDTO.JobInfo.builder()
+                                .id(job.getId())
+                                .title(job.getTitle())
+                                .slug(job.getSlug())
+                                .status(job.getStatus())
+                                .deadline(job.getDeadline())
+                                .company(company == null ? null
+                                        : ResApplicationDTO.CompanyInfo.builder()
+                                                .id(company.getId())
+                                                .name(company.getName())
+                                                .logoUrl(company.getLogoUrl())
+                                                .isBrandVerified(company.getIsBrandVerified())
+                                                .build())
+                                .build())
                 .build();
     }
 

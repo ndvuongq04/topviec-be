@@ -130,6 +130,30 @@ public class PublicApplicationController {
                 applicationService.updateApplicationCv(extractUserId(jwt), applicationId, request));
     }
 
+    /**
+     * PATCH /applications/{applicationId}/accept-invite
+     * UV chấp nhận lời mời từ talent pool (INVITED → PENDING)
+     */
+    @PatchMapping("/{applicationId}/accept-invite")
+    public ResponseEntity<ResApplicationDTO> acceptInvite(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                applicationService.acceptInvite(extractUserId(jwt), applicationId));
+    }
+
+    /**
+     * PATCH /applications/{applicationId}/decline-invite
+     * UV từ chối lời mời từ talent pool (INVITED → WITHDRAWN)
+     */
+    @PatchMapping("/{applicationId}/decline-invite")
+    public ResponseEntity<ResApplicationDTO> declineInvite(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                applicationService.declineInvite(extractUserId(jwt), applicationId));
+    }
+
     // -------------------------------------------------------------------------
     // Helper
     // -------------------------------------------------------------------------

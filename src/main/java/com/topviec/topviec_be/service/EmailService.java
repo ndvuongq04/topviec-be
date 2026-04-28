@@ -54,4 +54,8 @@ public interface EmailService {
     /** Quá 48h NTD không sửa — tin đã bị ẩn + cộng điểm */
     void sendComplaintAutoClosedEmail(String toEmail, String jobPostTitle, String complaintType,
                                       String reportCode);
+
+    /** Mời UV từ talent pool ứng tuyển vào tin tuyển dụng */
+    void sendTalentPoolInviteEmail(String toEmail, String candidateName, String companyName,
+                                   String jobTitle, String jobLink);
 }

@@ -1,7 +1,9 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
+import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateTalentPoolNoteDTO;
+import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -81,5 +83,17 @@ public class EmployerTalentPoolController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(talentPoolService.addToTalentPool(userId, companyId, request));
+    }
+
+    @PostMapping("/{talentPoolId}/invite")
+    public ResponseEntity<ResApplicationDTO> invite(
+            @PathVariable Long talentPoolId,
+            @Valid @RequestBody ReqInviteFromTalentPoolDTO request) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(talentPoolService.invite(userId, companyId, talentPoolId, request));
     }
 }
