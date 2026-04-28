@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAdjustViolationScoreDTO;
 import com.topviec.topviec_be.dto.request.ReqResetViolationScoreDTO;
+import com.topviec.topviec_be.dto.request.ReqUnsuspendDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.dto.response.ResViolationScoreDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
@@ -93,6 +94,23 @@ public class AdminViolationScoreController {
             + AdminRoleConstants.SUPPORT_ADMIN + "')")
     public ResponseEntity<List<ResAppealDTO>> getAppeals(@PathVariable Long employerId) {
         return ResponseEntity.ok(appealService.getByEmployer(employerId));
+    }
+
+    /**
+     * POST /admin/employers/{employerId}/unsuspend
+     * Admin duyệt kháng cáo của NTD: gỡ toàn bộ điểm vi phạm từ complaint liên quan
+     * và mở khóa tài khoản sớm nếu đang bị suspend.
+     */
+    @PostMapping("/{employerId}/unsuspend")
+    @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "')")
+    public ResponseEntity<ResAppealDTO> unsuspend(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long employerId,
+            @Valid @RequestBody ReqUnsuspendDTO request) {
+
+        return ResponseEntity.ok(appealService.unsuspend(extractUserId(jwt), employerId, request));
     }
 
     private Long extractUserId(Jwt jwt) {

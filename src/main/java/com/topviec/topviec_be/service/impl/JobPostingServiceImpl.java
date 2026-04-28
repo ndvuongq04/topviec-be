@@ -402,7 +402,8 @@ public class JobPostingServiceImpl implements JobPostingService {
 
         if (JobPostStatus.DRAFT.getValue().equals(status) ||
                 JobPostStatus.PENDING_APPROVAL.getValue().equals(status) ||
-                JobPostStatus.REJECTED.getValue().equals(status)) {
+                JobPostStatus.REJECTED.getValue().equals(status) ||
+                JobPostStatus.HIDDEN.getValue().equals(status)) {
             throw AppException
                     .badRequest("Tin không nằm trong trạng thái có thể gỡ (chỉ gỡ tin đã đăng, tạm dừng, gia hạn...)");
         }
@@ -418,6 +419,18 @@ public class JobPostingServiceImpl implements JobPostingService {
 
     @Override
     @Transactional
+    public ResJobPostingDetail restore(Long id, Long adminId) {
+        JobPosting jobPosting = findByIdOrThrow(id);
+        if (!JobPostStatus.HIDDEN.getValue().equals(jobPosting.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể khôi phục tin đang ở trạng thái HIDDEN");
+        }
+        jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
+        jobPosting.setUpdatedBy(adminId);
+        return toDetailResponse(jobPostingRepository.save(jobPosting));
+    }
+
+    @Override
+    @Transactional
     public ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId) {
         JobPosting jobPosting = findByIdOrThrow(id);
         if (!jobPosting.getCompanyId().equals(companyId)) {
@@ -425,7 +438,7 @@ public class JobPostingServiceImpl implements JobPostingService {
         }
         if (!JobPostStatus.DRAFT.getValue().equals(jobPosting.getStatus())
                 && !JobPostStatus.REJECTED.getValue().equals(jobPosting.getStatus())) {
-            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT hoặc REJECTED");
+            throw AppException.badRequest("Chỉ có thể gửi duyệt tin khi đang ở trạng thái DRAFT hoặc REJECTED. Tin đang bị ẩn do khiếu nại cần Admin khôi phục trước.");
         }
         saveEditLog(jobPosting, updatedByUserId);
         jobPosting.setStatus(JobPostStatus.PENDING_APPROVAL.getValue());
@@ -448,6 +461,7 @@ public class JobPostingServiceImpl implements JobPostingService {
 
         if (JobPostStatus.DRAFT.getValue().equals(status)
                 || JobPostStatus.REJECTED.getValue().equals(status)
+                || JobPostStatus.HIDDEN.getValue().equals(status)
                 || JobPostStatus.RENEWED.getValue().equals(status)) {
             return;
         }

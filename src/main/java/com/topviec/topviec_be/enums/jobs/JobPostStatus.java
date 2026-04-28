@@ -7,6 +7,7 @@ public enum JobPostStatus {
     DRAFT("draft"),
     PENDING_APPROVAL("pending_approval"),
     REJECTED("rejected"),
+    HIDDEN("hidden"),
     SCHEDULED("scheduled"),
     PUBLISHED("published"),
     PAUSED("paused"),

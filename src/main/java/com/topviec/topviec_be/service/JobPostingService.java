@@ -85,6 +85,9 @@ public interface JobPostingService {
         /** Employer gửi tin đang DRAFT/REJECTED lên chờ admin duyệt. */
         ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId);
 
+        /** Admin khôi phục tin đang HIDDEN về PUBLISHED. */
+        ResJobPostingDetail restore(Long id, Long adminId);
+
         // -------------------------------------------------------------------------
         // Employer — Soft Delete / Restore
         // -------------------------------------------------------------------------

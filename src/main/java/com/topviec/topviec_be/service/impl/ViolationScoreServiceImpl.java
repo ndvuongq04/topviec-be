@@ -236,9 +236,6 @@ public class ViolationScoreServiceImpl implements ViolationScoreService {
             }
 
             int currentScore = score.getTotalScore() != null ? score.getTotalScore() : 0;
-            if (currentScore <= 0) {
-                continue;
-            }
 
             score.setTotalScore(0);
             score.setLastGroupBViolationAt(null);

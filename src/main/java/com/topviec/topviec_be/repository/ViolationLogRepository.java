@@ -10,4 +10,6 @@ import java.util.List;
 public interface ViolationLogRepository extends JpaRepository<ViolationLog, Long> {
 
     List<ViolationLog> findByEmployerIdOrderByCreatedAtDesc(Long employerId);
+
+    List<ViolationLog> findByComplaintId(Long complaintId);
 }
