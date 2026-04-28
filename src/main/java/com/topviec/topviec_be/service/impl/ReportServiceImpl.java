@@ -39,7 +39,10 @@ import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.repository.ViolationLogRepository;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.ReportService;
+import com.topviec.topviec_be.event.ComplaintAutoClosedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,6 +58,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
@@ -83,6 +87,7 @@ public class ReportServiceImpl implements ReportService {
     private final ViolationLogRepository violationLogRepository;
     private final EmployerViolationScoreRepository employerViolationScoreRepository;
     private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -324,18 +329,44 @@ public class ReportServiceImpl implements ReportService {
     public void autoCloseExpiredGroupAComplaints() {
         List<Complaint> expired = complaintRepository.findExpiredGroupAComplaints(LocalDateTime.now());
         for (Complaint complaint : expired) {
-            jobPostingRepository.findById(complaint.getJobPostId()).ifPresent(job -> {
-                companyRepository.findById(job.getCompanyId()).ifPresent(company -> {
-                    addViolationScoreSystem(company, job.getId(), complaint, GROUP_A_POINTS);
-                    sendComplaintAutoClosedEmail(job, company, complaint);
-                });
-                job.setStatus(JobPostStatus.REJECTED.getValue());
-                job.setRejectionReason(complaint.getComplaintType());
-                jobPostingRepository.save(job);
-            });
-            complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
-            complaint.setResolvedAt(LocalDateTime.now());
-            complaintRepository.save(complaint);
+            try {
+                processExpiredGroupAComplaint(complaint);
+            } catch (Exception e) {
+                log.error("Failed to auto-close complaint id={}: {}", complaint.getId(), e.getMessage(), e);
+            }
+        }
+    }
+
+    private void processExpiredGroupAComplaint(Complaint complaint) {
+        JobPosting job = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        Company company = null;
+
+        if (job != null) {
+            company = companyRepository.findById(job.getCompanyId()).orElse(null);
+            if (company != null) {
+                addViolationScoreSystem(company, job.getId(), complaint, GROUP_A_POINTS);
+            }
+            job.setStatus(JobPostStatus.REJECTED.getValue());
+            job.setRejectionReason(complaint.getComplaintType());
+            jobPostingRepository.save(job);
+        } else {
+            log.warn("Job not found for expired complaint id={}, jobPostId={} — closing without penalty",
+                    complaint.getId(), complaint.getJobPostId());
+        }
+
+        complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
+        complaint.setResolvedAt(LocalDateTime.now());
+        complaintRepository.save(complaint);
+
+        if (job != null && company != null) {
+            String employerEmail = resolveEmployerEmail(company);
+            if (employerEmail != null) {
+                eventPublisher.publishEvent(new ComplaintAutoClosedEvent(
+                        employerEmail,
+                        job.getTitle(),
+                        complaint.getComplaintType(),
+                        buildReportCode(complaint.getId())));
+            }
         }
     }
 
@@ -740,19 +771,6 @@ public class ReportServiceImpl implements ReportService {
         }
 
         emailService.sendComplaintGroupBEmail(
-                employerEmail,
-                jobPosting.getTitle(),
-                complaint.getComplaintType(),
-                buildReportCode(complaint.getId()));
-    }
-
-    private void sendComplaintAutoClosedEmail(JobPosting jobPosting, Company company, Complaint complaint) {
-        String employerEmail = resolveEmployerEmail(company);
-        if (employerEmail == null) {
-            return;
-        }
-
-        emailService.sendComplaintAutoClosedEmail(
                 employerEmail,
                 jobPosting.getTitle(),
                 complaint.getComplaintType(),
