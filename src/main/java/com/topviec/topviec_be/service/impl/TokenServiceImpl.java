@@ -152,6 +152,30 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
+    public String generateTalentPoolInviteToken(Long applicationId, Long jobPostId, Duration ttl) {
+        String token = UUID.randomUUID().toString();
+        String key = "talent-pool-invite:" + token;
+        String payload = applicationId + ":" + jobPostId;
+        redisTemplate.opsForValue().set(key, payload, ttl);
+        return token;
+    }
+
+    @Override
+    public String verifyTalentPoolInviteToken(String token) {
+        String key = "talent-pool-invite:" + token;
+        String payload = redisTemplate.opsForValue().get(key);
+        if (payload == null) {
+            throw AppException.badRequest("Link mời ứng tuyển đã hết hạn hoặc không hợp lệ");
+        }
+        return payload;
+    }
+
+    @Override
+    public void invalidateTalentPoolInviteToken(String token) {
+        redisTemplate.delete("talent-pool-invite:" + token);
+    }
+
+    @Override
     public void storeReminderInfo(Long applicationId, Long roundId, LocalDateTime deadline, Duration ttl) {
         String key = INTERVIEW_REMINDER_PREFIX + applicationId + ":" + roundId;
         // format: reminderCount:lastRemindedAt:deadline
