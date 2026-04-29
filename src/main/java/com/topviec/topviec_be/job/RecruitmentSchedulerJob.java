@@ -2,6 +2,7 @@ package com.topviec.topviec_be.job;
 
 import com.topviec.topviec_be.entity.*;
 import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
+import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.activation.BrandingActivationService;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.repository.*;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -37,6 +39,9 @@ public class RecruitmentSchedulerJob {
     private final JobPostAddonRepository jobPostAddonRepository;
     private final CompanyRepository companyRepository;
     private final CompanyBrandingRepository companyBrandingRepository;
+    private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final ServicePackageRepository servicePackageRepository;
+    private final CompanyMemberRepository companyMemberRepository;
     private final TokenService tokenService;
     private final EmailService emailService;
 
@@ -251,6 +256,96 @@ public class RecruitmentSchedulerJob {
                 flagResetter.accept(company);
                 companyRepository.save(company);
             });
+        }
+    }
+
+    /**
+     * Tự động chuyển subscription từ ACTIVE → EXPIRED khi đã quá ngày hết hạn.
+     * Chạy mỗi giờ để đảm bảo trạng thái luôn chính xác.
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    @Transactional
+    public void expireSubscriptions() {
+        LocalDateTime now = LocalDateTime.now();
+        List<CompanySubscription> expired = companySubscriptionRepository
+                .findExpiredActiveSubscriptions(SubscriptionStatus.ACTIVE, now);
+
+        if (expired.isEmpty()) return;
+
+        log.info("[Scheduler] expireSubscriptions: {} gói subscription đã hết hạn, đang chuyển sang EXPIRED", expired.size());
+
+        for (CompanySubscription sub : expired) {
+            try {
+                sub.setStatus(SubscriptionStatus.EXPIRED);
+                companySubscriptionRepository.save(sub);
+                log.info("[Scheduler] Đã expire subscription id={}, companyId={}, expiredAt={}",
+                        sub.getId(), sub.getCompanyId(), sub.getExpiredAt());
+            } catch (Exception e) {
+                log.error("[Scheduler] Lỗi khi expire subscription id={}", sub.getId(), e);
+            }
+        }
+    }
+
+    /**
+     * Tự động gửi email nhắc nhở NTD khi gói subscription sắp hết hạn (trong 7 ngày).
+     * Chạy mỗi ngày lúc 9h sáng. Mỗi subscription chỉ gửi 1 lần duy nhất.
+     */
+    @Scheduled(cron = "0 0 9 * * *")
+    @Transactional
+    public void remindSubscriptionExpiry() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sevenDaysLater = now.plusDays(7);
+
+        log.info("[Scheduler] remindSubscriptionExpiry chạy lúc: {}", now);
+
+        // Query đã lọc reminderSentAt IS NULL — chỉ lấy subscription chưa được nhắc
+        List<CompanySubscription> expiringSubs = companySubscriptionRepository
+                .findByStatusAndExpiredAtBetween(SubscriptionStatus.ACTIVE, now, sevenDaysLater);
+
+        if (expiringSubs.isEmpty()) {
+            return;
+        }
+
+        log.info("[Scheduler] Tìm thấy {} gói subscription sắp hết hạn (chưa nhắc)", expiringSubs.size());
+
+        int sentCount = 0;
+        for (CompanySubscription sub : expiringSubs) {
+            try {
+                Company company = companyRepository.findById(sub.getCompanyId()).orElse(null);
+                if (company == null) continue;
+
+                ServicePackage pkg = servicePackageRepository.findById(sub.getServicePackageId()).orElse(null);
+                String packageName = pkg != null ? pkg.getName() : "Gói dịch vụ";
+
+                // Tìm email owner của công ty
+                String ownerEmail = companyMemberRepository
+                        .findOwnerByCompanyId(sub.getCompanyId())
+                        .flatMap(member -> userRepository.findById(member.getUserId()))
+                        .map(User::getEmail)
+                        .orElse(company.getEmail());
+
+                if (ownerEmail == null) continue;
+
+                int daysRemaining = (int) ChronoUnit.DAYS.between(now.toLocalDate(), sub.getExpiredAt().toLocalDate());
+                String expiredAtStr = sub.getExpiredAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+                emailService.sendSubscriptionExpiryReminder(
+                        ownerEmail, company.getName(), packageName, expiredAtStr, daysRemaining);
+
+                // Đánh dấu đã gửi — không gửi lại lần nữa
+                sub.setReminderSentAt(now);
+                companySubscriptionRepository.save(sub);
+
+                sentCount++;
+                log.info("📧 [Scheduler] Đã gửi email nhắc gia hạn cho company={}, hết hạn={}",
+                        sub.getCompanyId(), expiredAtStr);
+            } catch (Exception e) {
+                log.error("[Scheduler] Lỗi gửi email nhắc gia hạn cho subscription={}", sub.getId(), e);
+            }
+        }
+
+        if (sentCount > 0) {
+            log.info("[Scheduler] remindSubscriptionExpiry: đã gửi {} email nhắc nhở", sentCount);
         }
     }
 

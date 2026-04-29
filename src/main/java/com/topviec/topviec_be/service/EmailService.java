@@ -58,4 +58,8 @@ public interface EmailService {
     /** Mời UV từ talent pool ứng tuyển vào tin tuyển dụng */
     void sendTalentPoolInviteEmail(String toEmail, String candidateName, String companyName,
                                    String jobTitle, String jobLink);
+
+    /** Nhắc nhở NTD gia hạn gói subscription sắp hết hạn */
+    void sendSubscriptionExpiryReminder(String toEmail, String companyName, String packageName,
+                                        String expiredAt, int daysRemaining);
 }

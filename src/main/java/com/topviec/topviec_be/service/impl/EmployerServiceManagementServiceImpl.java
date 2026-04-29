@@ -1,20 +1,30 @@
 package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
+import com.topviec.topviec_be.dto.request.ReqRenewSubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO.ResSubscriptionUsageDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
+import com.topviec.topviec_be.dto.response.ResSubscriptionRenewalDTO;
 import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.CompanySubscription;
 import com.topviec.topviec_be.entity.JobPostAddon;
 import com.topviec.topviec_be.entity.JobPosting;
+import com.topviec.topviec_be.entity.Order;
+import com.topviec.topviec_be.entity.OrderItem;
 import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.entity.ServicePackageDetail;
+import com.topviec.topviec_be.entity.SubscriptionRenewalLog;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
+import com.topviec.topviec_be.enums.services.BillingCycle;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
+import com.topviec.topviec_be.enums.services.OrderItemType;
+import com.topviec.topviec_be.enums.services.OrderStatus;
+import com.topviec.topviec_be.enums.services.OrderType;
 import com.topviec.topviec_be.enums.services.ServiceCategory;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.exception.AppException;
@@ -23,8 +33,11 @@ import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
 import com.topviec.topviec_be.repository.JobPostAddonRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.repository.OrderRepository;
+import com.topviec.topviec_be.repository.ServicePackageDetailRepository;
 import com.topviec.topviec_be.repository.ServicePackageRepository;
 import com.topviec.topviec_be.repository.ServiceRepository;
+import com.topviec.topviec_be.repository.SubscriptionRenewalLogRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
@@ -36,7 +49,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,10 +67,13 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         private final AddonServiceRepository addonServiceRepository;
         private final ServiceRepository serviceRepository;
         private final ServicePackageRepository servicePackageRepository;
+        private final ServicePackageDetailRepository servicePackageDetailRepository;
         private final JobPostingRepository jobPostingRepository;
         private final JobPostAddonRepository jobPostAddonRepository;
         private final ServiceActivationRouter serviceActivationRouter;
         private final BrandingActivationService brandingActivationService;
+        private final OrderRepository orderRepository;
+        private final SubscriptionRenewalLogRepository subscriptionRenewalLogRepository;
 
         @Override
         @Transactional(readOnly = true)
@@ -65,6 +83,11 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 CompanySubscription subscription = companySubscriptionRepository
                                 .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE)
                                 .orElseThrow(() -> AppException.notFound("Công ty chưa đăng ký gói dịch vụ nào."));
+
+                if (subscription.getExpiredAt() != null
+                                && subscription.getExpiredAt().isBefore(LocalDateTime.now())) {
+                        throw AppException.notFound("Gói dịch vụ đã hết hạn. Vui lòng gia hạn hoặc mua gói mới.");
+                }
 
                 ServicePackage servicePackage = servicePackageRepository.findById(subscription.getServicePackageId())
                                 .orElse(null);
@@ -262,6 +285,144 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 }
 
                 return brandingActivationService.activate(serviceCode, companyId, companyAddon, addonService);
+        }
+
+        @Override
+        @Transactional
+        public ResSubscriptionRenewalDTO renewSubscription(Long userId, ReqRenewSubscriptionDTO request) {
+                Long companyId = getCompanyId(userId);
+
+                // 1. Tìm subscription ACTIVE hiện tại
+                CompanySubscription subscription = companySubscriptionRepository
+                                .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE)
+                                .orElseThrow(() -> AppException.badRequest(
+                                                "Không tìm thấy gói dịch vụ đang hoạt động. Vui lòng mua gói mới."));
+
+                // 2. Lấy thông tin gói (cùng gói hiện tại)
+                ServicePackage servicePackage = servicePackageRepository.findById(subscription.getServicePackageId())
+                                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin gói dịch vụ."));
+
+                if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
+                        throw AppException.badRequest("Gói dịch vụ này không còn hoạt động. Không thể gia hạn.");
+                }
+
+                if (subscription.getExpiredAt() == null) {
+                        throw AppException.badRequest("Gói dịch vụ không có ngày hết hạn, không thể gia hạn.");
+                }
+
+                // 3. Tạo Order gia hạn
+                Order order = Order.builder()
+                                .companyId(companyId)
+                                .orderCode("ORD-RN-" + System.currentTimeMillis())
+                                .type(OrderType.SUBSCRIPTION)
+                                .totalAmount(servicePackage.getPrice())
+                                .status(OrderStatus.PAID)
+                                .paymentMethod(request.getPaymentMethod())
+                                .paidAt(LocalDateTime.now())
+                                .createdBy(userId)
+                                .build();
+                Order savedOrder = orderRepository.save(order);
+
+                OrderItem item = OrderItem.builder()
+                                .orderId(savedOrder.getId())
+                                .itemType(OrderItemType.SUBSCRIPTION)
+                                .servicePackageId(servicePackage.getId())
+                                .quantity(1)
+                                .unitPrice(servicePackage.getPrice())
+                                .totalPrice(servicePackage.getPrice())
+                                .billingCycle(servicePackage.getBillingCycle())
+                                .build();
+                savedOrder.setOrderItems(new ArrayList<>(List.of(item)));
+
+                // 4. Kéo dài expiredAt (nối tiếp, không mất thời gian còn lại)
+                LocalDateTime oldExpiredAt = subscription.getExpiredAt();
+                LocalDateTime newExpiredAt = subscription.getBillingCycle() == BillingCycle.MONTHLY
+                                ? oldExpiredAt.plusMonths(1)
+                                : oldExpiredAt.plusYears(1);
+                subscription.setExpiredAt(newExpiredAt);
+                subscription.setReminderSentAt(null); // Reset để chu kỳ mới có thể nhắc lại
+                companySubscriptionRepository.save(subscription);
+
+                // 5. Cộng dồn quota cho mỗi feature
+                List<ServicePackageDetail> details = servicePackageDetailRepository
+                                .findByServicePackageId(servicePackage.getId());
+                List<SubscriptionUsage> usages = subscriptionUsageRepository
+                                .findByCompanySubscriptionId(subscription.getId());
+
+                int totalQuotaAdded = 0;
+                for (ServicePackageDetail detail : details) {
+                        Services svc = serviceRepository.findById(detail.getServiceId()).orElse(null);
+                        if (svc == null) continue;
+
+                        SubscriptionUsage usage = usages.stream()
+                                        .filter(u -> u.getFeatureCode().equals(svc.getCode()))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (usage != null) {
+                                // Cộng dồn: giữ lại phần chưa dùng + thêm quota mới
+                                usage.setQuantityTotal(usage.getQuantityTotal() + detail.getQuantity());
+                                usage.setQuantityRemaining(usage.getQuantityRemaining() + detail.getQuantity());
+                                usage.setResetAt(newExpiredAt);
+                                subscriptionUsageRepository.save(usage);
+                        } else {
+                                // Feature mới chưa có — tạo usage mới
+                                SubscriptionUsage newUsage = SubscriptionUsage.builder()
+                                                .companySubscriptionId(subscription.getId())
+                                                .companyId(companyId)
+                                                .featureCode(svc.getCode())
+                                                .quantityTotal(detail.getQuantity())
+                                                .quantityRemaining(detail.getQuantity())
+                                                .resetAt(newExpiredAt)
+                                                .build();
+                                subscriptionUsageRepository.save(newUsage);
+                        }
+                        totalQuotaAdded += detail.getQuantity();
+                }
+
+                // 6. Ghi log gia hạn
+                SubscriptionRenewalLog renewalLog = SubscriptionRenewalLog.builder()
+                                .companySubscriptionId(subscription.getId())
+                                .orderId(savedOrder.getId())
+                                .oldExpiredAt(oldExpiredAt)
+                                .newExpiredAt(newExpiredAt)
+                                .quotaAdded(totalQuotaAdded)
+                                .renewedBy(userId)
+                                .build();
+                SubscriptionRenewalLog savedLog = subscriptionRenewalLogRepository.save(renewalLog);
+
+                // 7. Build response
+                List<SubscriptionUsage> updatedUsages = subscriptionUsageRepository
+                                .findByCompanySubscriptionId(subscription.getId());
+
+                List<ResSubscriptionRenewalDTO.UsageInfo> usageInfos = updatedUsages.stream()
+                                .map(u -> {
+                                        Services svc = serviceRepository.findByCode(u.getFeatureCode()).orElse(null);
+                                        return ResSubscriptionRenewalDTO.UsageInfo.builder()
+                                                        .featureCode(u.getFeatureCode())
+                                                        .featureName(svc != null ? svc.getName() : null)
+                                                        .quantityTotal(u.getQuantityTotal())
+                                                        .quantityRemaining(u.getQuantityRemaining())
+                                                        .build();
+                                })
+                                .collect(Collectors.toList());
+
+                return ResSubscriptionRenewalDTO.builder()
+                                .renewalLogId(savedLog.getId())
+                                .orderId(savedOrder.getId())
+                                .orderCode(savedOrder.getOrderCode())
+                                .totalAmount(savedOrder.getTotalAmount())
+                                .subscription(ResSubscriptionRenewalDTO.SubscriptionInfo.builder()
+                                                .id(subscription.getId())
+                                                .packageName(servicePackage.getName())
+                                                .packageCode(servicePackage.getCode())
+                                                .billingCycle(subscription.getBillingCycle())
+                                                .status(subscription.getStatus())
+                                                .oldExpiredAt(oldExpiredAt)
+                                                .newExpiredAt(newExpiredAt)
+                                                .usages(usageInfos)
+                                                .build())
+                                .build();
         }
 
         private Long getCompanyId(Long userId) {
