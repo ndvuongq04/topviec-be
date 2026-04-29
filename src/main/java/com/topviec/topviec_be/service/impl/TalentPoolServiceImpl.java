@@ -8,6 +8,7 @@ import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
+import com.topviec.topviec_be.dto.response.ResTalentPoolInviteInfoDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Application;
 import com.topviec.topviec_be.entity.CandidateProfile;
@@ -30,6 +31,7 @@ import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.TalentPoolRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.TalentPoolService;
+import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,6 +40,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,9 +61,13 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final CompanyRepository companyRepository;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final TokenService tokenService;
 
     @Value("${app.talent-pool-invite-url}")
     private String talentPoolInviteUrl;
+
+    @Value("${app.token.talent-pool-invite-ttl:7}")
+    private long talentPoolInviteTtlDays;
 
     // -------------------------------------------------------------------------
     // POST — thêm UV vào talent pool
@@ -349,9 +356,9 @@ public class TalentPoolServiceImpl implements TalentPoolService {
 
     private void publishInviteEvent(String email, String candidateName, String companyName,
             JobPosting job, Long applicationId) {
-        String jobLink = talentPoolInviteUrl
-                + "?applicationId=" + applicationId
-                + "&jobId=" + job.getId();
+        String token = tokenService.generateTalentPoolInviteToken(
+                applicationId, job.getId(), Duration.ofDays(talentPoolInviteTtlDays));
+        String jobLink = talentPoolInviteUrl + "?token=" + token;
         eventPublisher.publishEvent(new TalentPoolInviteEvent(email, candidateName, companyName, job.getTitle(), jobLink));
     }
 
@@ -428,6 +435,27 @@ public class TalentPoolServiceImpl implements TalentPoolService {
                 .expectedSalaryMax(profile != null ? profile.getExpectedSalaryMax() : null)
                 .salaryNegotiable(profile != null ? profile.getSalaryNegotiable() : null)
                 .jobSeekingStatus(profile != null ? profile.getJobSeekingStatus() : null)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResTalentPoolInviteInfoDTO verifyInviteToken(String token) {
+        String payload = tokenService.verifyTalentPoolInviteToken(token);
+        String[] parts = payload.split(":");
+        Long applicationId = Long.parseLong(parts[0]);
+        Long jobPostId = Long.parseLong(parts[1]);
+
+        JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Tin tuyển dụng không còn tồn tại"));
+        Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
+
+        return ResTalentPoolInviteInfoDTO.builder()
+                .applicationId(applicationId)
+                .jobPostId(jobPostId)
+                .jobTitle(job.getTitle())
+                .companyName(company != null ? company.getName() : "")
+                .companyLogoUrl(company != null ? company.getLogoUrl() : null)
                 .build();
     }
 }

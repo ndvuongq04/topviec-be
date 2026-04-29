@@ -31,6 +31,13 @@ public interface TokenService {
 
     void invalidateInterviewUpdateToken(String token);
 
+    // Talent Pool Invite
+    String generateTalentPoolInviteToken(Long applicationId, Long jobPostId, Duration ttl);
+
+    String verifyTalentPoolInviteToken(String token);
+
+    void invalidateTalentPoolInviteToken(String token);
+
     void storeReminderInfo(Long applicationId, Long roundId, LocalDateTime deadline, Duration ttl);
 
     ReminderInfo getReminderInfo(Long applicationId, Long roundId);
