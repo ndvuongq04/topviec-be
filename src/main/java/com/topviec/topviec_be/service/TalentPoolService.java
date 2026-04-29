@@ -17,6 +17,9 @@ public interface TalentPoolService {
 
     ResTalentPoolCandidateDetailDTO getTalentPoolCandidateDetail(Long companyId, Long talentPoolId);
 
+    /** NTD xem chi tiết UV chưa lưu vào talent pool (theo candidateUserId) */
+    ResTalentPoolCandidateDetailDTO getCandidateDetail(Long companyId, Long candidateUserId);
+
     void removeFromTalentPool(Long companyId, Long talentPoolId);
 
     void updateNote(Long companyId, Long talentPoolId, String note);

@@ -3,6 +3,7 @@ package com.topviec.topviec_be.repository;
 import com.topviec.topviec_be.entity.TalentPool;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Repository;
 public interface TalentPoolRepository extends JpaRepository<TalentPool, Long> {
 
     boolean existsByCompanyIdAndCandidateUserId(Long companyId, Long candidateUserId);
+
+    Optional<TalentPool> findByCompanyIdAndCandidateUserId(Long companyId, Long candidateUserId);
 
     @Query("""
             SELECT tp.candidateUserId FROM TalentPool tp

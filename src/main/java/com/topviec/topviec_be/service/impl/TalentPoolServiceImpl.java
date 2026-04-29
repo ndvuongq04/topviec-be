@@ -241,6 +241,80 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     }
 
     // -------------------------------------------------------------------------
+    // GET — chi tiết UV chưa lưu vào talent pool (theo candidateUserId)
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResTalentPoolCandidateDetailDTO getCandidateDetail(Long companyId, Long candidateUserId) {
+        CandidateProfile profile = candidateProfileRepository.findByUserId(candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy hồ sơ ứng viên"));
+
+        User candidateUser = userRepository.findById(candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản ứng viên"));
+
+        // Kiểm tra xem UV đã có trong talent pool chưa → nếu có thì bổ sung thông tin
+        TalentPool talentPool = talentPoolRepository
+                .findByCompanyIdAndCandidateUserId(companyId, candidateUserId)
+                .orElse(null);
+
+        String addedByName = null;
+        if (talentPool != null && talentPool.getAddedBy() != null) {
+            addedByName = userRepository.findById(talentPool.getAddedBy())
+                    .map(User::getEmail)
+                    .orElse(null);
+        }
+
+        String locationName = null;
+        if (profile.getPreferredLocationId() != null) {
+            locationName = locationRepository.findById(profile.getPreferredLocationId().longValue())
+                    .map(Location::getName)
+                    .orElse(null);
+        }
+
+        Cvs defaultCv = cvsRepository.findDefaultByUserId(candidateUserId).orElse(null);
+
+        return ResTalentPoolCandidateDetailDTO.builder()
+                // talent pool entry (null nếu chưa lưu)
+                .talentPoolId(talentPool != null ? talentPool.getId() : null)
+                .source(talentPool != null ? talentPool.getSource() : null)
+                .note(talentPool != null ? talentPool.getNote() : null)
+                .addedAt(talentPool != null ? talentPool.getCreatedAt() : null)
+                .addedBy(talentPool != null ? talentPool.getAddedBy() : null)
+                .addedByName(addedByName)
+                // thông tin cơ bản
+                .candidateUserId(candidateUserId)
+                .fullName(profile.getFullName())
+                .avatarUrl(profile.getAvatarUrl())
+                .bio(profile.getBio())
+                .gender(profile.getGender())
+                .linkedinUrl(profile.getLinkedinUrl())
+                .githubUrl(profile.getGithubUrl())
+                .personalWebsite(profile.getPersonalWebsite())
+                .profileCompletionPct(profile.getProfileCompletionPct())
+                .jobSeekingStatus(profile.getJobSeekingStatus())
+                // thông tin có thể ẩn
+                .phone(profile.getHidePhone() ? null : profile.getPhoneDisplay())
+                .phoneHidden(profile.getHidePhone())
+                .email(profile.getHideEmail() ? null : candidateUser.getEmail())
+                .emailHidden(profile.getHideEmail())
+                .dateOfBirth(profile.getHideDateOfBirth() ? null : profile.getDateOfBirth())
+                .dateOfBirthHidden(profile.getHideDateOfBirth())
+                // mong muốn công việc
+                .preferredJobTitle(profile.getPreferredJobTitle())
+                .preferredWorkType(profile.getPreferredWorkType())
+                .preferredLocationId(profile.getPreferredLocationId())
+                .preferredLocationName(locationName)
+                .expectedSalaryMin(profile.getHideExpectedSalary() ? null : profile.getExpectedSalaryMin())
+                .expectedSalaryMax(profile.getHideExpectedSalary() ? null : profile.getExpectedSalaryMax())
+                .salaryNegotiable(profile.getHideExpectedSalary() ? null : profile.getSalaryNegotiable())
+                .salaryHidden(profile.getHideExpectedSalary())
+                // CV mặc định
+                .defaultCv(defaultCv != null ? toDefaultCvDTO(defaultCv) : null)
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
     // PATCH — cập nhật note cho UV trong talent pool
     // -------------------------------------------------------------------------
 
