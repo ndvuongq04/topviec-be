@@ -55,4 +55,10 @@ public interface ReportService {
 
     /** NTD xem danh sách khiếu nại của 1 tin thuộc công ty mình */
     ResultPaginationDTO getEmployerReportsByJobPost(Long employerUserId, Long jobPostId, String status, String group, String complaintType, Pageable pageable);
+
+    /** Admin xem tất cả khiếu nại của cùng tin với 1 complaintId cho trước */
+    ResultPaginationDTO getReportsByComplaint(Long complaintId, String status, String group, String complaintType, Pageable pageable);
+
+    /** NTD xem tất cả khiếu nại của cùng tin với 1 complaintId (phải thuộc công ty mình) */
+    ResultPaginationDTO getEmployerReportsByComplaint(Long employerUserId, Long complaintId, String status, String group, String complaintType, Pageable pageable);
 }
