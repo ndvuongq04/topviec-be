@@ -25,5 +25,5 @@ public interface AppealService {
      * Admin duyệt kháng cáo, gỡ điểm vi phạm từ complaint liên quan và mở khóa tài khoản sớm.
      * Chỉ áp dụng khi appeal ở trạng thái pending.
      */
-    ResAppealDTO unsuspend(Long adminUserId, Long employerId, ReqUnsuspendDTO request);
+    ResAppealDTO unsuspend(Long adminUserId, Long companyId, ReqUnsuspendDTO request);
 }
