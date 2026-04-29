@@ -50,6 +50,22 @@ public class AdminReportController {
                 reportService.getReports(search, status, group, complaintType, fromDate, toDate, pageable));
     }
 
+    @GetMapping("/job-posts/{jobPostId}")
+    @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+            + AdminRoleConstants.SUPPORT_ADMIN + "')")
+    public ResponseEntity<ResultPaginationDTO> getReportsByJobPost(
+            @PathVariable Long jobPostId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String group,
+            @RequestParam(required = false) String complaintType,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        return ResponseEntity.ok(
+                reportService.getReportsByJobPost(jobPostId, status, group, complaintType, pageable));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"

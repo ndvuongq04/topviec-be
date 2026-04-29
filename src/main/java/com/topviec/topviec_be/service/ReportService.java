@@ -49,4 +49,10 @@ public interface ReportService {
 
     /** NTD xác nhận đã sửa tin → tự đóng báo cáo nhóm A */
     ResEmployerComplaintDetailDTO respondToReport(Long employerUserId, Long reportId);
+
+    /** Admin xem danh sách khiếu nại của 1 tin tuyển dụng */
+    ResultPaginationDTO getReportsByJobPost(Long jobPostId, String status, String group, String complaintType, Pageable pageable);
+
+    /** NTD xem danh sách khiếu nại của 1 tin thuộc công ty mình */
+    ResultPaginationDTO getEmployerReportsByJobPost(Long employerUserId, Long jobPostId, String status, String group, String complaintType, Pageable pageable);
 }

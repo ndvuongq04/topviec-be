@@ -996,6 +996,76 @@ public class ReportServiceImpl implements ReportService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getReportsByJobPost(
+            Long jobPostId,
+            String status,
+            String group,
+            String complaintType,
+            Pageable pageable) {
+
+        jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        Page<Complaint> page = complaintRepository.findAdminReportsByJobPostId(
+                jobPostId,
+                normalizeValue(status),
+                normalizeValue(group),
+                normalizeValue(complaintType),
+                pageable);
+
+        return toPagination(page, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getEmployerReportsByJobPost(
+            Long employerUserId,
+            Long jobPostId,
+            String status,
+            String group,
+            String complaintType,
+            Pageable pageable) {
+
+        Company company = companyRepository.findByUserId(employerUserId)
+                .orElseGet(() -> companyRepository.findByCreatedBy(employerUserId).orElse(null));
+        if (company == null) {
+            throw AppException.forbidden("Bạn không có công ty trên hệ thống");
+        }
+
+        JobPosting jobPosting = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!jobPosting.getCompanyId().equals(company.getId())) {
+            throw AppException.forbidden("Bạn không có quyền xem khiếu nại của tin này");
+        }
+
+        Page<Complaint> page = complaintRepository.findEmployerReports(
+                List.of(jobPostId),
+                EMPLOYER_VISIBLE_STATUSES,
+                null,
+                normalizeValue(status),
+                normalizeValue(group),
+                normalizeValue(complaintType),
+                pageable);
+
+        Map<Long, JobPosting> jobMap = Map.of(jobPosting.getId(), jobPosting);
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(page.getContent().stream()
+                .map(c -> toEmployerSummary(c, jobMap))
+                .toList());
+        return result;
+    }
+
     private record ProcessingInfo(LocalDateTime deadline, long remainingHours, long totalHours) {
     }
 }

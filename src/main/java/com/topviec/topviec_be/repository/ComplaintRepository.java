@@ -60,6 +60,29 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             @Param("complaintType") String complaintType,
             Pageable pageable);
 
+    @Query(value = """
+            SELECT c FROM Complaint c
+            WHERE c.jobPostId = :jobPostId
+            AND c.deletedAt IS NULL
+            AND (:status IS NULL OR c.status = :status)
+            AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
+            AND (:complaintType IS NULL OR c.complaintType = :complaintType)
+            ORDER BY c.createdAt DESC
+            """, countQuery = """
+            SELECT COUNT(c) FROM Complaint c
+            WHERE c.jobPostId = :jobPostId
+            AND c.deletedAt IS NULL
+            AND (:status IS NULL OR c.status = :status)
+            AND (:groupValue IS NULL OR c.violationGroup = :groupValue)
+            AND (:complaintType IS NULL OR c.complaintType = :complaintType)
+            """)
+    Page<Complaint> findAdminReportsByJobPostId(
+            @Param("jobPostId") Long jobPostId,
+            @Param("status") String status,
+            @Param("groupValue") String groupValue,
+            @Param("complaintType") String complaintType,
+            Pageable pageable);
+
     @Query("""
             SELECT c FROM Complaint c
             WHERE c.violationGroup = 'a'
