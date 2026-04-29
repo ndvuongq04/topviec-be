@@ -1,10 +1,12 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
+import com.topviec.topviec_be.dto.request.ReqRenewSubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
+import com.topviec.topviec_be.dto.response.ResSubscriptionRenewalDTO;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,17 @@ public class EmployerServiceManagementController {
     public ResponseEntity<ResCompanySubscriptionDTO> getMySubscription(
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(employerServiceManagementService.getMySubscription(extractUserId(jwt)));
+    }
+
+    /**
+     * Gia hạn gói subscription hiện tại (cùng gói, nối thời gian, cộng dồn quota)
+     */
+    @PostMapping("/subscription/renew")
+    public ResponseEntity<ResSubscriptionRenewalDTO> renewSubscription(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ReqRenewSubscriptionDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(employerServiceManagementService.renewSubscription(extractUserId(jwt), request));
     }
 
     /**

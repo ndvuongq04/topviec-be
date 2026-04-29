@@ -189,6 +189,20 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] " + companyName + " mời bạn ứng tuyển vào vị trí " + jobTitle, htmlBody);
     }
 
+    @Override
+    public void sendSubscriptionExpiryReminder(String toEmail, String companyName, String packageName,
+                                                String expiredAt, int daysRemaining) {
+        Context context = new Context();
+        context.setVariable("companyName", companyName);
+        context.setVariable("packageName", packageName);
+        context.setVariable("expiredAt", expiredAt);
+        context.setVariable("daysRemaining", daysRemaining);
+        context.setVariable("renewLink", baseUrl + "/employer/services");
+
+        String htmlBody = templateEngine.process("email/subscription-expiry-reminder", context);
+        sendHtmlEmail(toEmail, "[Topviec] Gói dịch vụ của bạn sắp hết hạn — Gia hạn ngay", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {
