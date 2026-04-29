@@ -13,6 +13,16 @@ public interface TalentPoolRepository extends JpaRepository<TalentPool, Long> {
 
     boolean existsByCompanyIdAndCandidateUserId(Long companyId, Long candidateUserId);
 
+    @Query("""
+            SELECT tp.candidateUserId FROM TalentPool tp
+            WHERE tp.companyId = :companyId
+            AND tp.deletedAt IS NULL
+            AND tp.candidateUserId IN :candidateUserIds
+            """)
+    List<Long> findExistingCandidateUserIds(
+            @Param("companyId") Long companyId,
+            @Param("candidateUserIds") List<Long> candidateUserIds);
+
     @Query(value = """
             SELECT tp FROM TalentPool tp
             WHERE tp.companyId = :companyId

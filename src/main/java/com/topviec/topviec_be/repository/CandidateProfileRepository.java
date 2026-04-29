@@ -1,6 +1,8 @@
 package com.topviec.topviec_be.repository;
 
 import com.topviec.topviec_be.entity.CandidateProfile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -24,4 +26,20 @@ public interface CandidateProfileRepository extends JpaRepository<CandidateProfi
     @Transactional
     @Query("UPDATE CandidateProfile c SET c.profileCompletionPct = :pct WHERE c.userId = :userId")
     void updateProfileCompletionPct(@Param("userId") Long userId, @Param("pct") int pct);
+
+    @Query(value = """
+            SELECT cp FROM CandidateProfile cp
+            WHERE cp.deletedAt IS NULL
+            AND cp.cvPublic = true
+            AND (:locationId IS NULL OR cp.preferredLocationId = :locationId)
+            ORDER BY cp.updatedAt DESC
+            """, countQuery = """
+            SELECT COUNT(cp) FROM CandidateProfile cp
+            WHERE cp.deletedAt IS NULL
+            AND cp.cvPublic = true
+            AND (:locationId IS NULL OR cp.preferredLocationId = :locationId)
+            """)
+    Page<CandidateProfile> searchCandidatesByLocation(
+            @Param("locationId") Integer locationId,
+            Pageable pageable);
 }

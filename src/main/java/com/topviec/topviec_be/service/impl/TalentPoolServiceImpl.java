@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
 import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
 import com.topviec.topviec_be.event.TalentPoolInviteEvent;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
+import com.topviec.topviec_be.dto.response.ResCandidateSearchResultDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
@@ -41,8 +42,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -436,6 +440,60 @@ public class TalentPoolServiceImpl implements TalentPoolService {
                 .salaryNegotiable(profile != null ? profile.getSalaryNegotiable() : null)
                 .jobSeekingStatus(profile != null ? profile.getJobSeekingStatus() : null)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO searchCandidates(Long companyId, Integer locationId, Pageable pageable) {
+        Page<CandidateProfile> page = candidateProfileRepository.searchCandidatesByLocation(locationId, pageable);
+
+        List<CandidateProfile> profiles = page.getContent();
+        List<Long> userIds = profiles.stream().map(CandidateProfile::getUserId).toList();
+
+        // Batch load location names
+        List<Long> locationIds = profiles.stream()
+                .map(CandidateProfile::getPreferredLocationId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(Integer::longValue)
+                .toList();
+        Map<Integer, String> locationNameMap = locationIds.isEmpty()
+                ? Collections.emptyMap()
+                : locationRepository.findAllById(locationIds).stream()
+                        .collect(Collectors.toMap(l -> l.getId().intValue(), Location::getName));
+
+        // Batch check talent pool membership
+        Set<Long> poolMemberIds = userIds.isEmpty()
+                ? Collections.emptySet()
+                : new HashSet<>(talentPoolRepository.findExistingCandidateUserIds(companyId, userIds));
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(profiles.stream()
+                .map(cp -> ResCandidateSearchResultDTO.builder()
+                        .candidateUserId(cp.getUserId())
+                        .fullName(cp.getFullName())
+                        .avatarUrl(cp.getAvatarUrl())
+                        .preferredJobTitle(cp.getPreferredJobTitle())
+                        .preferredWorkType(cp.getPreferredWorkType())
+                        .preferredLocationId(cp.getPreferredLocationId())
+                        .preferredLocationName(cp.getPreferredLocationId() != null
+                                ? locationNameMap.get(cp.getPreferredLocationId())
+                                : null)
+                        .expectedSalaryMin(cp.getExpectedSalaryMin())
+                        .expectedSalaryMax(cp.getExpectedSalaryMax())
+                        .salaryNegotiable(cp.getSalaryNegotiable())
+                        .jobSeekingStatus(cp.getJobSeekingStatus())
+                        .alreadyInPool(poolMemberIds.contains(cp.getUserId()))
+                        .build())
+                .toList());
+        return result;
     }
 
     @Override

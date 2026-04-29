@@ -74,6 +74,22 @@ public class EmployerTalentPoolController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * GET /employer/talent-pool/search-candidates?locationId=...
+     * NTD tìm kiếm UV trong DB theo địa chỉ mong muốn để thêm vào talent pool.
+     * locationId: bắt buộc — ID địa chỉ mong muốn của ứng viên.
+     */
+    @GetMapping("/search-candidates")
+    public ResponseEntity<ResultPaginationDTO> searchCandidates(
+            @RequestParam Integer locationId,
+            @PageableDefault(size = 10) Pageable pageable) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.searchCandidates(companyId, locationId, pageable));
+    }
+
     @PostMapping
     public ResponseEntity<ResTalentPoolDTO> addToTalentPool(
             @Valid @RequestBody ReqAddToTalentPoolDTO request) {
