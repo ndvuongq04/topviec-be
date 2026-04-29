@@ -2,9 +2,11 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
+import com.topviec.topviec_be.service.AppealService;
 import com.topviec.topviec_be.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import java.time.LocalDate;
 public class AdminReportController {
 
     private final ReportService reportService;
+    private final AppealService appealService;
 
     @GetMapping
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
@@ -75,20 +78,15 @@ public class AdminReportController {
         return ResponseEntity.ok(reportService.getDetail(id));
     }
 
-    @GetMapping("/{id}/job-post-complaints")
+    @GetMapping("/{id}/appeal")
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "', '"
             + AdminRoleConstants.SUPPORT_ADMIN + "')")
-    public ResponseEntity<ResultPaginationDTO> getReportsByComplaint(
-            @PathVariable Long id,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String group,
-            @RequestParam(required = false) String complaintType,
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
-
-        return ResponseEntity.ok(
-                reportService.getReportsByComplaint(id, status, group, complaintType, pageable));
+    public ResponseEntity<ResAppealDTO> getAppealByComplaint(@PathVariable Long id) {
+        return appealService.getByComplaint(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
     }
 
     @PatchMapping("/{id}/confirm")

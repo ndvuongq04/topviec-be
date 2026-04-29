@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqUnsuspendDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface AppealService {
 
@@ -13,6 +14,12 @@ public interface AppealService {
 
     /** Admin xem toàn bộ danh sách kháng cáo của một NTD */
     List<ResAppealDTO> getByEmployer(Long employerId);
+
+    /** Admin lấy kháng cáo của một báo cáo cụ thể (nếu có) */
+    Optional<ResAppealDTO> getByComplaint(Long complaintId);
+
+    /** NTD lấy kháng cáo của một báo cáo thuộc công ty mình (nếu có) */
+    Optional<ResAppealDTO> getByComplaintAsEmployer(Long employerUserId, Long complaintId);
 
     /**
      * Admin duyệt kháng cáo, gỡ điểm vi phạm từ complaint liên quan và mở khóa tài khoản sớm.

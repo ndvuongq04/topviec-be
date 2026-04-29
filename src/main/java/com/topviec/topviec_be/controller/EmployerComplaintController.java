@@ -91,20 +91,26 @@ public class EmployerComplaintController {
     }
 
     /**
-     * GET /employer/me/reports/{id}/job-post-complaints
-     * Tất cả khiếu nại của cùng tin với khiếu nại {id} — chỉ cho phép nếu tin thuộc công ty NTD.
+     * GET /employer/me/reports/{id}/appeal
+     * Kháng cáo của NTD cho khiếu nại {id} — chỉ cho phép nếu tin thuộc công ty NTD.
      */
-    @GetMapping("/reports/{id}/job-post-complaints")
-    public ResponseEntity<ResultPaginationDTO> getReportsByComplaint(
+    @GetMapping("/reports/{id}/appeal")
+    public ResponseEntity<ResAppealDTO> getAppealByComplaint(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long id,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String group,
-            @RequestParam(required = false) String complaintType,
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+            @PathVariable Long id) {
 
-        return ResponseEntity.ok(reportService.getEmployerReportsByComplaint(
-                extractUserId(jwt), id, status, group, complaintType, pageable));
+        return appealService.getByComplaintAsEmployer(extractUserId(jwt), id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
+    /**
+     * GET /employer/me/appeals
+     * NTD xem toàn bộ danh sách kháng cáo của chính mình.
+     */
+    @GetMapping("/appeals")
+    public ResponseEntity<java.util.List<ResAppealDTO>> getMyAppeals(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(appealService.getByEmployer(extractUserId(jwt)));
     }
 
     /**
