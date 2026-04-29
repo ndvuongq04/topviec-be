@@ -8,6 +8,7 @@ import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolInviteInfoDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
+import java.util.Set;
 
 public interface TalentPoolService {
     ResTalentPoolDTO addToTalentPool(Long userId, Long companyId, ReqAddToTalentPoolDTO request);
@@ -23,4 +24,7 @@ public interface TalentPoolService {
     ResApplicationDTO invite(Long employerUserId, Long companyId, Long talentPoolId, ReqInviteFromTalentPoolDTO request);
 
     ResTalentPoolInviteInfoDTO verifyInviteToken(String token);
+
+    /** NTD tìm kiếm UV trong DB theo địa chỉ mong muốn để thêm vào talent pool */
+    ResultPaginationDTO searchCandidates(Long companyId, Integer locationId, Pageable pageable);
 }

@@ -246,31 +246,14 @@ public class ReportServiceImpl implements ReportService {
             return getDetail(complaint.getId());
         }
 
+        // Cả nhóm A và B: chỉ chuyển sang PROCESSING, chưa cộng điểm
+        complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
+
         if (ViolationGroup.A.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
-            // Nhóm A: NTD có 48h sửa tin, chưa cộng điểm — scheduler xử lý nếu quá hạn
-            complaint.setStatus(ComplaintStatus.PROCESSING.getValue());
+            // Nhóm A: NTD có 48h sửa tin — scheduler xử lý nếu quá hạn
             complaint.setEmailSentAt(LocalDateTime.now());
             complaint.setEmployerDeadline(LocalDateTime.now().plusHours(GROUP_A_SLA_HOURS));
             sendComplaintGroupAEmail(complaint);
-        } else {
-            // Nhóm B: 30 điểm + ẩn tin + kết thúc ngay
-            JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
-                    .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
-            Company company = companyRepository.findById(jobPosting.getCompanyId())
-                    .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
-            String note = trimToNull(request.getResolutionNote());
-
-            addViolationScore(company, jobPosting, complaint, adminUser, GROUP_B_POINTS, note);
-
-            jobPosting.setStatus(JobPostStatus.HIDDEN.getValue());
-            jobPosting.setRejectionReason(complaint.getComplaintType());
-            jobPosting.setModerationNote(note);
-            jobPosting.setUpdatedBy(adminUser.getUser().getId());
-            jobPostingRepository.save(jobPosting);
-
-            complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
-            complaint.setResolvedAt(LocalDateTime.now());
-            sendComplaintGroupBEmail(jobPosting, company, complaint);
         }
 
         complaintRepository.save(complaint);
@@ -304,15 +287,19 @@ public class ReportServiceImpl implements ReportService {
             throw AppException.badRequest("decision khong hop le. Chi chap nhan: approve | reject");
         }
 
-        // Admin chủ động xử lý trước deadline (tương tự scheduler)
+        // Admin chủ động xử lý — cộng điểm + ẩn/reject tin
         JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin bị báo cáo"));
         Company company = companyRepository.findById(jobPosting.getCompanyId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
         String note = trimToNull(request.getResolutionNote());
 
-        addViolationScore(company, jobPosting, complaint, adminUser, GROUP_A_POINTS, note);
-        jobPosting.setStatus(JobPostStatus.REJECTED.getValue());
+        boolean isGroupB = ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup());
+        int points = isGroupB ? GROUP_B_POINTS : GROUP_A_POINTS;
+        String newJobStatus = isGroupB ? JobPostStatus.HIDDEN.getValue() : JobPostStatus.REJECTED.getValue();
+
+        addViolationScore(company, jobPosting, complaint, adminUser, points, note);
+        jobPosting.setStatus(newJobStatus);
         jobPosting.setRejectionReason(complaint.getComplaintType());
         jobPosting.setModerationNote(note);
         jobPosting.setUpdatedBy(adminUser.getUser().getId());
@@ -320,6 +307,11 @@ public class ReportServiceImpl implements ReportService {
 
         complaint.setStatus(ComplaintStatus.RESOLVED.getValue());
         complaint.setResolvedAt(LocalDateTime.now());
+
+        // Gửi email thông báo nhóm B khi xử lý xong
+        if (isGroupB) {
+            sendComplaintGroupBEmail(jobPosting, company, complaint);
+        }
         complaintRepository.save(complaint);
         return getDetail(complaint.getId());
     }

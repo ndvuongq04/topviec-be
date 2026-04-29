@@ -1,6 +1,9 @@
 package com.topviec.topviec_be.repository;
 
 import com.topviec.topviec_be.entity.TalentPool;
+
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +15,16 @@ import org.springframework.stereotype.Repository;
 public interface TalentPoolRepository extends JpaRepository<TalentPool, Long> {
 
     boolean existsByCompanyIdAndCandidateUserId(Long companyId, Long candidateUserId);
+
+    @Query("""
+            SELECT tp.candidateUserId FROM TalentPool tp
+            WHERE tp.companyId = :companyId
+            AND tp.deletedAt IS NULL
+            AND tp.candidateUserId IN :candidateUserIds
+            """)
+    List<Long> findExistingCandidateUserIds(
+            @Param("companyId") Long companyId,
+            @Param("candidateUserIds") List<Long> candidateUserIds);
 
     @Query(value = """
             SELECT tp FROM TalentPool tp
@@ -32,8 +45,7 @@ public interface TalentPoolRepository extends JpaRepository<TalentPool, Long> {
                 )
             )
             ORDER BY tp.createdAt DESC
-            """,
-            countQuery = """
+            """, countQuery = """
             SELECT COUNT(tp) FROM TalentPool tp
             WHERE tp.companyId = :companyId
             AND tp.deletedAt IS NULL
