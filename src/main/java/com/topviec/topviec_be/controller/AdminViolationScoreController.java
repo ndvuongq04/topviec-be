@@ -97,20 +97,20 @@ public class AdminViolationScoreController {
     }
 
     /**
-     * POST /admin/employers/{employerId}/unsuspend
+     * POST /admin/employers/{companyId}/unsuspend
      * Admin duyệt kháng cáo của NTD: gỡ toàn bộ điểm vi phạm từ complaint liên quan
      * và mở khóa tài khoản sớm nếu đang bị suspend.
      */
-    @PostMapping("/{employerId}/unsuspend")
+    @PostMapping("/{companyId}/unsuspend")
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
     public ResponseEntity<ResAppealDTO> unsuspend(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long employerId,
+            @PathVariable Long companyId,
             @Valid @RequestBody ReqUnsuspendDTO request) {
 
-        return ResponseEntity.ok(appealService.unsuspend(extractUserId(jwt), employerId, request));
+        return ResponseEntity.ok(appealService.unsuspend(extractUserId(jwt), companyId, request));
     }
 
     private Long extractUserId(Jwt jwt) {

@@ -209,19 +209,15 @@ public class AppealServiceImpl implements AppealService {
 
     @Override
     @Transactional
-    public ResAppealDTO unsuspend(Long adminUserId, Long employerId, ReqUnsuspendDTO request) {
+    public ResAppealDTO unsuspend(Long adminUserId, Long companyId, ReqUnsuspendDTO request) {
         AdminUser adminUser = adminUserRepository.findActiveByUserId(adminUserId)
                 .orElseThrow(() -> AppException.forbidden("Không tìm thấy tài khoản admin hợp lệ"));
 
-        userRepository.findById(employerId)
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy người dùng"));
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty"));
 
         ComplaintAppeal appeal = appealRepository.findById(request.getAppealId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy kháng cáo"));
-
-        if (!employerId.equals(appeal.getEmployerId())) {
-            throw AppException.badRequest("Kháng cáo này không thuộc về NTD được chỉ định");
-        }
 
         if (!AppealStatus.PENDING.getValue().equals(appeal.getStatus())) {
             throw AppException.badRequest("Chỉ có thể duyệt kháng cáo ở trạng thái pending");
@@ -230,7 +226,14 @@ public class AppealServiceImpl implements AppealService {
         Complaint complaint = complaintRepository.findByIdAndDeletedAtIsNull(appeal.getComplaintId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy khiếu nại liên quan"));
 
+        // Validate: kháng cáo phải thuộc về công ty được chỉ định (qua complaint → jobPosting → companyId)
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
+        if (jobPosting == null || !companyId.equals(jobPosting.getCompanyId())) {
+            throw AppException.badRequest("Kháng cáo này không thuộc về công ty được chỉ định");
+        }
+
         // Tính tổng điểm cần gỡ từ các violation log gắn với complaint này
+        Long employerId = appeal.getEmployerId();
         List<ViolationLog> logsToReverse = violationLogRepository.findByComplaintId(complaint.getId())
                 .stream()
                 .filter(log -> log.getPoints() != null && log.getPoints() > 0)
@@ -264,23 +267,16 @@ public class AppealServiceImpl implements AppealService {
         }
 
         // Mở khóa công ty và đồng bộ điểm
-        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId()).orElse(null);
-        Company company = null;
-        if (jobPosting != null) {
-            company = companyRepository.findById(jobPosting.getCompanyId()).orElse(null);
+        company.setViolationScore(newScore);
+        if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
+            company.setStatus(CompanyStatus.ACTIVE.getValue());
+            company.setSuspendedAt(null);
+            company.setSuspendedReason(null);
         }
-        if (company != null) {
-            company.setViolationScore(newScore);
-            if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
-                company.setStatus(CompanyStatus.ACTIVE.getValue());
-                company.setSuspendedAt(null);
-                company.setSuspendedReason(null);
-            }
-            company.setUpdatedBy(adminUser.getUser().getId());
-            companyRepository.save(company);
-        }
+        company.setUpdatedBy(adminUser.getUser().getId());
+        companyRepository.save(company);
 
-        if (jobPosting != null && JobPostStatus.HIDDEN.getValue().equals(jobPosting.getStatus())) {
+        if (JobPostStatus.HIDDEN.getValue().equals(jobPosting.getStatus())) {
             jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
             jobPosting.setUpdatedBy(adminUser.getUser().getId());
             jobPostingRepository.save(jobPosting);
