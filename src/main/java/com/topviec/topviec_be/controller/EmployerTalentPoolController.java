@@ -53,6 +53,20 @@ public class EmployerTalentPoolController {
         return ResponseEntity.ok(talentPoolService.getTalentPoolCandidateDetail(companyId, talentPoolId));
     }
 
+    /**
+     * GET /employer/talent-pool/candidates/{candidateUserId}
+     * NTD xem chi tiết UV (ngay cả khi chưa thêm vào talent pool)
+     */
+    @GetMapping("/candidates/{candidateUserId}")
+    public ResponseEntity<ResTalentPoolCandidateDetailDTO> getCandidateDetail(
+            @PathVariable Long candidateUserId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.getCandidateDetail(companyId, candidateUserId));
+    }
+
     @PatchMapping("/{talentPoolId}/note")
     public ResponseEntity<Void> updateNote(
             @PathVariable Long talentPoolId,
