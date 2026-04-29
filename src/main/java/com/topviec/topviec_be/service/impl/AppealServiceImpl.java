@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -154,6 +155,56 @@ public class AppealServiceImpl implements AppealService {
                     return toResponse(appeal, complaint, jobPosting, company, reviewer);
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ResAppealDTO> getByComplaint(Long complaintId) {
+        complaintRepository.findByIdAndDeletedAtIsNull(complaintId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo"));
+
+        return appealRepository.findByComplaintId(complaintId)
+                .map(appeal -> buildSingleResponse(appeal));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ResAppealDTO> getByComplaintAsEmployer(Long employerUserId, Long complaintId) {
+        Complaint complaint = complaintRepository.findByIdAndDeletedAtIsNull(complaintId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo"));
+
+        JobPosting jobPosting = jobPostingRepository.findById(complaint.getJobPostId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng liên quan"));
+
+        Company company = companyRepository.findById(jobPosting.getCompanyId())
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty liên quan"));
+
+        Long companyOwnerUserId = company.getUserId() != null ? company.getUserId() : company.getCreatedBy();
+        if (!employerUserId.equals(companyOwnerUserId)) {
+            throw AppException.forbidden("Bạn không có quyền xem kháng cáo của báo cáo này");
+        }
+
+        return appealRepository.findByComplaintId(complaintId)
+                .map(appeal -> {
+                    AdminUser reviewer = appeal.getReviewedBy() != null
+                            ? adminUserRepository.findById(appeal.getReviewedBy()).orElse(null)
+                            : null;
+                    return toResponse(appeal, complaint, jobPosting, company, reviewer);
+                });
+    }
+
+    private ResAppealDTO buildSingleResponse(ComplaintAppeal appeal) {
+        Complaint complaint = complaintRepository.findByIdAndDeletedAtIsNull(appeal.getComplaintId()).orElse(null);
+        JobPosting jobPosting = complaint != null
+                ? jobPostingRepository.findById(complaint.getJobPostId()).orElse(null)
+                : null;
+        Company company = jobPosting != null
+                ? companyRepository.findById(jobPosting.getCompanyId()).orElse(null)
+                : null;
+        AdminUser reviewer = appeal.getReviewedBy() != null
+                ? adminUserRepository.findById(appeal.getReviewedBy()).orElse(null)
+                : null;
+        return toResponse(appeal, complaint, jobPosting, company, reviewer);
     }
 
     @Override

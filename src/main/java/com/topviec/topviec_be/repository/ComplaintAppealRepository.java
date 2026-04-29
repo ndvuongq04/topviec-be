@@ -12,6 +12,8 @@ public interface ComplaintAppealRepository extends JpaRepository<ComplaintAppeal
 
     List<ComplaintAppeal> findByEmployerIdOrderByCreatedAtDesc(Long employerId);
 
+    Optional<ComplaintAppeal> findByComplaintId(Long complaintId);
+
     Optional<ComplaintAppeal> findByComplaintIdAndEmployerId(Long complaintId, Long employerId);
 
     boolean existsByComplaintIdAndEmployerIdAndStatusIn(Long complaintId, Long employerId, List<String> statuses);
