@@ -467,15 +467,17 @@ public class ReportServiceImpl implements ReportService {
             throw AppException.conflict("Bạn đã báo cáo tin tuyển dụng này trước đó");
         }
 
-        if (determineGroup(request.getComplaintType()) == ViolationGroup.B
-                && (request.getEvidences() == null || request.getEvidences().isEmpty())) {
-            throw AppException.badRequest("Nhóm vi phạm B bắt buộc phải có ít nhất 1 bằng chứng");
-        }
+        // if (determineGroup(request.getComplaintType()) == ViolationGroup.B
+        // && (request.getEvidences() == null || request.getEvidences().isEmpty())) {
+        // throw AppException.badRequest("Nhóm vi phạm B bắt buộc phải có ít nhất 1 bằng
+        // chứng");
+        // }
     }
 
     private void addViolationScoreSystem(Company company, Long jobPostId, Complaint complaint, int points) {
         Long employerUserId = company.getUserId() != null ? company.getUserId() : company.getCreatedBy();
-        if (employerUserId == null) return;
+        if (employerUserId == null)
+            return;
 
         violationLogRepository.save(ViolationLog.builder()
                 .employerId(employerUserId)
@@ -905,7 +907,7 @@ public class ReportServiceImpl implements ReportService {
         LocalDateTime emailSentAt = complaint.getEmailSentAt();
         if (emailSentAt != null
                 && (jobPosting.getUpdatedAt() == null
-                    || !jobPosting.getUpdatedAt().isAfter(emailSentAt))) {
+                        || !jobPosting.getUpdatedAt().isAfter(emailSentAt))) {
             throw AppException.badRequest(
                     "Ban chua chinh sua tin tuyen dung. Vui long cap nhat tin truoc khi xac nhan da sua.");
         }

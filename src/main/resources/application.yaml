@@ -67,6 +67,7 @@ app:
   reset-password-url: ${APP_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
   confirm-interview-url: ${APP_CONFIRM_INTERVIEW_URL:http://localhost:5173/interview-confirm-update}
   slot-selection-url: ${APP_SLOT_SELECTION_URL:http://localhost:5173/interview-select-slot}
+  talent-pool-invite-url: ${APP_TALENT_POOL_INVITE_URL:http://localhost:5173/talent-pool-invite}
 
   # config cho Cloudinary
   cloudinary:
