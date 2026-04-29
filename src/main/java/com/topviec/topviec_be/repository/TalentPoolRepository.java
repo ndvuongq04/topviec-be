@@ -1,6 +1,9 @@
 package com.topviec.topviec_be.repository;
 
 import com.topviec.topviec_be.entity.TalentPool;
+
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -42,8 +45,7 @@ public interface TalentPoolRepository extends JpaRepository<TalentPool, Long> {
                 )
             )
             ORDER BY tp.createdAt DESC
-            """,
-            countQuery = """
+            """, countQuery = """
             SELECT COUNT(tp) FROM TalentPool tp
             WHERE tp.companyId = :companyId
             AND tp.deletedAt IS NULL

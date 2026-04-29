@@ -13,7 +13,6 @@ import com.topviec.topviec_be.entity.ViolationLog;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.complaints.AppealStatus;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
-import com.topviec.topviec_be.enums.complaints.ViolationGroup;
 import com.topviec.topviec_be.enums.complaints.ViolationSource;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
@@ -58,16 +57,13 @@ public class AppealServiceImpl implements AppealService {
                 .filter(u -> u.getUserType() == UserType.EMPLOYER)
                 .orElseThrow(() -> AppException.forbidden("Chỉ nhà tuyển dụng mới được nộp kháng cáo"));
 
-        // Validate complaint exists and is Group B + RESOLVED
+        // Validate complaint exists and is PROCESSING or RESOLVED
         Complaint complaint = complaintRepository.findByIdAndDeletedAtIsNull(request.getComplaintId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy báo cáo"));
 
-        if (!ViolationGroup.B.getValue().equalsIgnoreCase(complaint.getViolationGroup())) {
-            throw AppException.badRequest("Chỉ có thể kháng cáo với báo cáo thuộc nhóm vi phạm B");
-        }
-
-        if (!"resolved".equalsIgnoreCase(complaint.getStatus())) {
-            throw AppException.badRequest("Chỉ có thể kháng cáo khi báo cáo đã được xử lý (resolved)");
+        if (!List.of("processing", "resolved").contains(
+                complaint.getStatus() != null ? complaint.getStatus().toLowerCase() : "")) {
+            throw AppException.badRequest("Chỉ có thể kháng cáo khi báo cáo đang xử lý hoặc đã xử lý");
         }
 
         // Validate employer is the one penalized (company of job post belongs to employer)
