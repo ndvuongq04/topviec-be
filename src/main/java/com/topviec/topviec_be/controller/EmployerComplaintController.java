@@ -91,6 +91,23 @@ public class EmployerComplaintController {
     }
 
     /**
+     * GET /employer/me/reports/{id}/job-post-complaints
+     * Tất cả khiếu nại của cùng tin với khiếu nại {id} — chỉ cho phép nếu tin thuộc công ty NTD.
+     */
+    @GetMapping("/reports/{id}/job-post-complaints")
+    public ResponseEntity<ResultPaginationDTO> getReportsByComplaint(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long id,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String group,
+            @RequestParam(required = false) String complaintType,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        return ResponseEntity.ok(reportService.getEmployerReportsByComplaint(
+                extractUserId(jwt), id, status, group, complaintType, pageable));
+    }
+
+    /**
      * GET /employer/me/violation-score
      * NTD xem điểm vi phạm hiện tại của mình.
      */

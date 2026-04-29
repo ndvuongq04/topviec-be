@@ -1020,6 +1020,33 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
+    public ResultPaginationDTO getReportsByComplaint(
+            Long complaintId,
+            String status,
+            String group,
+            String complaintType,
+            Pageable pageable) {
+
+        Complaint complaint = findComplaintOrThrow(complaintId);
+        return getReportsByJobPost(complaint.getJobPostId(), status, group, complaintType, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getEmployerReportsByComplaint(
+            Long employerUserId,
+            Long complaintId,
+            String status,
+            String group,
+            String complaintType,
+            Pageable pageable) {
+
+        Complaint complaint = findComplaintOrThrow(complaintId);
+        return getEmployerReportsByJobPost(employerUserId, complaint.getJobPostId(), status, group, complaintType, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ResultPaginationDTO getEmployerReportsByJobPost(
             Long employerUserId,
             Long jobPostId,
