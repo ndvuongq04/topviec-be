@@ -351,7 +351,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
             JobPosting job, Long applicationId) {
         String jobLink = talentPoolInviteUrl
                 + "?applicationId=" + applicationId
-                + "&jobSlug=" + job.getSlug();
+                + "&jobId=" + job.getId();
         eventPublisher.publishEvent(new TalentPoolInviteEvent(email, candidateName, companyName, job.getTitle(), jobLink));
     }
 
