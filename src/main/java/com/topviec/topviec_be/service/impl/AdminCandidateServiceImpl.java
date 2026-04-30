@@ -196,4 +196,23 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
                 .totalSavedJobs(totalSavedJobs)
                 .build();
     }
+
+    @Override
+    public String toggleCandidateStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản người dùng"));
+
+        UserStatus current = user.getStatus();
+
+        if (current == UserStatus.ACTIVE) {
+            user.setStatus(UserStatus.LOCKED_PERM);
+        } else if (current == UserStatus.LOCKED_PERM) {
+            user.setStatus(UserStatus.ACTIVE);
+        } else {
+            throw AppException.badRequest("Không thể thay đổi trạng thái tài khoản đang ở trạng thái: " + current.getValue());
+        }
+
+        userRepository.save(user);
+        return user.getStatus().getValue();
+    }
 }

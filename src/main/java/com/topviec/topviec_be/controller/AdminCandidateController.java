@@ -92,4 +92,15 @@ public class AdminCandidateController {
             @PathVariable Long userId) {
         return ResponseEntity.ok(adminCandidateService.getCandidateStatistics(userId));
     }
+
+    /**
+     * PATCH /admin/candidates/{userId}/toggle-status
+     * Nếu status hiện tại là active → chuyển thành locked_perm
+     * Nếu status hiện tại là locked_perm → chuyển thành active
+     */
+    @PatchMapping("/{userId}/toggle-status")
+    public ResponseEntity<String> toggleCandidateStatus(@PathVariable Long userId) {
+        String newStatus = adminCandidateService.toggleCandidateStatus(userId);
+        return ResponseEntity.ok(newStatus);
+    }
 }
