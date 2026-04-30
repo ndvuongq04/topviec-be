@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.response.ResAdminCandidateDetailDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCandidateStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
 import com.topviec.topviec_be.service.AdminCandidateService;
@@ -81,5 +82,14 @@ public class AdminCandidateController {
             @PathVariable Long userId,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(adminCandidateService.getCandidateSavedJobs(userId, pageable));
+    }
+
+    /**
+     * GET /admin/candidates/{userId}/statistics
+     */
+    @GetMapping("/{userId}/statistics")
+    public ResponseEntity<ResAdminCandidateStatisticsDTO> getCandidateStatistics(
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(adminCandidateService.getCandidateStatistics(userId));
     }
 }

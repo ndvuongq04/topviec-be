@@ -41,4 +41,6 @@ public interface CompanyFollowRepository extends JpaRepository<CompanyFollow, Lo
             Pageable pageable);
 
     long countByCompanyId(Long companyId);
+
+    long countByUserId(Long userId);
 }
