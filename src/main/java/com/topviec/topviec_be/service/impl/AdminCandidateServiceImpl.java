@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.response.ResAdminCandidateDTO;
 import com.topviec.topviec_be.dto.response.ResAdminCandidateDetailDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCandidateStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.CandidateProfile;
 import com.topviec.topviec_be.entity.User;
@@ -10,6 +11,10 @@ import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.repository.CvsRepository;
+import com.topviec.topviec_be.repository.ApplicationRepository;
+import com.topviec.topviec_be.repository.CompanyFollowRepository;
+import com.topviec.topviec_be.repository.SavedJobRepository;
 import com.topviec.topviec_be.entity.Location;
 import com.topviec.topviec_be.service.AdminCandidateService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +42,10 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
     private final ApplicationService applicationService;
     private final CompanyFollowService companyFollowService;
     private final SavedJobService savedJobService;
+    private final CvsRepository cvsRepository;
+    private final ApplicationRepository applicationRepository;
+    private final CompanyFollowRepository companyFollowRepository;
+    private final SavedJobRepository savedJobRepository;
 
     @Override
     public ResultPaginationDTO getCandidates(String statusStr, String keyword, Pageable pageable) {
@@ -130,8 +139,6 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
                 .build();
     }
 
-
-
     @Override
     public ResultPaginationDTO getCandidateCvs(Long userId, Pageable pageable) {
         List<ResCvDTO> allCvs = cvService.getMyCvs(userId);
@@ -170,5 +177,23 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
     @Override
     public ResultPaginationDTO getCandidateSavedJobs(Long userId, Pageable pageable) {
         return savedJobService.getSavedJobs(userId, pageable.getPageNumber(), pageable.getPageSize());
+    }
+
+    @Override
+    public ResAdminCandidateStatisticsDTO getCandidateStatistics(Long userId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tài khoản người dùng"));
+
+        long totalCvs = cvsRepository.countByUserId(userId);
+        long totalApplications = applicationRepository.countByCandidateUserIdAndDeletedAtIsNull(userId);
+        long totalFollowedCompanies = companyFollowRepository.countByUserId(userId);
+        long totalSavedJobs = savedJobRepository.countByUserId(userId);
+
+        return ResAdminCandidateStatisticsDTO.builder()
+                .totalCvs(totalCvs)
+                .totalApplications(totalApplications)
+                .totalFollowedCompanies(totalFollowedCompanies)
+                .totalSavedJobs(totalSavedJobs)
+                .build();
     }
 }

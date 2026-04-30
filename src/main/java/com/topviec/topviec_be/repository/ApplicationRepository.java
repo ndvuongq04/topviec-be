@@ -161,6 +161,9 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
         /** Đếm số hồ sơ (chưa xóa) theo job post id. */
         long countByJobPostIdAndDeletedAtIsNull(Long jobPostId);
 
+        /** Đếm số hồ sơ (chưa xóa) theo candidate user id. */
+        long countByCandidateUserIdAndDeletedAtIsNull(Long candidateUserId);
+
         /**
          * Batch đếm số hồ sơ theo nhiều job — tránh N+1 khi hiển thị danh sách.
          * Trả về List<Object[]> gồm [jobPostId, count].
