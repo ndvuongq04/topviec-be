@@ -31,6 +31,7 @@ public class ResAdminCandidateDetailDTO {
     private String preferredJobTitle;
     private String preferredWorkType;
     private Integer preferredLocationId;
+    private String preferredLocationName;
     private Integer profileCompletionPct;
     private Boolean isCvPublic;
     private LocalDateTime createdAt;

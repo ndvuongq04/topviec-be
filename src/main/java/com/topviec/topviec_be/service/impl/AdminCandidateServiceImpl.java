@@ -8,7 +8,9 @@ import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.users.UserStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
+import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.entity.Location;
 import com.topviec.topviec_be.service.AdminCandidateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +32,7 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
 
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
+    private final LocationRepository locationRepository;
     private final CvService cvService;
     private final ApplicationService applicationService;
     private final CompanyFollowService companyFollowService;
@@ -117,6 +120,10 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
                 .preferredJobTitle(cp.getPreferredJobTitle())
                 .preferredWorkType(cp.getPreferredWorkType())
                 .preferredLocationId(cp.getPreferredLocationId())
+                .preferredLocationName(cp.getPreferredLocationId() != null
+                        ? locationRepository.findById(Long.valueOf(cp.getPreferredLocationId()))
+                                .map(Location::getName).orElse(null)
+                        : null)
                 .profileCompletionPct(cp.getProfileCompletionPct())
                 .isCvPublic(cp.getCvPublic())
                 .createdAt(cp.getCreatedAt())

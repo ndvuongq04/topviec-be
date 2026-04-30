@@ -11,6 +11,8 @@ import com.topviec.topviec_be.enums.company.VerificationStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyFollowRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.repository.IndustryRepository;
+import com.topviec.topviec_be.entity.Industry;
 import com.topviec.topviec_be.service.CompanyFollowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,7 @@ public class CompanyFollowServiceImpl implements CompanyFollowService {
 
     private final CompanyFollowRepository companyFollowRepository;
     private final CompanyRepository companyRepository;
+    private final IndustryRepository industryRepository;
 
     // -------------------------------------------------------------------------
     // Candidate — Follow / Unfollow Actions
@@ -95,6 +98,16 @@ public class CompanyFollowServiceImpl implements CompanyFollowService {
         Map<Long, Company> companyMap = companies.stream()
                 .collect(Collectors.toMap(Company::getId, c -> c));
 
+        // Fetch all industries related to these companies in a batch
+        List<Long> industryIds = companies.stream()
+                .map(Company::getIndustryId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, String> industryMap = industryIds.isEmpty() ? Map.of()
+                : industryRepository.findAllById(industryIds).stream()
+                        .collect(Collectors.toMap(Industry::getId, Industry::getName));
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -105,7 +118,11 @@ public class CompanyFollowServiceImpl implements CompanyFollowService {
         result.setMeta(meta);
         result.setResult(page.getContent().stream()
                 .filter(cf -> companyMap.containsKey(cf.getCompanyId())) // bỏ qua nếu company đã bị xóa
-                .map(cf -> toResponse(cf, companyMap.get(cf.getCompanyId())))
+                .map(cf -> {
+                    Company c = companyMap.get(cf.getCompanyId());
+                    String industryName = industryMap.get(c.getIndustryId());
+                    return toResponse(cf, c, industryName);
+                })
                 .toList());
         return result;
     }
@@ -114,13 +131,14 @@ public class CompanyFollowServiceImpl implements CompanyFollowService {
     // Helper
     // -------------------------------------------------------------------------
 
-    private ResCompanyFollowDTO toResponse(CompanyFollow cf, Company c) {
+    private ResCompanyFollowDTO toResponse(CompanyFollow cf, Company c, String industryName) {
         ResCompanyDTO companyDTO = ResCompanyDTO.builder()
                 .id(c.getId())
                 .slug(c.getSlug())
                 .name(c.getName())
                 .logoUrl(c.getLogoUrl())
                 .industryId(c.getIndustryId())
+                .industryName(industryName)
                 .companySize(c.getCompanySize() != null ? CompanySize.fromValue(c.getCompanySize()) : null)
                 .provinceId(c.getProvinceId())
                 .address(c.getAddress())
