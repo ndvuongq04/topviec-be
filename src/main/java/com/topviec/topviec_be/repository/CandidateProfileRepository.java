@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -16,6 +17,8 @@ public interface CandidateProfileRepository extends JpaRepository<CandidateProfi
     Optional<CandidateProfile> findByUserId(Long userId);
 
     boolean existsByUserId(Long userId);
+
+    List<CandidateProfile> findByUserIdIn(List<Long> userIds);
 
     @Modifying
     @Transactional

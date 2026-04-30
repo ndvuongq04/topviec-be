@@ -19,7 +19,8 @@ public interface CompanyService {
         ResCompanyDTO getById(Long id);
 
         ResultPaginationDTO getPublicCompanies(String keyword, Integer provinceId,
-                        Long industryId, Pageable pageable);
+                        Long industryId, Boolean isBanner, Boolean isTopEmployer, Boolean isBrandVerified,
+                        Pageable pageable);
 
         ResCompanyDTO adminGetById(Long id);
 

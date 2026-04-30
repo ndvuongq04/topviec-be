@@ -2,6 +2,7 @@ package com.topviec.topviec_be.dto.response;
 
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -23,10 +24,17 @@ public class ResJobPostingSummary {
     private Boolean salaryNegotiable;
     private Boolean isFeatured;
     private Boolean isUrgent;
+    private Boolean isHot;
     private Integer viewCount;
+    private Integer applicationCount;   // Tổng số hồ sơ đã nộp vào tin
+    private Integer interviewRoundsCount; // Tổng số vòng phỏng vấn của tin
+    private Integer headcount;          // Số UV cần tuyển
+    private Integer hiredCount;         // Số offer thành công (status = hired)
     private LocalDateTime deadline;
     private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
+    private LocalDateTime deletedAt;   // null = đang hoạt động, non-null = đã xóa mềm
+    private List<LocationDTO> locations;
 
     @Getter
     @Setter
@@ -39,6 +47,8 @@ public class ResJobPostingSummary {
         private String slug;
         private String logoUrl;
         private String address;
+        private Boolean isTopEmployer;
+        private Boolean isBrandVerified;
     }
 
     @Getter
@@ -59,5 +69,17 @@ public class ResJobPostingSummary {
     public static class LevelDTO {
         private Long id;
         private String name;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LocationDTO {
+        private Long id;
+        private String name;
+        private String addressDetail;
+        private Boolean isRemote;
     }
 }

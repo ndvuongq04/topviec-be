@@ -26,6 +26,15 @@ public class AdminUserController {
         private final AdminUserService adminUserService;
 
         /**
+         * GET /admin/users/me
+         * Admin xem thông tin cá nhân của chính mình
+         */
+        @GetMapping("/me")
+        public ResponseEntity<ResAdminUser> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
+                return ResponseEntity.ok(adminUserService.getMyAdminProfile(extractUserId(jwt)));
+        }
+
+        /**
          * POST /api/admin/users
          * Chỉ super_admin được tạo admin mới
          */

@@ -12,6 +12,7 @@ import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
+import com.topviec.topviec_be.repository.JobPostLocationRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.LevelRepository;
 import com.topviec.topviec_be.repository.SavedJobRepository;
@@ -24,6 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +40,7 @@ public class SavedJobServiceImpl implements SavedJobService {
         private final CompanyRepository companyRepository;
         private final IndustryRepository industryRepository;
         private final LevelRepository levelRepository;
+        private final JobPostLocationRepository jobPostLocationRepository;
 
         @Override
         @Transactional
@@ -93,6 +97,20 @@ public class SavedJobServiceImpl implements SavedJobService {
                                 .findAllById(jobMap.values().stream().map(JobPosting::getLevelId).distinct().toList())
                                 .stream().collect(Collectors.toMap(Level::getId, l -> l));
 
+                // Batch load locations kèm province (1 query, tránh N+1)
+                Map<Long, List<ResJobPostingSummary.LocationDTO>> locationMap = new HashMap<>();
+                if (!jobPostIds.isEmpty()) {
+                        jobPostLocationRepository.findByJobPostIdInWithProvince(jobPostIds).forEach(loc -> {
+                                locationMap.computeIfAbsent(loc.getJobPostId(), k -> new ArrayList<>())
+                                                .add(ResJobPostingSummary.LocationDTO.builder()
+                                                                .id(loc.getProvinceId())
+                                                                .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
+                                                                .addressDetail(loc.getAddressDetail())
+                                                                .isRemote(loc.getIsRemote())
+                                                                .build());
+                        });
+                }
+
                 ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
                 meta.setPage(page);
                 meta.setPageSize(size);
@@ -104,7 +122,7 @@ public class SavedJobServiceImpl implements SavedJobService {
                 result.setResult(savedJobs.stream()
                                 .map(s -> {
                                         JobPosting j = jobMap.get(s.getJobPost().getId());
-                                        return toResponse(s, j, companyMap, industryMap, levelMap);
+                                        return toResponse(s, j, companyMap, industryMap, levelMap, locationMap);
                                 })
                                 .toList());
 
@@ -125,21 +143,33 @@ public class SavedJobServiceImpl implements SavedJobService {
                 Company company = companyRepository.findById(j.getCompanyId()).orElse(null);
                 Industry industry = industryRepository.findById(j.getIndustryId()).orElse(null);
                 Level level = levelRepository.findById(j.getLevelId()).orElse(null);
-                return buildResponse(s, j, company, industry, level);
+                List<ResJobPostingSummary.LocationDTO> locations = jobPostLocationRepository
+                                .findByJobPostIdWithProvince(j.getId()).stream()
+                                .map(loc -> ResJobPostingSummary.LocationDTO.builder()
+                                                .id(loc.getProvinceId())
+                                                .name(loc.getProvince() != null ? loc.getProvince().getName() : null)
+                                                .addressDetail(loc.getAddressDetail())
+                                                .isRemote(loc.getIsRemote())
+                                                .build())
+                                .toList();
+                return buildResponse(s, j, company, industry, level, locations);
         }
 
         private ResSavedJobDTO toResponse(SavedJob s, JobPosting j,
                         Map<Long, Company> companyMap,
                         Map<Long, Industry> industryMap,
-                        Map<Long, Level> levelMap) {
+                        Map<Long, Level> levelMap,
+                        Map<Long, List<ResJobPostingSummary.LocationDTO>> locationMap) {
                 return buildResponse(s, j,
                                 companyMap.get(j.getCompanyId()),
                                 industryMap.get(j.getIndustryId()),
-                                levelMap.get(j.getLevelId()));
+                                levelMap.get(j.getLevelId()),
+                                locationMap.getOrDefault(j.getId(), List.of()));
         }
 
         private ResSavedJobDTO buildResponse(SavedJob s, JobPosting j,
-                        Company company, Industry industry, Level level) {
+                        Company company, Industry industry, Level level,
+                        List<ResJobPostingSummary.LocationDTO> locations) {
                 ResJobPostingSummary summary = ResJobPostingSummary.builder()
                                 .id(j.getId())
                                 .title(j.getTitle())
@@ -148,8 +178,11 @@ public class SavedJobServiceImpl implements SavedJobService {
                                                 : ResJobPostingSummary.CompanyDTO.builder()
                                                                 .id(company.getId())
                                                                 .name(company.getName())
+                                                                .slug(company.getSlug())
                                                                 .logoUrl(company.getLogoUrl())
                                                                 .address(company.getAddress())
+                                                                .isTopEmployer(company.getIsTopEmployer())
+                                                                .isBrandVerified(company.getIsBrandVerified())
                                                                 .build())
                                 .industry(industry == null ? null
                                                 : ResJobPostingSummary.IndustryDTO.builder()
@@ -168,10 +201,12 @@ public class SavedJobServiceImpl implements SavedJobService {
                                 .salaryNegotiable(j.getSalaryNegotiable())
                                 .isFeatured(j.getIsFeatured())
                                 .isUrgent(j.getIsUrgent())
+                                .isHot(j.getIsHot())
                                 .viewCount(j.getViewCount())
                                 .deadline(j.getDeadline())
                                 .publishedAt(j.getPublishedAt())
                                 .createdAt(j.getCreatedAt())
+                                .locations(locations)
                                 .build();
 
                 return ResSavedJobDTO.builder()

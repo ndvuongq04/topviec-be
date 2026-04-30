@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.repository;
 
 import com.topviec.topviec_be.entity.JobPosting;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -8,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -16,6 +19,9 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
 
     Optional<JobPosting> findByIdAndDeletedAtIsNull(Long id);
 
+    /** Dùng cho restore: tìm tin kể cả đã bị xóa mềm. */
+    Optional<JobPosting> findById(Long id);
+
     boolean existsBySlugAndDeletedAtIsNull(String slug);
 
     boolean existsBySlugAndIdNotAndDeletedAtIsNull(String slug, Long id);
@@ -23,4 +29,11 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
     @Modifying
     @Query("UPDATE JobPosting j SET j.viewCount = j.viewCount + 1 WHERE j.id = :id")
     void incrementViewCount(@Param("id") Long id);
+
+    @Query("SELECT j.companyId, COUNT(j) FROM JobPosting j WHERE j.companyId IN :companyIds AND j.status IN ('published', 'interviewing') AND j.deletedAt IS NULL GROUP BY j.companyId")
+    List<Object[]> countActiveByCompanyIds(@Param("companyIds") List<Long> companyIds);
+
+    @Query("SELECT COUNT(j) FROM JobPosting j WHERE j.companyId = :companyId AND j.status IN ('published', 'interviewing') AND j.deletedAt IS NULL")
+    long countActiveByCompanyId(@Param("companyId") Long companyId);
+
 }

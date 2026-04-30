@@ -17,8 +17,12 @@ public class JobPostingSpecification {
                 : cb.equal(root.get("status"), status.trim());
     }
 
-    public static Specification<JobPosting> isPublished() {
-        return hasStatus("published");
+    /**
+     * Tin hiển thị công khai cho UV: published HOẶC interviewing.
+     * Nghiệp vụ: NTT vừa phỏng vấn vừa tuyển dụng → tin vẫn phải hiển thị.
+     */
+    public static Specification<JobPosting> isVisibleToCandidate() {
+        return (root, query, cb) -> root.get("status").in("published", "interviewing");
     }
 
     public static Specification<JobPosting> hasKeyword(String keyword) {
@@ -63,6 +67,12 @@ public class JobPostingSpecification {
                 : cb.equal(root.get("isUrgent"), isUrgent);
     }
 
+    public static Specification<JobPosting> isHot(Boolean isHot) {
+        return (root, query, cb) -> isHot == null
+                ? null
+                : cb.equal(root.get("isHot"), isHot);
+    }
+
     // ── Lọc lương (giao nhau với khoảng lương của job) ─────────────────────
 
     /** Lọc job có salaryMax >= salaryMin của filter (khoảng lương có giao nhau). */
@@ -97,7 +107,7 @@ public class JobPostingSpecification {
 
     public static Specification<JobPosting> withFilter(
             String keyword, Long companyId, Long industryId, Long levelId,
-            String workType, String status, Boolean isFeatured, Boolean isUrgent,
+            String workType, String status, Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax) {
 
@@ -110,22 +120,55 @@ public class JobPostingSpecification {
                 .and(hasStatus(status))
                 .and(isFeatured(isFeatured))
                 .and(isUrgent(isUrgent))
+                .and(isHot(isHot))
                 .and(salaryAtLeast(salaryMin))
                 .and(salaryAtMost(salaryMax))
                 .and(experienceAtLeast(experienceYearsMin))
                 .and(experienceAtMost(experienceYearsMax));
     }
 
+    // ── Bộ lọc Employer (bao gồm tin đã xóa mềm) ──────────────────────────
+
+    public static Specification<JobPosting> withEmployerFilter(
+            String keyword, Long companyId, Long industryId, Long levelId,
+            String workType, String status, Boolean isFeatured, Boolean isUrgent, Boolean isHot,
+            Long salaryMin, Long salaryMax,
+            Integer experienceYearsMin, Integer experienceYearsMax) {
+
+        // Không dùng notDeleted() → lấy tất cả kể cả đã xóa mềm
+        return Specification.where(hasKeyword(keyword))
+                .and(hasCompany(companyId))
+                .and(hasIndustry(industryId))
+                .and(hasLevel(levelId))
+                .and(hasWorkType(workType))
+                .and(hasStatus(status))
+                .and(isFeatured(isFeatured))
+                .and(isUrgent(isUrgent))
+                .and(isHot(isHot))
+                .and(salaryAtLeast(salaryMin))
+                .and(salaryAtMost(salaryMax))
+                .and(experienceAtLeast(experienceYearsMin))
+                .and(experienceAtMost(experienceYearsMax));
+    }
+
+    public static Specification<JobPosting> withPublicCompanyFilter(
+            String keyword, Long companyId) {
+
+        // Không dùng notDeleted() → lấy tất cả kể cả đã xóa mềm
+        return Specification.where(hasKeyword(keyword))
+                .and(hasCompany(companyId));
+    }
+
     // ── Bộ lọc public (chỉ published, không có filter status) ─────────────
 
     public static Specification<JobPosting> withPublicFilter(
             String keyword, Long companyId, Long industryId, Long levelId,
-            String workType, Boolean isFeatured, Boolean isUrgent,
+            String workType, Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax) {
 
         return Specification.where(notDeleted())
-                .and(isPublished())
+                .and(isVisibleToCandidate())
                 .and(hasKeyword(keyword))
                 .and(hasCompany(companyId))
                 .and(hasIndustry(industryId))
@@ -133,6 +176,7 @@ public class JobPostingSpecification {
                 .and(hasWorkType(workType))
                 .and(isFeatured(isFeatured))
                 .and(isUrgent(isUrgent))
+                .and(isHot(isHot))
                 .and(salaryAtLeast(salaryMin))
                 .and(salaryAtMost(salaryMax))
                 .and(experienceAtLeast(experienceYearsMin))

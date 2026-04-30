@@ -57,4 +57,12 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Lo
     Optional<CompanyMember> findByCompanyIdAndUserId(
             @Param("companyId") Long companyId,
             @Param("userId") Long userId);
+
+    @Query("""
+            SELECT cm FROM CompanyMember cm
+            WHERE cm.companyId = :companyId AND cm.userId IN :userIds AND cm.deletedAt IS NULL
+            """)
+    List<CompanyMember> findByCompanyIdAndUserIds(
+            @Param("companyId") Long companyId,
+            @Param("userIds") List<Long> userIds);
 }
