@@ -40,4 +40,26 @@ public interface EmailService {
      */
     void sendSlotSelectionEmail(String toEmail, String candidateName, String companyName, String jobTitle,
                                 String roundName, String deadline, String selectSlotLink);
+
+    // ── Khiếu nại tin tuyển dụng ──────────────────────────────────────────────
+
+    /** Nhóm A: NTD có 48h để sửa tin trước khi bị ẩn */
+    void sendComplaintGroupAEmail(String toEmail, String jobPostTitle, String complaintType,
+                                  String reportCode, String deadline);
+
+    /** Nhóm B: vi phạm nghiêm trọng — ẩn tin + cộng điểm ngay */
+    void sendComplaintGroupBEmail(String toEmail, String jobPostTitle, String complaintType,
+                                  String reportCode);
+
+    /** Quá 48h NTD không sửa — tin đã bị ẩn + cộng điểm */
+    void sendComplaintAutoClosedEmail(String toEmail, String jobPostTitle, String complaintType,
+                                      String reportCode);
+
+    /** Mời UV từ talent pool ứng tuyển vào tin tuyển dụng */
+    void sendTalentPoolInviteEmail(String toEmail, String candidateName, String companyName,
+                                   String jobTitle, String jobLink);
+
+    /** Nhắc nhở NTD gia hạn gói subscription sắp hết hạn */
+    void sendSubscriptionExpiryReminder(String toEmail, String companyName, String packageName,
+                                        String expiredAt, int daysRemaining);
 }

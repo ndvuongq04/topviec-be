@@ -51,7 +51,7 @@ public enum ApplicationStatus {
     public boolean canTransitionTo(ApplicationStatus next) {
         return switch (this) {
             case PENDING -> next == SEEN || next == WITHDRAWN || next == EXPIRED;
-            case INVITED -> next == PENDING || next == EXPIRED;
+            case INVITED -> next == PENDING || next == EXPIRED || next == WITHDRAWN;
             case SEEN -> next == CONSIDERING || next == CV_PASSED
                     || next == REJECTED || next == EXPIRED || next == WITHDRAWN;
             case CONSIDERING -> next == CV_PASSED || next == REJECTED

@@ -1,7 +1,9 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
+import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateTalentPoolNoteDTO;
+import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -51,6 +53,20 @@ public class EmployerTalentPoolController {
         return ResponseEntity.ok(talentPoolService.getTalentPoolCandidateDetail(companyId, talentPoolId));
     }
 
+    /**
+     * GET /employer/talent-pool/candidates/{candidateUserId}
+     * NTD xem chi tiết UV (ngay cả khi chưa thêm vào talent pool)
+     */
+    @GetMapping("/candidates/{candidateUserId}")
+    public ResponseEntity<ResTalentPoolCandidateDetailDTO> getCandidateDetail(
+            @PathVariable Long candidateUserId) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.getCandidateDetail(companyId, candidateUserId));
+    }
+
     @PatchMapping("/{talentPoolId}/note")
     public ResponseEntity<Void> updateNote(
             @PathVariable Long talentPoolId,
@@ -72,6 +88,22 @@ public class EmployerTalentPoolController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * GET /employer/talent-pool/search-candidates?locationId=...
+     * NTD tìm kiếm UV trong DB theo địa chỉ mong muốn để thêm vào talent pool.
+     * locationId: bắt buộc — ID địa chỉ mong muốn của ứng viên.
+     */
+    @GetMapping("/search-candidates")
+    public ResponseEntity<ResultPaginationDTO> searchCandidates(
+            @RequestParam Integer locationId,
+            @PageableDefault(size = 10) Pageable pageable) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.ok(talentPoolService.searchCandidates(companyId, locationId, pageable));
+    }
+
     @PostMapping
     public ResponseEntity<ResTalentPoolDTO> addToTalentPool(
             @Valid @RequestBody ReqAddToTalentPoolDTO request) {
@@ -81,5 +113,17 @@ public class EmployerTalentPoolController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(talentPoolService.addToTalentPool(userId, companyId, request));
+    }
+
+    @PostMapping("/{talentPoolId}/invite")
+    public ResponseEntity<ResApplicationDTO> invite(
+            @PathVariable Long talentPoolId,
+            @Valid @RequestBody ReqInviteFromTalentPoolDTO request) {
+
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(talentPoolService.invite(userId, companyId, talentPoolId, request));
     }
 }

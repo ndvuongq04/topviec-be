@@ -15,6 +15,8 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
     Optional<Company> findBySlug(String slug);
 
+    Optional<Company> findByUserId(Long userId);
+
     Optional<Company> findByCreatedBy(Long userId);
 
     boolean existsBySlug(String slug);

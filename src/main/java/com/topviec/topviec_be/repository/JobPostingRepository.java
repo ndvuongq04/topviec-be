@@ -36,4 +36,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
     @Query("SELECT COUNT(j) FROM JobPosting j WHERE j.companyId = :companyId AND j.status IN ('published', 'interviewing') AND j.deletedAt IS NULL")
     long countActiveByCompanyId(@Param("companyId") Long companyId);
 
+    @Query("SELECT j.id FROM JobPosting j WHERE j.companyId = :companyId AND j.deletedAt IS NULL")
+    List<Long> findIdsByCompanyId(@Param("companyId") Long companyId);
+
 }

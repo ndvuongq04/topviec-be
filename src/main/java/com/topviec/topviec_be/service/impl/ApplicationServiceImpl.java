@@ -450,6 +450,49 @@ public class ApplicationServiceImpl implements ApplicationService {
         return toEmployerResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public ResApplicationDTO acceptInvite(Long candidateUserId, Long applicationId) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        if (!ApplicationStatus.INVITED.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể chấp nhận lời mời ở trạng thái invited");
+        }
+
+        application.setStatus(ApplicationStatus.PENDING.getValue());
+        Application saved = applicationRepository.save(application);
+
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
+    @Override
+    @Transactional
+    public ResApplicationDTO declineInvite(Long candidateUserId, Long applicationId) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        if (!ApplicationStatus.INVITED.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể từ chối lời mời ở trạng thái invited");
+        }
+
+        application.setStatus(ApplicationStatus.WITHDRAWN.getValue());
+        application.setWithdrawnAt(LocalDateTime.now());
+        Application saved = applicationRepository.save(application);
+
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
     private ResEmployerApplicationDTO toEmployerResponse(Application a) {
         User user = null;
         CandidateProfile profile = null;

@@ -1,10 +1,12 @@
 package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
+import com.topviec.topviec_be.dto.request.ReqRenewSubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
 import com.topviec.topviec_be.dto.response.ResCompanySubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
+import com.topviec.topviec_be.dto.response.ResSubscriptionRenewalDTO;
 
 import java.util.List;
 
@@ -21,4 +23,7 @@ public interface EmployerServiceManagementService {
 
     /** Áp dụng dịch vụ BRANDING cho công ty (route tự động theo service code của addon) */
     ResCompanyBrandingDTO applyBrandingToCompany(Long userId, ReqApplyAddonDTO request);
+
+    /** Gia hạn gói subscription hiện tại (cùng gói, nối thời gian, cộng dồn quota) */
+    ResSubscriptionRenewalDTO renewSubscription(Long userId, ReqRenewSubscriptionDTO request);
 }

@@ -62,11 +62,13 @@ app:
     reset-password-prefix: ${RESET_PASSWORD_PREFIX:reset-password}
     interview-reminder-prefix: ${INTERVIEW_REMINDER_PREFIX:interview:reminder:}
     interview-update-ttl: ${INTERVIEW_UPDATE_TTL:7} # ngày
+    talent-pool-invite-ttl: ${TALENT_POOL_INVITE_TTL:7} # ngày
   base-url: ${APP_BASE_URL:http://localhost:5173}
   verify-email-url: ${APP_VERIFY_EMAIL_URL:http://localhost:5173/verify-email}
   reset-password-url: ${APP_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
   confirm-interview-url: ${APP_CONFIRM_INTERVIEW_URL:http://localhost:5173/interview-confirm-update}
   slot-selection-url: ${APP_SLOT_SELECTION_URL:http://localhost:5173/interview-select-slot}
+  talent-pool-invite-url: ${APP_TALENT_POOL_INVITE_URL:http://localhost:5173/talent-pool-invite}
 
   # config cho Cloudinary
   cloudinary:

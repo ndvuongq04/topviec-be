@@ -67,6 +67,10 @@ public class CompanySubscription {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Thời điểm đã gửi email nhắc gia hạn — null = chưa gửi */
+    @Column(name = "reminder_sent_at")
+    private LocalDateTime reminderSentAt;
+
     @JsonIgnore
     @OneToMany(mappedBy = "companySubscription", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SubscriptionUsage> usages = new ArrayList<>();
