@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
@@ -97,6 +98,17 @@ public class AdminCompanyController {
 
                 companyService.deleteCompany(id, extractUserId(jwt));
                 return ResponseEntity.noContent().build();
+        }
+
+        @GetMapping("/{id}/statistics")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "', '"
+                        + AdminRoleConstants.FINANCE_ADMIN + "')")
+        public ResponseEntity<ResAdminCompanyStatisticsDTO> getCompanyStatistics(
+                        @PathVariable Long id) {
+                return ResponseEntity.ok(companyService.getCompanyStatistics(id));
         }
 
         private Long extractUserId(Jwt jwt) {

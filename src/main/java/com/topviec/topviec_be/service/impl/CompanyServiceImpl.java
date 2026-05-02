@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Company;
@@ -9,12 +10,17 @@ import com.topviec.topviec_be.enums.company.CompanySize;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.CompanySubscription;
 import com.topviec.topviec_be.entity.Industry;
+import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +40,8 @@ public class CompanyServiceImpl implements CompanyService {
     private final CompanyMemberRepository companyMemberRepository;
     private final IndustryRepository industryRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final ApplicationRepository applicationRepository;
+    private final CompanySubscriptionRepository companySubscriptionRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -446,5 +454,48 @@ public class CompanyServiceImpl implements CompanyService {
         return companyRepository.findByCreatedBy(userId)
                 .orElseThrow(() -> AppException.notFound("Bạn chưa có hồ sơ công ty"))
                 .getId();
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin — Company Statistics
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResAdminCompanyStatisticsDTO getCompanyStatistics(Long companyId) {
+        // Validate company exists
+        findByIdOrThrow(companyId);
+
+        // 1. Tổng tin đã đăng (chưa bị xóa mềm)
+        long totalJobPostings = jobPostingRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
+
+        // 2. Tổng CV/đơn ứng tuyển đã nhận
+        long totalApplicationsReceived = applicationRepository.countByCompanyId(companyId);
+
+        // 3. Gói dịch vụ đang sử dụng (status = ACTIVE)
+        List<CompanySubscription> activeSubscriptions = companySubscriptionRepository
+                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
+
+        List<ResAdminCompanyStatisticsDTO.ActiveSubscriptionDTO> subscriptionDTOs = activeSubscriptions.stream()
+                .map(sub -> {
+                    ServicePackage pkg = sub.getServicePackage();
+                    return ResAdminCompanyStatisticsDTO.ActiveSubscriptionDTO.builder()
+                            .subscriptionId(sub.getId())
+                            .servicePackageId(sub.getServicePackageId())
+                            .packageName(pkg != null ? pkg.getName() : null)
+                            .packageCode(pkg != null ? pkg.getCode() : null)
+                            .billingCycle(sub.getBillingCycle())
+                            .status(sub.getStatus())
+                            .startedAt(sub.getStartedAt())
+                            .expiredAt(sub.getExpiredAt())
+                            .build();
+                })
+                .toList();
+
+        return ResAdminCompanyStatisticsDTO.builder()
+                .totalJobPostings(totalJobPostings)
+                .totalApplicationsReceived(totalApplicationsReceived)
+                .activeSubscriptions(subscriptionDTOs)
+                .build();
     }
 }

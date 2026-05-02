@@ -39,4 +39,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
     @Query("SELECT j.id FROM JobPosting j WHERE j.companyId = :companyId AND j.deletedAt IS NULL")
     List<Long> findIdsByCompanyId(@Param("companyId") Long companyId);
 
+    /** Đếm tổng số tin tuyển dụng (chưa xóa mềm) theo công ty. */
+    long countByCompanyIdAndDeletedAtIsNull(Long companyId);
+
 }

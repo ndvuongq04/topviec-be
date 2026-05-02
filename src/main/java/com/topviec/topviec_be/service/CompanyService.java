@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
@@ -38,4 +39,7 @@ public interface CompanyService {
         void deleteCompany(Long companyId, Long adminId);
 
         Long getCompanyIdByUserId(Long userId);
+
+        /** Admin: lấy thống kê tổng quan của công ty (tổng tin, tổng CV, gói dịch vụ). */
+        ResAdminCompanyStatisticsDTO getCompanyStatistics(Long companyId);
 }
