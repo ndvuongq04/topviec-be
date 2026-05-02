@@ -150,4 +150,40 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate,
             Pageable pageable);
+
+    // ── Statistics queries ─────────────────────────────────────────────────────
+
+    /** Tổng số báo cáo (chưa xóa mềm) */
+    long countByDeletedAtIsNull();
+
+    /** Số báo cáo chờ xử lý (status = pending) */
+    long countByStatusAndDeletedAtIsNull(String status);
+
+    /** Số báo cáo thuộc nhóm B (vi phạm nặng) */
+    long countByViolationGroupAndDeletedAtIsNull(String violationGroup);
+
+    /**
+     * Số báo cáo quá hạn SLA — chưa xử lý xong mà đã quá deadline.
+     * Nhóm A: deadline = createdAt + 42h, Nhóm B: deadline = createdAt + 72h.
+     * Nếu employerDeadline đã set thì dùng nó, không thì tính từ createdAt.
+     */
+    @Query("""
+            SELECT COUNT(c) FROM Complaint c
+            WHERE c.deletedAt IS NULL
+            AND c.status IN ('pending', 'processing', 'waiting_employer')
+            AND (
+                (c.employerDeadline IS NOT NULL AND c.employerDeadline < :now)
+                OR (
+                    c.employerDeadline IS NULL
+                    AND (
+                        (c.violationGroup = 'B' AND c.createdAt < :deadlineB)
+                        OR (c.violationGroup <> 'B' AND c.createdAt < :deadlineA)
+                    )
+                )
+            )
+            """)
+    long countSlaOverdue(
+            @Param("now") LocalDateTime now,
+            @Param("deadlineA") LocalDateTime deadlineA,
+            @Param("deadlineB") LocalDateTime deadlineB);
 }

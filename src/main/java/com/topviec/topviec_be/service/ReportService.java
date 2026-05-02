@@ -3,6 +3,7 @@ package com.topviec.topviec_be.service;
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResAdminReportStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
@@ -61,4 +62,7 @@ public interface ReportService {
 
     /** NTD xem tất cả khiếu nại của cùng tin với 1 complaintId (phải thuộc công ty mình) */
     ResultPaginationDTO getEmployerReportsByComplaint(Long employerUserId, Long complaintId, String status, String group, String complaintType, Pageable pageable);
+
+    /** Admin: thống kê tổng quan báo cáo toàn hệ thống */
+    ResAdminReportStatisticsDTO getReportStatistics();
 }

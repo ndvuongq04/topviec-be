@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResAdminReportStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -111,6 +112,15 @@ public class AdminReportController {
             @Valid @RequestBody ReqProcessReportDTO request) {
 
         return ResponseEntity.ok(reportService.process(extractUserId(jwt), id, request));
+    }
+
+    @GetMapping("/statistics")
+    @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+            + AdminRoleConstants.SUPPORT_ADMIN + "')")
+    public ResponseEntity<ResAdminReportStatisticsDTO> getReportStatistics() {
+        return ResponseEntity.ok(reportService.getReportStatistics());
     }
 
     private Long extractUserId(Jwt jwt) {
