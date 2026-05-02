@@ -3,6 +3,7 @@ package com.topviec.topviec_be.controller;
 import com.topviec.topviec_be.dto.request.ReqCreateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerJobStatisticsDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,18 @@ public class EmployerCompanyController {
             @Valid @RequestBody ReqUpdateCompanyDTO request) {
 
         ResCompanyDTO data = companyService.updateMyCompany(extractUserId(jwt), request);
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * GET /employer/company/job-statistics
+     * Employer xem thống kê tin tuyển dụng của công ty mình.
+     */
+    @GetMapping("/job-statistics")
+    public ResponseEntity<ResEmployerJobStatisticsDTO> getJobStatistics(
+            @AuthenticationPrincipal Jwt jwt) {
+        
+        ResEmployerJobStatisticsDTO data = companyService.getEmployerJobStatistics(extractUserId(jwt));
         return ResponseEntity.ok(data);
     }
 

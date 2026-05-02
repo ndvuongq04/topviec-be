@@ -4,6 +4,7 @@ import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerJobStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
 
@@ -42,4 +43,7 @@ public interface CompanyService {
 
         /** Admin: lấy thống kê tổng quan của công ty (tổng tin, tổng CV, gói dịch vụ). */
         ResAdminCompanyStatisticsDTO getCompanyStatistics(Long companyId);
+
+        /** Employer: lấy thống kê tin tuyển dụng của công ty. */
+        ResEmployerJobStatisticsDTO getEmployerJobStatistics(Long userId);
 }
