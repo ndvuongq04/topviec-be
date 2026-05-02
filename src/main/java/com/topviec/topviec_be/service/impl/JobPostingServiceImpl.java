@@ -814,4 +814,36 @@ public class JobPostingServiceImpl implements JobPostingService {
         JobPosting saved = jobPostingRepository.save(jobPosting);
         return toDetailResponse(saved);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO getJobPostingStatistics(Long id, Long companyId) {
+        JobPosting jobPosting = jobPostingRepository.findById(id)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Bạn không có quyền xem thống kê tin tuyển dụng của công ty khác");
+        }
+
+        int viewCount = jobPosting.getViewCount() != null ? jobPosting.getViewCount() : 0;
+        int editCount = jobPosting.getEditCount() != null ? jobPosting.getEditCount() : 0;
+        String editStatus = editCount + "/1";
+
+        long applicationCount = applicationRepository.countByJobPostIdAndDeletedAtIsNull(id);
+
+        long remainingDays = 0;
+        if (jobPosting.getExpiredAt() != null) {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            if (jobPosting.getExpiredAt().isAfter(now)) {
+                remainingDays = java.time.Duration.between(now, jobPosting.getExpiredAt()).toDays();
+            }
+        }
+
+        return com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO.builder()
+                .viewCount(viewCount)
+                .applicationCount(applicationCount)
+                .editStatus(editStatus)
+                .remainingDays(remainingDays)
+                .build();
+    }
 }

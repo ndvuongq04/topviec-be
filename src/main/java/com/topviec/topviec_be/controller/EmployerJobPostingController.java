@@ -3,6 +3,7 @@ package com.topviec.topviec_be.controller;
 import com.topviec.topviec_be.dto.request.ReqCreateJobPostingDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateJobPostingDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
+import com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.JobPostingService;
@@ -179,5 +180,16 @@ public class EmployerJobPostingController {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
         return ResponseEntity.ok(jobPostingService.restore(id, companyId, userId));
+    }
+
+    /**
+     * GET /employer/job-postings/{id}/statistics
+     * Lấy thống kê của một tin tuyển dụng.
+     */
+    @GetMapping("/{id}/statistics")
+    public ResponseEntity<ResJobPostingStatisticsDTO> getJobPostingStatistics(@PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(jobPostingService.getJobPostingStatistics(id, companyId));
     }
 }
