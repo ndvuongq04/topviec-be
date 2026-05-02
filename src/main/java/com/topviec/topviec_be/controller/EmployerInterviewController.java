@@ -2,6 +2,7 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.*;
 import com.topviec.topviec_be.dto.response.*;
+import com.topviec.topviec_be.dto.response.ResEmployerInterviewStatisticsDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.util.SecurityUtil;
@@ -281,5 +282,14 @@ public class EmployerInterviewController {
 
         interviewService.completeRecruitment(jobPostId, userId, companyId, request);
         return ResponseEntity.ok().build();
+    }
+
+    // ── Thống kê phỏng vấn ───────────────────────────────────────────────────
+
+    @GetMapping("/interview-statistics")
+    public ResponseEntity<ResEmployerInterviewStatisticsDTO> getInterviewStatistics() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(interviewService.getEmployerInterviewStatistics(companyId));
     }
 }

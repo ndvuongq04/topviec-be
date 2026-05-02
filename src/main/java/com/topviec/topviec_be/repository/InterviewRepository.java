@@ -67,4 +67,50 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
                         ORDER BY i.createdAt ASC
                         """)
         List<Interview> findPendingCandidatesByRoundId(@Param("roundId") Long roundId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.isDefault = true
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countPendingNewSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.isDefault = false
+                        AND i.confirmedByCandidate = false
+                        AND i.status = 'scheduled'
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countUnconfirmedSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt < CURRENT_TIMESTAMP
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countOverdueSchedulesByCompanyId(@Param("companyId") Long companyId);
 }
