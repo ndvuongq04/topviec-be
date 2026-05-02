@@ -76,4 +76,10 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Lo
             AND cm.deletedAt IS NULL
             """)
     Optional<CompanyMember> findOwnerByCompanyId(@Param("companyId") Long companyId);
+
+    // ── Thống kê thành viên ─────────────────────────────────────────
+
+    long countByCompanyIdAndDeletedAtIsNull(Long companyId);
+
+    long countByCompanyIdAndStatusAndDeletedAtIsNull(Long companyId, String status);
 }

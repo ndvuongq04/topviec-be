@@ -100,4 +100,7 @@ public interface JobPostingService {
 
         /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */
         ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId);
+
+        /** Lấy thống kê của một tin tuyển dụng (view, applications, edit count, remaining days). */
+        com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO getJobPostingStatistics(Long id, Long companyId);
 }

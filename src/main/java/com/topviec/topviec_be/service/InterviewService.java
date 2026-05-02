@@ -111,4 +111,8 @@ public interface InterviewService {
 
         void completeRecruitment(Long jobPostId, Long userId, Long companyId,
                         ReqCompleteRecruitmentDTO request);
+
+        // ── Thống kê phỏng vấn ───────────────────────────────────────────────────
+
+        com.topviec.topviec_be.dto.response.ResEmployerInterviewStatisticsDTO getEmployerInterviewStatistics(Long companyId);
 }

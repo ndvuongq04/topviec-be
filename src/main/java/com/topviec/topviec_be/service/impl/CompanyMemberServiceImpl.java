@@ -4,6 +4,7 @@ import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdatePermissionDTO;
 import com.topviec.topviec_be.dto.response.ResActionSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyMemberDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerMemberStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerProfileDTO;
 import com.topviec.topviec_be.dto.response.ResMemberPermissionDetailDTO;
 import com.topviec.topviec_be.dto.response.ResPermissionChangeLogDTO;
@@ -618,15 +619,17 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
 
     private Map<String, List<ResActionSummaryDTO>> enrichPermissions(
             Map<String, List<String>> raw, Map<String, String> codeNameMap) {
-        if (raw == null) return Map.of("grant", List.of(), "revoke", List.of());
+        if (raw == null)
+            return Map.of("grant", List.of(), "revoke", List.of());
         Map<String, List<ResActionSummaryDTO>> result = new HashMap<>();
         raw.forEach((key, codes) -> {
-            List<ResActionSummaryDTO> enriched = codes == null ? List.of() : codes.stream()
-                    .map(code -> ResActionSummaryDTO.builder()
-                            .code(code)
-                            .name(codeNameMap.getOrDefault(code, code))
-                            .build())
-                    .toList();
+            List<ResActionSummaryDTO> enriched = codes == null ? List.of()
+                    : codes.stream()
+                            .map(code -> ResActionSummaryDTO.builder()
+                                    .code(code)
+                                    .name(codeNameMap.getOrDefault(code, code))
+                                    .build())
+                            .toList();
             result.put(key, enriched);
         });
         return result;
@@ -647,6 +650,27 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                 .newPermissions(enrichPermissions(l.getNewPermissions(), codeNameMap))
                 .reason(l.getReason())
                 .createdAt(l.getCreatedAt())
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Thống kê thành viên
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerMemberStatisticsDTO getMemberStatistics(Long companyId) {
+        long totalMembers = companyMemberRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
+        long activeMembers = companyMemberRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId, "active");
+        long pendingMembers = companyMemberRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId, "pending");
+        long lockedMembers = companyMemberRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId,
+                "deactivated");
+
+        return ResEmployerMemberStatisticsDTO.builder()
+                .totalMembers(totalMembers)
+                .activeMembers(activeMembers)
+                .pendingMembers(pendingMembers)
+                .lockedMembers(lockedMembers)
                 .build();
     }
 }
