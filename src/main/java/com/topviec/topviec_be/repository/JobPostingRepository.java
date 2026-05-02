@@ -42,4 +42,18 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
     /** Đếm tổng số tin tuyển dụng (chưa xóa mềm) theo công ty. */
     long countByCompanyIdAndDeletedAtIsNull(Long companyId);
 
+    long countByCompanyIdAndStatusAndDeletedAtIsNull(Long companyId, String status);
+
+    @Query("""
+            SELECT COUNT(j) FROM JobPosting j
+            WHERE j.companyId = :companyId
+            AND j.status IN ('published', 'interviewing')
+            AND j.deletedAt IS NULL
+            AND j.expiredAt > :now
+            AND j.expiredAt <= :sevenDaysLater
+            """)
+    long countExpiringByCompanyId(
+            @Param("companyId") Long companyId,
+            @Param("now") LocalDateTime now,
+            @Param("sevenDaysLater") LocalDateTime sevenDaysLater);
 }

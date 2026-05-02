@@ -4,6 +4,7 @@ import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerJobStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.enums.company.CompanySize;
@@ -496,6 +497,32 @@ public class CompanyServiceImpl implements CompanyService {
                 .totalJobPostings(totalJobPostings)
                 .totalApplicationsReceived(totalApplicationsReceived)
                 .activeSubscriptions(subscriptionDTOs)
+                .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Employer — Job Statistics
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerJobStatisticsDTO getEmployerJobStatistics(Long userId) {
+        Company company = findByCreatedByOrThrow(userId);
+        Long companyId = company.getId();
+
+        long totalJobPosts = jobPostingRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
+        long activeJobPosts = jobPostingRepository.countActiveByCompanyId(companyId);
+        long pendingJobPosts = jobPostingRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId, "pending_approval");
+        
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sevenDaysLater = now.plusDays(7);
+        long expiringJobPosts = jobPostingRepository.countExpiringByCompanyId(companyId, now, sevenDaysLater);
+
+        return ResEmployerJobStatisticsDTO.builder()
+                .totalJobPosts(totalJobPosts)
+                .activeJobPosts(activeJobPosts)
+                .pendingJobPosts(pendingJobPosts)
+                .expiringJobPosts(expiringJobPosts)
                 .build();
     }
 }
