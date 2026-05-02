@@ -3,6 +3,7 @@ package com.topviec.topviec_be.service.impl;
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
+import com.topviec.topviec_be.dto.response.ResAdminReportStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateReportSummaryDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintDetailDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerComplaintSummaryDTO;
@@ -1083,6 +1084,39 @@ public class ReportServiceImpl implements ReportService {
                 .map(c -> toEmployerSummary(c, jobMap))
                 .toList());
         return result;
+    }
+
+    // ── Admin statistics ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResAdminReportStatisticsDTO getReportStatistics() {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Tổng báo cáo (chưa xóa mềm)
+        long totalReports = complaintRepository.countByDeletedAtIsNull();
+
+        // 2. Số báo cáo chờ xử lý (status = pending)
+        long pendingReports = complaintRepository
+                .countByStatusAndDeletedAtIsNull(ComplaintStatus.PENDING.getValue());
+
+        // 3. Số báo cáo nhóm B (vi phạm nặng)
+        long groupBReports = complaintRepository
+                .countByViolationGroupAndDeletedAtIsNull(ViolationGroup.B.getValue());
+
+        // 4. Số báo cáo quá hạn SLA
+        // deadlineA = now - 42h → complaint createdAt < deadlineA means overdue for group A
+        // deadlineB = now - 72h → complaint createdAt < deadlineB means overdue for group B
+        LocalDateTime deadlineA = now.minusHours(GROUP_A_SLA_HOURS);
+        LocalDateTime deadlineB = now.minusHours(GROUP_B_SLA_HOURS);
+        long slaOverdueReports = complaintRepository.countSlaOverdue(now, deadlineA, deadlineB);
+
+        return ResAdminReportStatisticsDTO.builder()
+                .totalReports(totalReports)
+                .pendingReports(pendingReports)
+                .groupBReports(groupBReports)
+                .slaOverdueReports(slaOverdueReports)
+                .build();
     }
 
     private record ProcessingInfo(LocalDateTime deadline, long remainingHours, long totalHours) {
