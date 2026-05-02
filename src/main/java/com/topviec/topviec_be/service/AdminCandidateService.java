@@ -20,4 +20,6 @@ public interface AdminCandidateService {
     ResultPaginationDTO getCandidateSavedJobs(Long userId, Pageable pageable);
 
     ResAdminCandidateStatisticsDTO getCandidateStatistics(Long userId);
+
+    String toggleCandidateStatus(Long userId);
 }
