@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqServiceDTO;
+import com.topviec.topviec_be.dto.response.ResAdminServiceStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResServiceDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
@@ -60,5 +61,13 @@ public class AdminServiceCatalogController {
             @PathVariable Long id,
             @Valid @RequestBody ReqServiceDTO request) {
         return ResponseEntity.ok(serviceCatalogService.updateService(id, request));
+    }
+
+    @GetMapping("/statistics")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
+    public ResponseEntity<ResAdminServiceStatisticsDTO> getServiceStatistics() {
+        return ResponseEntity.ok(serviceCatalogService.getServiceStatistics());
     }
 }
