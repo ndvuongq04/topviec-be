@@ -25,4 +25,11 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     /** Đếm số công ty (distinct) có ít nhất 1 đơn hàng đã thanh toán */
     @Query("SELECT COUNT(DISTINCT o.companyId) FROM Order o WHERE o.status = :status")
     long countDistinctCompanyByStatus(@Param("status") OrderStatus status);
+
+    /** Đếm số đơn hàng theo trạng thái */
+    long countByStatus(OrderStatus status);
+
+    /** Tổng giá trị đơn hàng theo trạng thái */
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = :status")
+    BigDecimal sumTotalAmountByStatus(@Param("status") OrderStatus status);
 }

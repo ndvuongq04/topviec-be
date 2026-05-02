@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
+import com.topviec.topviec_be.dto.response.ResAdminOrderStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
@@ -57,6 +58,14 @@ public class AdminOrderController {
             @PathVariable Long id,
             @Valid @RequestBody ReqUpdateOrderStatusDTO request) {
         return ResponseEntity.ok(orderService.updateOrderStatus(extractUserId(jwt), id, request));
+    }
+
+    @GetMapping("/statistics")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
+    public ResponseEntity<ResAdminOrderStatisticsDTO> getOrderStatistics() {
+        return ResponseEntity.ok(orderService.getOrderStatistics());
     }
 
     private Long extractUserId(Jwt jwt) {
