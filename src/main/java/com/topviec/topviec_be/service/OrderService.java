@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service;
 
 import com.topviec.topviec_be.dto.request.ReqCreateOrderDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
+import com.topviec.topviec_be.dto.response.ResAdminOrderStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.services.OrderStatus;
@@ -30,4 +31,7 @@ public interface OrderService {
         ResOrderDTO getOrderById(Long orderId);
 
         ResOrderDTO updateOrderStatus(Long adminId, Long orderId, ReqUpdateOrderStatusDTO request);
+
+        /** Admin: thống kê tổng quan đơn hàng toàn hệ thống */
+        ResAdminOrderStatisticsDTO getOrderStatistics();
 }

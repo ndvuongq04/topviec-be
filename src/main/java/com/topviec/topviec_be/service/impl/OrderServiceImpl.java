@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqCreateOrderDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
+import com.topviec.topviec_be.dto.response.ResAdminOrderStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResOrderItemDTO;
@@ -284,6 +285,31 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(request.getStatus());
         return mapToDTO(orderRepository.save(order));
+    }
+
+    // ── Admin statistics ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResAdminOrderStatisticsDTO getOrderStatistics() {
+        // 1. Tổng đơn hàng
+        long totalOrders = orderRepository.count();
+
+        // 2. Tổng đơn hàng đã thanh toán
+        long paidOrders = orderRepository.countByStatus(OrderStatus.PAID);
+
+        // 3. Tổng đơn hàng đang chờ xử lý
+        long pendingOrders = orderRepository.countByStatus(OrderStatus.PENDING);
+
+        // 4. Tổng giá trị (tất cả đơn đã thanh toán)
+        BigDecimal totalRevenue = orderRepository.sumTotalAmountByStatus(OrderStatus.PAID);
+
+        return ResAdminOrderStatisticsDTO.builder()
+                .totalOrders(totalOrders)
+                .paidOrders(paidOrders)
+                .pendingOrders(pendingOrders)
+                .totalRevenue(totalRevenue != null ? totalRevenue : BigDecimal.ZERO)
+                .build();
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
