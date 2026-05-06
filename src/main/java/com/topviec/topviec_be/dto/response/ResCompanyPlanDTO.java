@@ -23,6 +23,7 @@ public class ResCompanyPlanDTO {
         private Long servicePackageId;
         private String packageName;
         private String packageCode;
+        private String billingCycle;
         private String status;
         private LocalDateTime startedAt;
         private LocalDateTime expiredAt;
@@ -38,6 +39,8 @@ public class ResCompanyPlanDTO {
         private Long addonServiceId;
         private String addonName;
         private String addonCode;
+        private String serviceCategory;
+        private String serviceCategoryName;
         private String status;
         private Integer total;
         private Integer used;

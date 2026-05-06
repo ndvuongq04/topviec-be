@@ -547,6 +547,7 @@ public class CompanyServiceImpl implements CompanyService {
                     .servicePackageId(sub.getServicePackageId())
                     .packageName(pkg != null ? pkg.getName() : null)
                     .packageCode(pkg != null ? pkg.getCode() : null)
+                    .billingCycle(sub.getBillingCycle() != null ? sub.getBillingCycle().name() : null)
                     .status(sub.getStatus() != null ? sub.getStatus().name() : null)
                     .startedAt(sub.getStartedAt())
                     .expiredAt(sub.getExpiredAt())
@@ -558,12 +559,15 @@ public class CompanyServiceImpl implements CompanyService {
         List<CompanyAddon> addons = companyAddonRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
         List<ResCompanyPlanDTO.CurrentAddonDTO> addonDTOs = addons.stream()
                 .map(a -> {
-                    AddonService addonService = a.getAddonService();
+                    com.topviec.topviec_be.entity.AddonService addonService = a.getAddonService();
+                    com.topviec.topviec_be.entity.Services svc = addonService != null ? addonService.getService() : null;
                     return ResCompanyPlanDTO.CurrentAddonDTO.builder()
                             .addonId(a.getId())
                             .addonServiceId(a.getAddonServiceId())
                             .addonName(addonService != null ? addonService.getName() : null)
                             .addonCode(addonService != null ? addonService.getCode() : null)
+                            .serviceCategory(svc != null && svc.getCategory() != null ? svc.getCategory().name() : null)
+                            .serviceCategoryName(svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
                             .status(a.getStatus() != null ? a.getStatus().name() : null)
                             .total(a.getQuantityTotal())
                             .used(a.getQuantityTotal() - a.getQuantityRemaining())
@@ -604,6 +608,7 @@ public class CompanyServiceImpl implements CompanyService {
                     .startedAt(sub.getStartedAt())
                     .expiredAt(sub.getExpiredAt())
                     .purchasedAt(sub.getCreatedAt())
+                    .packagePrice(pkg != null ? pkg.getPrice() : null)
                     .build();
         }).toList();
 
