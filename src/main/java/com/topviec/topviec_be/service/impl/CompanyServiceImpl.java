@@ -29,6 +29,7 @@ import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
 import com.topviec.topviec_be.dto.response.ResCompanyPlanDTO;
+import com.topviec.topviec_be.dto.response.ResSubscriptionHistoryDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -576,6 +577,47 @@ public class CompanyServiceImpl implements CompanyService {
                 .currentPackage(currentPackageDTO)
                 .currentAddons(addonDTOs)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getSubscriptionHistory(Long companyId, Pageable pageable) {
+        findByIdOrThrow(companyId);
+
+        Page<CompanySubscription> page = companySubscriptionRepository.findByCompanyIdOrderByCreatedAtDesc(companyId,
+                pageable);
+
+        List<ResSubscriptionHistoryDTO> results = page.getContent().stream().map(sub -> {
+            ServicePackage pkg = sub.getServicePackage();
+            if (pkg == null && sub.getServicePackageId() != null) {
+                // If lazy loading issue or need explicit fetch
+            }
+            return ResSubscriptionHistoryDTO.builder()
+                    .subscriptionId(sub.getId())
+                    .companyId(sub.getCompanyId())
+                    .orderId(sub.getOrderId())
+                    .servicePackageId(sub.getServicePackageId())
+                    .packageName(pkg != null ? pkg.getName() : null)
+                    .packageCode(pkg != null ? pkg.getCode() : null)
+                    .status(sub.getStatus() != null ? sub.getStatus().name() : null)
+                    .billingCycle(sub.getBillingCycle() != null ? sub.getBillingCycle().name() : null)
+                    .startedAt(sub.getStartedAt())
+                    .expiredAt(sub.getExpiredAt())
+                    .purchasedAt(sub.getCreatedAt())
+                    .build();
+        }).toList();
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(results);
+
+        return result;
     }
 
     // -------------------------------------------------------------------------

@@ -123,6 +123,18 @@ public class AdminCompanyController {
                 return ResponseEntity.ok(companyService.getCompanyPlan(id));
         }
 
+        @GetMapping("/{id}/subscriptions")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+                        + AdminRoleConstants.SUPER_ADMIN + "', '"
+                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+                        + AdminRoleConstants.SUPPORT_ADMIN + "', '"
+                        + AdminRoleConstants.FINANCE_ADMIN + "')")
+        public ResponseEntity<ResultPaginationDTO> getSubscriptionHistory(
+                        @PathVariable Long id,
+                        @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+                return ResponseEntity.ok(companyService.getSubscriptionHistory(id, pageable));
+        }
+
         private Long extractUserId(Jwt jwt) {
                 return Long.parseLong(jwt.getSubject());
         }
