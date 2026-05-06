@@ -35,6 +35,18 @@ public class ResJobPostingSummary {
     private LocalDateTime createdAt;
     private LocalDateTime deletedAt;   // null = đang hoạt động, non-null = đã xóa mềm
     private List<LocationDTO> locations;
+    private AssignedRecruiterDTO assignedRecruiter; // NTD đang được phân công quản lý tin (null = chưa phân công)
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class AssignedRecruiterDTO {
+        private Long userId;
+        private String email;
+        private String jobTitle; // Chức danh trong công ty
+    }
 
     @Getter
     @Setter
