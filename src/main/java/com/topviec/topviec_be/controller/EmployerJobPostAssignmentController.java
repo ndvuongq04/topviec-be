@@ -55,16 +55,19 @@ public class EmployerJobPostAssignmentController {
     /**
      * GET /employer/job-assignments/recruiters
      * Lấy danh sách NTD trong công ty kèm số tin đang quản lý.
+     * Nếu truyền jobPostId: sẽ đánh dấu NTD đang quản lý tin đó (isCurrentAssignee = true).
      */
     @GetMapping("/recruiters")
     public ResponseEntity<ResultPaginationDTO> getRecruitersWithAssignmentCount(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long jobPostId,
             @PageableDefault(size = 20) Pageable pageable) {
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(currentUserId);
 
-        return ResponseEntity.ok(assignmentService.getRecruitersWithAssignmentCount(companyId, keyword, pageable));
+        return ResponseEntity.ok(
+                assignmentService.getRecruitersWithAssignmentCount(companyId, keyword, jobPostId, pageable));
     }
 
     // =========================================================================
@@ -157,5 +160,24 @@ public class EmployerJobPostAssignmentController {
         Long companyId = companyService.getCompanyIdByUserId(currentUserId);
 
         return ResponseEntity.ok(assignmentService.revokeAssignment(request, currentUserId, companyId));
+    }
+
+    // =========================================================================
+    // Đổi người phân công
+    // =========================================================================
+
+    /**
+     * PUT /employer/job-assignments/reassign
+     * Đổi người phân công: thu hồi NTD cũ + giao cho NTD mới trong 1 bước.
+     * Body: { jobPostId, userId, note }
+     */
+    @PutMapping("/reassign")
+    public ResponseEntity<ResJobPostAssignmentDTO> reassignJobPost(
+            @Valid @RequestBody ReqAssignJobPostDTO request) {
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
+
+        return ResponseEntity.ok(assignmentService.reassignJobPost(request, currentUserId, companyId));
     }
 }

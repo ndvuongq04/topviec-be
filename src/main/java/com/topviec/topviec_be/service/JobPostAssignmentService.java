@@ -29,9 +29,19 @@ public interface JobPostAssignmentService {
      *
      * @param companyId  ID công ty
      * @param keyword    Tìm kiếm theo email (optional)
+     * @param jobPostId  ID tin tuyển dụng (optional) — nếu truyền sẽ đánh dấu NTD đang quản lý tin này
      * @param pageable   Phân trang
      */
-    ResultPaginationDTO getRecruitersWithAssignmentCount(Long companyId, String keyword, Pageable pageable);
+    ResultPaginationDTO getRecruitersWithAssignmentCount(Long companyId, String keyword, Long jobPostId, Pageable pageable);
+
+    /**
+     * Đổi người phân công: thu hồi NTD cũ + giao cho NTD mới trong 1 bước.
+     *
+     * @param request       Thông tin phân công mới (jobPostId, userId, note)
+     * @param reassignedBy  ID người thực hiện đổi phân công
+     * @param companyId     ID công ty
+     */
+    ResJobPostAssignmentDTO reassignJobPost(ReqAssignJobPostDTO request, Long reassignedBy, Long companyId);
 
     // ── Quản lý theo tin tuyển dụng ──────────────────────────────────────
 

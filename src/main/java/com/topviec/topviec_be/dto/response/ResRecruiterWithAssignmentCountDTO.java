@@ -13,4 +13,5 @@ public class ResRecruiterWithAssignmentCountDTO {
     private String jobTitle;
     private String status;
     private long assignedJobCount;
+    private Boolean isCurrentAssignee; // true nếu NTD đang quản lý tin cụ thể (khi truyền jobPostId)
 }
