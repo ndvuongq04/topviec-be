@@ -52,6 +52,11 @@ public interface CompanyService {
          */
         ResCompanyPlanDTO getCompanyPlan(Long companyId);
 
+        /**
+         * Admin: lấy lịch sử mua/gia hạn gói dịch vụ của công ty.
+         */
+        ResultPaginationDTO getSubscriptionHistory(Long companyId, Pageable pageable);
+
         /** Employer: lấy thống kê tin tuyển dụng của công ty. */
         ResEmployerJobStatisticsDTO getEmployerJobStatistics(Long userId);
 }
