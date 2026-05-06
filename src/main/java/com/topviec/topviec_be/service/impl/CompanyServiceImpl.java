@@ -21,13 +21,16 @@ import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.CompanySubscription;
 import com.topviec.topviec_be.entity.Industry;
+import com.topviec.topviec_be.entity.Order;
 import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
+import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.dto.response.ResCompanyPlanDTO;
 import com.topviec.topviec_be.dto.response.ResSubscriptionHistoryDTO;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +56,7 @@ public class CompanyServiceImpl implements CompanyService {
     private final CompanySubscriptionRepository companySubscriptionRepository;
     private final CompanyAddonRepository companyAddonRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
+    private final ServiceRepository serviceRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -518,6 +522,9 @@ public class CompanyServiceImpl implements CompanyService {
         // Validate company exists
         findByIdOrThrow(companyId);
 
+        Map<String, String> serviceCodeToNameMap = new java.util.HashMap<>();
+        serviceRepository.findAll().forEach(s -> serviceCodeToNameMap.put(s.getCode(), s.getName()));
+
         // 1. Lấy gói dịch vụ hiện hành (ưu tiên ACTIVE, nếu không có thì lấy gói mới
         // nhất)
         ResCompanyPlanDTO.CurrentPackageDTO currentPackageDTO = null;
@@ -537,10 +544,13 @@ public class CompanyServiceImpl implements CompanyService {
             List<ResCompanyPlanDTO.UsageDTO> usageDTOs = usages.stream()
                     .map(u -> ResCompanyPlanDTO.UsageDTO.builder()
                             .featureCode(u.getFeatureCode())
+                            .featureName(serviceCodeToNameMap.get(u.getFeatureCode()))
                             .total(u.getQuantityTotal())
                             .used(u.getQuantityTotal() - u.getQuantityRemaining())
                             .build())
                     .toList();
+
+            Order packageOrder = sub.getOrder();
 
             currentPackageDTO = ResCompanyPlanDTO.CurrentPackageDTO.builder()
                     .subscriptionId(sub.getId())
@@ -551,6 +561,8 @@ public class CompanyServiceImpl implements CompanyService {
                     .status(sub.getStatus() != null ? sub.getStatus().name() : null)
                     .startedAt(sub.getStartedAt())
                     .expiredAt(sub.getExpiredAt())
+                    .orderId(sub.getOrderId())
+                    .orderCode(packageOrder != null ? packageOrder.getOrderCode() : null)
                     .usages(usageDTOs)
                     .build();
         }
@@ -559,20 +571,24 @@ public class CompanyServiceImpl implements CompanyService {
         List<CompanyAddon> addons = companyAddonRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
         List<ResCompanyPlanDTO.CurrentAddonDTO> addonDTOs = addons.stream()
                 .map(a -> {
-                    com.topviec.topviec_be.entity.AddonService addonService = a.getAddonService();
-                    com.topviec.topviec_be.entity.Services svc = addonService != null ? addonService.getService() : null;
+                    AddonService addonService = a.getAddonService();
+                    Services svc = addonService != null ? addonService.getService() : null;
+                    Order order = a.getOrder();
                     return ResCompanyPlanDTO.CurrentAddonDTO.builder()
                             .addonId(a.getId())
                             .addonServiceId(a.getAddonServiceId())
                             .addonName(addonService != null ? addonService.getName() : null)
                             .addonCode(addonService != null ? addonService.getCode() : null)
                             .serviceCategory(svc != null && svc.getCategory() != null ? svc.getCategory().name() : null)
-                            .serviceCategoryName(svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
+                            .serviceCategoryName(
+                                    svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
                             .status(a.getStatus() != null ? a.getStatus().name() : null)
                             .total(a.getQuantityTotal())
                             .used(a.getQuantityTotal() - a.getQuantityRemaining())
                             .startedAt(a.getStartedAt())
                             .expiredAt(a.getExpiredAt())
+                            .orderId(a.getOrderId())
+                            .orderCode(order != null ? order.getOrderCode() : null)
                             .build();
                 })
                 .toList();

@@ -27,6 +27,8 @@ public class ResCompanyPlanDTO {
         private String status;
         private LocalDateTime startedAt;
         private LocalDateTime expiredAt;
+        private Long orderId;
+        private String orderCode;
         private List<UsageDTO> usages;
     }
 
@@ -46,6 +48,8 @@ public class ResCompanyPlanDTO {
         private Integer used;
         private LocalDateTime startedAt;
         private LocalDateTime expiredAt;
+        private Long orderId;
+        private String orderCode;
     }
 
     @Data
@@ -54,6 +58,7 @@ public class ResCompanyPlanDTO {
     @AllArgsConstructor
     public static class UsageDTO {
         private String featureCode;
+        private String featureName;
         private Integer total;
         private Integer used;
     }
