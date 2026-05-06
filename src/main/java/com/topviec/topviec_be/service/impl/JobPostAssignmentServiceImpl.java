@@ -10,11 +10,13 @@ import com.topviec.topviec_be.entity.JobPostAssignment;
 import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.companyMember.MemberRole;
+import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.JobPostAssignmentRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.JobPostAssignmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
     private final JobPostingRepository jobPostingRepository;
     private final CompanyMemberRepository companyMemberRepository;
     private final UserRepository userRepository;
+    private final CompanyMemberService companyMemberService;
 
     // =========================================================================
     // Giao việc
@@ -56,7 +59,14 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
             throw AppException.forbidden("Tin tuyển dụng không thuộc công ty của bạn");
         }
 
-        // 2. Kiểm tra tin đã có người được phân công chưa (1 tin chỉ 1 NTD)
+        // 2. Kiểm tra trạng thái tin có được phép phân công không
+        if (!JobPostStatus.fromValue(jobPosting.getStatus()).isAssignable()) {
+            throw AppException.badRequest(
+                    "Không thể phân công tin ở trạng thái '" + jobPosting.getStatus()
+                            + "'. Chỉ cho phép phân công tin: scheduled, published, paused, renewed, interviewing, closed.");
+        }
+
+        // 3. Kiểm tra tin đã có người được phân công chưa (1 tin chỉ 1 NTD)
         if (assignmentRepository.existsByJobPostIdAndRevokedAtIsNull(jobPostId)) {
             throw AppException.conflict("Tin tuyển dụng này đã có nhà tuyển dụng được phân công. "
                     + "Vui lòng thu hồi phân công cũ trước khi giao cho người khác.");
@@ -68,6 +78,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
         if (!"active".equals(member.getStatus())) {
             throw AppException.badRequest("Nhà tuyển dụng chưa kích hoạt tài khoản trong công ty");
+        }
+
+        // 5. Kiểm tra NTD có quyền được nhận phân công không
+        if (!companyMemberService.hasPermission(companyId, userId, "job_assignment:receive")) {
+            throw AppException.forbidden("Nhà tuyển dụng này không có quyền nhận phân công tin tuyển dụng");
         }
 
         // 4. Tạo phân công mới
@@ -95,6 +110,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
                 companyId, "active", null, keyword, pageable);
 
         List<CompanyMember> members = pageMembers.getContent();
+
+        // 2. Lọc chỉ giữ lại các member có quyền job_assignment:receive
+        members = members.stream()
+                .filter(m -> companyMemberService.hasPermission(companyId, m.getUserId(), "job_assignment:receive"))
+                .toList();
 
         // 2. Lấy email users
         List<Long> userIds = members.stream().map(CompanyMember::getUserId).toList();
@@ -153,12 +173,24 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
             throw AppException.forbidden("Tin tuyển dụng không thuộc công ty của bạn");
         }
 
-        // 2. Kiểm tra NTD mới là thành viên active trong công ty
+        // 2. Kiểm tra trạng thái tin có được phép phân công không
+        if (!JobPostStatus.fromValue(jobPosting.getStatus()).isAssignable()) {
+            throw AppException.badRequest(
+                    "Không thể phân công tin ở trạng thái '" + jobPosting.getStatus()
+                            + "'. Chỉ cho phép phân công tin: scheduled, published, paused, renewed, interviewing, closed.");
+        }
+
+        // 3. Kiểm tra NTD mới là thành viên active trong công ty
         CompanyMember member = companyMemberRepository.findByCompanyIdAndUserId(companyId, newUserId)
                 .orElseThrow(() -> AppException.notFound("Nhà tuyển dụng không phải thành viên của công ty"));
 
         if (!"active".equals(member.getStatus())) {
             throw AppException.badRequest("Nhà tuyển dụng chưa kích hoạt tài khoản trong công ty");
+        }
+
+        // 4. Kiểm tra NTD mới có quyền được nhận phân công không
+        if (!companyMemberService.hasPermission(companyId, newUserId, "job_assignment:receive")) {
+            throw AppException.forbidden("Nhà tuyển dụng này không có quyền nhận phân công tin tuyển dụng");
         }
 
         // 3. Thu hồi phân công cũ (nếu có)
@@ -406,6 +438,9 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
                     predicates.add(cb.equal(root.get("companyId"), companyId));
                     predicates.add(cb.isNull(root.get("deletedAt")));
+
+                    // Chỉ lấy tin có trạng thái được phép phân công
+                    predicates.add(root.get("status").in(JobPostStatus.getAssignableValues()));
 
                     // Loại trừ các tin đã được phân công
                     if (!assignedJobPostIds.isEmpty()) {
