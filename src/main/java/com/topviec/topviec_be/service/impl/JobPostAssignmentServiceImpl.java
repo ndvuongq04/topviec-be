@@ -16,6 +16,7 @@ import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.JobPostAssignmentRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.JobPostAssignmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
     private final JobPostingRepository jobPostingRepository;
     private final CompanyMemberRepository companyMemberRepository;
     private final UserRepository userRepository;
+    private final CompanyMemberService companyMemberService;
 
     // =========================================================================
     // Giao việc
@@ -78,6 +80,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
             throw AppException.badRequest("Nhà tuyển dụng chưa kích hoạt tài khoản trong công ty");
         }
 
+        // 5. Kiểm tra NTD có quyền được nhận phân công không
+        if (!companyMemberService.hasPermission(companyId, userId, "job_assignment:receive")) {
+            throw AppException.forbidden("Nhà tuyển dụng này không có quyền nhận phân công tin tuyển dụng");
+        }
+
         // 4. Tạo phân công mới
         JobPostAssignment assignment = JobPostAssignment.builder()
                 .jobPostId(jobPostId)
@@ -103,6 +110,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
                 companyId, "active", null, keyword, pageable);
 
         List<CompanyMember> members = pageMembers.getContent();
+
+        // 2. Lọc chỉ giữ lại các member có quyền job_assignment:receive
+        members = members.stream()
+                .filter(m -> companyMemberService.hasPermission(companyId, m.getUserId(), "job_assignment:receive"))
+                .toList();
 
         // 2. Lấy email users
         List<Long> userIds = members.stream().map(CompanyMember::getUserId).toList();
@@ -174,6 +186,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
         if (!"active".equals(member.getStatus())) {
             throw AppException.badRequest("Nhà tuyển dụng chưa kích hoạt tài khoản trong công ty");
+        }
+
+        // 4. Kiểm tra NTD mới có quyền được nhận phân công không
+        if (!companyMemberService.hasPermission(companyId, newUserId, "job_assignment:receive")) {
+            throw AppException.forbidden("Nhà tuyển dụng này không có quyền nhận phân công tin tuyển dụng");
         }
 
         // 3. Thu hồi phân công cũ (nếu có)

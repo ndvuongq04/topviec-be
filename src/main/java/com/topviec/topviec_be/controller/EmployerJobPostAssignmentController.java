@@ -40,8 +40,10 @@ public class EmployerJobPostAssignmentController {
      * POST /employer/job-assignments
      * Phân công tin tuyển dụng cho một NTD.
      * Body: { jobPostId, userId, note }
+     * Yêu cầu quyền: job_assignment:manage
      */
     @PostMapping
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job_assignment:manage')")
     public ResponseEntity<ResJobPostAssignmentDTO> assignJobPost(
             @Valid @RequestBody ReqAssignJobPostDTO request) {
 
@@ -151,8 +153,10 @@ public class EmployerJobPostAssignmentController {
      * PATCH /employer/job-assignments/revoke
      * Thu hồi phân công tin tuyển dụng.
      * Body: { jobPostId, note }
+     * Yêu cầu quyền: job_assignment:manage
      */
     @PatchMapping("/revoke")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job_assignment:manage')")
     public ResponseEntity<ResJobPostAssignmentDTO> revokeAssignment(
             @Valid @RequestBody ReqRevokeAssignmentDTO request) {
 
@@ -170,8 +174,10 @@ public class EmployerJobPostAssignmentController {
      * PUT /employer/job-assignments/reassign
      * Đổi người phân công: thu hồi NTD cũ + giao cho NTD mới trong 1 bước.
      * Body: { jobPostId, userId, note }
+     * Yêu cầu quyền: job_assignment:manage
      */
     @PutMapping("/reassign")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job_assignment:manage')")
     public ResponseEntity<ResJobPostAssignmentDTO> reassignJobPost(
             @Valid @RequestBody ReqAssignJobPostDTO request) {
 
