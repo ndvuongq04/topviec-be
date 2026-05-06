@@ -23,4 +23,5 @@ public class ResSubscriptionHistoryDTO {
     private LocalDateTime startedAt;
     private LocalDateTime expiredAt;
     private LocalDateTime purchasedAt; // Mapping from createdAt
+    private java.math.BigDecimal packagePrice;
 }
