@@ -34,4 +34,7 @@ public interface OrderService {
 
         /** Admin: thống kê tổng quan đơn hàng toàn hệ thống */
         ResAdminOrderStatisticsDTO getOrderStatistics();
+
+        /** Admin: lấy lịch sử đơn hàng của 1 công ty */
+        ResultPaginationDTO getOrdersByCompanyId(Long companyId, Pageable pageable);
 }

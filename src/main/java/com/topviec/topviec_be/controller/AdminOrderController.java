@@ -68,6 +68,16 @@ public class AdminOrderController {
         return ResponseEntity.ok(orderService.getOrderStatistics());
     }
 
+    @GetMapping("/company/{companyId}")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
+    public ResponseEntity<ResultPaginationDTO> getOrdersByCompany(
+            @PathVariable Long companyId,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByCompanyId(companyId, pageable));
+    }
+
     private Long extractUserId(Jwt jwt) {
         return Long.parseLong(jwt.getSubject());
     }

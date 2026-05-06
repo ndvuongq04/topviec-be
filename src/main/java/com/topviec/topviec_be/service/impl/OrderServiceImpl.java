@@ -312,6 +312,13 @@ public class OrderServiceImpl implements OrderService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getOrdersByCompanyId(Long companyId, Pageable pageable) {
+        Page<Order> page = orderRepository.findByCompanyIdOrderByCreatedAtDesc(companyId, pageable);
+        return buildPaginationResult(page, pageable);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────────
 
     private LocalDateTime parseDateFilter(String dateFilter, String rawDate, boolean isStart) {
