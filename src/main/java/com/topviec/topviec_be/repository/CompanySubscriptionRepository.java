@@ -18,6 +18,8 @@ public interface CompanySubscriptionRepository extends JpaRepository<CompanySubs
 
     Optional<CompanySubscription> findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(Long companyId, SubscriptionStatus status);
 
+    Optional<CompanySubscription> findFirstByCompanyIdOrderByCreatedAtDesc(Long companyId);
+
     /** Tìm subscription ACTIVE sắp hết hạn + chưa gửi nhắc nhở — dùng cho scheduler */
     @Query("SELECT cs FROM CompanySubscription cs WHERE cs.status = :status " +
            "AND cs.expiredAt BETWEEN :from AND :to " +
