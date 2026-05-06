@@ -35,13 +35,16 @@ public interface JobPostAssignmentRepository extends JpaRepository<JobPostAssign
     /** Đếm số tin đang được phân công cho một recruiter. */
     long countByUserIdAndRevokedAtIsNull(Long userId);
 
-    /** Đếm số tin đang quản lý cho danh sách recruiter. */
+    /** Đếm số tin đang quản lý cho danh sách recruiter (trong công ty). */
     @Query("""
             SELECT a.userId, COUNT(a) FROM JobPostAssignment a
+            JOIN JobPosting jp ON a.jobPostId = jp.id
             WHERE a.userId IN :userIds AND a.revokedAt IS NULL
+            AND jp.companyId = :companyId AND jp.deletedAt IS NULL
             GROUP BY a.userId
             """)
-    List<Object[]> countActiveByUserIds(@Param("userIds") List<Long> userIds);
+    List<Object[]> countActiveByUserIds(@Param("userIds") List<Long> userIds,
+            @Param("companyId") Long companyId);
 
     // ── Phân trang ──────────────────────────────────────────────────────
 

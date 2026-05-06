@@ -103,7 +103,7 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
         // 3. Lấy số tin đang quản lý
         Map<Long, Long> assignmentCountMap = Map.of();
         if (!userIds.isEmpty()) {
-            assignmentCountMap = assignmentRepository.countActiveByUserIds(userIds).stream()
+            assignmentCountMap = assignmentRepository.countActiveByUserIds(userIds, companyId).stream()
                     .collect(Collectors.toMap(
                             row -> (Long) row[0],
                             row -> (Long) row[1]));
