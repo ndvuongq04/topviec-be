@@ -88,7 +88,8 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getRecruitersWithAssignmentCount(Long companyId, String keyword, Pageable pageable) {
+    public ResultPaginationDTO getRecruitersWithAssignmentCount(Long companyId, String keyword, Long jobPostId,
+            Pageable pageable) {
         // 1. Lấy danh sách thành viên active trong công ty (phân trang + tìm kiếm)
         Page<CompanyMember> pageMembers = companyMemberRepository.findByFilters(
                 companyId, "active", null, keyword, pageable);
@@ -109,8 +110,17 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
                             row -> (Long) row[1]));
         }
 
-        // 4. Map to DTO
+        // 4. Tìm NTD đang quản lý tin cụ thể (nếu jobPostId được truyền vào)
+        Long currentAssigneeUserId = null;
+        if (jobPostId != null) {
+            currentAssigneeUserId = assignmentRepository.findByJobPostIdAndRevokedAtIsNull(jobPostId)
+                    .map(JobPostAssignment::getUserId)
+                    .orElse(null);
+        }
+
+        // 5. Map to DTO
         Map<Long, Long> finalAssignmentCountMap = assignmentCountMap;
+        Long finalCurrentAssigneeUserId = currentAssigneeUserId;
         List<ResRecruiterWithAssignmentCountDTO> result = members.stream()
                 .map(m -> ResRecruiterWithAssignmentCountDTO.builder()
                         .userId(m.getUserId())
@@ -119,11 +129,68 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
                         .jobTitle(m.getJobTitle())
                         .status(m.getStatus())
                         .assignedJobCount(finalAssignmentCountMap.getOrDefault(m.getUserId(), 0L))
+                        .isCurrentAssignee(finalCurrentAssigneeUserId != null
+                                ? m.getUserId().equals(finalCurrentAssigneeUserId)
+                                : null)
                         .build())
                 .toList();
 
-        // 5. Build pagination response
+        // 6. Build pagination response
         return buildPaginationResult(pageMembers, result);
+    }
+
+    @Override
+    @Transactional
+    public ResJobPostAssignmentDTO reassignJobPost(ReqAssignJobPostDTO request, Long reassignedBy, Long companyId) {
+        Long jobPostId = request.getJobPostId();
+        Long newUserId = request.getUserId();
+
+        // 1. Kiểm tra tin tuyển dụng tồn tại và thuộc về công ty
+        JobPosting jobPosting = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
+
+        if (!jobPosting.getCompanyId().equals(companyId)) {
+            throw AppException.forbidden("Tin tuyển dụng không thuộc công ty của bạn");
+        }
+
+        // 2. Kiểm tra NTD mới là thành viên active trong công ty
+        CompanyMember member = companyMemberRepository.findByCompanyIdAndUserId(companyId, newUserId)
+                .orElseThrow(() -> AppException.notFound("Nhà tuyển dụng không phải thành viên của công ty"));
+
+        if (!"active".equals(member.getStatus())) {
+            throw AppException.badRequest("Nhà tuyển dụng chưa kích hoạt tài khoản trong công ty");
+        }
+
+        // 3. Thu hồi phân công cũ (nếu có)
+        assignmentRepository.findByJobPostIdAndRevokedAtIsNull(jobPostId)
+                .ifPresent(oldAssignment -> {
+                    // Không cho phép đổi cho chính người đang quản lý
+                    if (oldAssignment.getUserId().equals(newUserId)) {
+                        throw AppException.conflict("Nhà tuyển dụng này đang quản lý tin tuyển dụng này rồi");
+                    }
+                    oldAssignment.setRevokedAt(LocalDateTime.now());
+                    oldAssignment.setRevokedBy(reassignedBy);
+                    String revokeNote = "Đổi phân công sang NTD mới (userId: " + newUserId + ")";
+                    oldAssignment.setNote(oldAssignment.getNote() != null
+                            ? oldAssignment.getNote() + " | " + revokeNote
+                            : revokeNote);
+                    assignmentRepository.save(oldAssignment);
+                });
+
+        // 4. Tạo phân công mới
+        JobPostAssignment newAssignment = JobPostAssignment.builder()
+                .jobPostId(jobPostId)
+                .userId(newUserId)
+                .assignedBy(reassignedBy)
+                .note(request.getNote())
+                .build();
+
+        JobPostAssignment saved = assignmentRepository.save(newAssignment);
+
+        log.info("Đổi phân công tin [{}] sang NTD userId [{}] bởi userId [{}] trong công ty [{}]",
+                jobPostId, newUserId, reassignedBy, companyId);
+
+        return toResponse(saved);
     }
 
     // =========================================================================
