@@ -6,6 +6,7 @@ import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerJobStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.enums.company.CompanySize;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
@@ -23,6 +24,11 @@ import com.topviec.topviec_be.entity.Industry;
 import com.topviec.topviec_be.entity.ServicePackage;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
+import com.topviec.topviec_be.repository.CompanyAddonRepository;
+import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
+import com.topviec.topviec_be.entity.CompanyAddon;
+import com.topviec.topviec_be.entity.SubscriptionUsage;
+import com.topviec.topviec_be.dto.response.ResCompanyPlanDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +50,8 @@ public class CompanyServiceImpl implements CompanyService {
     private final JobPostingRepository jobPostingRepository;
     private final ApplicationRepository applicationRepository;
     private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final CompanyAddonRepository companyAddonRepository;
+    private final SubscriptionUsageRepository subscriptionUsageRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -294,13 +303,15 @@ public class CompanyServiceImpl implements CompanyService {
 
     private Company findByCreatedByOrThrow(Long userId) {
         // 1. Kiểm tra xem user có phải người tạo công ty không
-        java.util.Optional<Company> companyOpt = companyRepository.findByCreatedBy(userId);
+        Optional<Company> companyOpt = companyRepository.findByCreatedBy(userId);
         if (companyOpt.isPresent()) {
             return companyOpt.get();
         }
 
-        // 2. Nếu không, kiểm tra xem user có phải là thành viên active của công ty nào không
-        java.util.Optional<CompanyMember> memberOpt = companyMemberRepository.findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active");
+        // 2. Nếu không, kiểm tra xem user có phải là thành viên active của công ty nào
+        // không
+        Optional<CompanyMember> memberOpt = companyMemberRepository
+                .findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active");
         if (memberOpt.isPresent()) {
             return companyRepository.findById(memberOpt.get().getCompanyId())
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty của bạn"));
@@ -500,6 +511,73 @@ public class CompanyServiceImpl implements CompanyService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResCompanyPlanDTO getCompanyPlan(Long companyId) {
+        // Validate company exists
+        findByIdOrThrow(companyId);
+
+        // 1. Lấy gói dịch vụ hiện hành (ưu tiên ACTIVE, nếu không có thì lấy gói mới
+        // nhất)
+        ResCompanyPlanDTO.CurrentPackageDTO currentPackageDTO = null;
+        Optional<CompanySubscription> optSubscription = companySubscriptionRepository
+                .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
+
+        if (optSubscription.isEmpty()) {
+            optSubscription = companySubscriptionRepository.findFirstByCompanyIdOrderByCreatedAtDesc(companyId);
+        }
+
+        if (optSubscription.isPresent()) {
+            CompanySubscription sub = optSubscription.get();
+            ServicePackage pkg = sub.getServicePackage();
+
+            // Lấy danh sách usage của subscription này
+            List<SubscriptionUsage> usages = subscriptionUsageRepository.findByCompanySubscriptionId(sub.getId());
+            List<ResCompanyPlanDTO.UsageDTO> usageDTOs = usages.stream()
+                    .map(u -> ResCompanyPlanDTO.UsageDTO.builder()
+                            .featureCode(u.getFeatureCode())
+                            .total(u.getQuantityTotal())
+                            .used(u.getQuantityTotal() - u.getQuantityRemaining())
+                            .build())
+                    .toList();
+
+            currentPackageDTO = ResCompanyPlanDTO.CurrentPackageDTO.builder()
+                    .subscriptionId(sub.getId())
+                    .servicePackageId(sub.getServicePackageId())
+                    .packageName(pkg != null ? pkg.getName() : null)
+                    .packageCode(pkg != null ? pkg.getCode() : null)
+                    .status(sub.getStatus() != null ? sub.getStatus().name() : null)
+                    .startedAt(sub.getStartedAt())
+                    .expiredAt(sub.getExpiredAt())
+                    .usages(usageDTOs)
+                    .build();
+        }
+
+        // 2. Lấy danh sách dịch vụ lẻ
+        List<CompanyAddon> addons = companyAddonRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        List<ResCompanyPlanDTO.CurrentAddonDTO> addonDTOs = addons.stream()
+                .map(a -> {
+                    AddonService addonService = a.getAddonService();
+                    return ResCompanyPlanDTO.CurrentAddonDTO.builder()
+                            .addonId(a.getId())
+                            .addonServiceId(a.getAddonServiceId())
+                            .addonName(addonService != null ? addonService.getName() : null)
+                            .addonCode(addonService != null ? addonService.getCode() : null)
+                            .status(a.getStatus() != null ? a.getStatus().name() : null)
+                            .total(a.getQuantityTotal())
+                            .used(a.getQuantityTotal() - a.getQuantityRemaining())
+                            .startedAt(a.getStartedAt())
+                            .expiredAt(a.getExpiredAt())
+                            .build();
+                })
+                .toList();
+
+        return ResCompanyPlanDTO.builder()
+                .currentPackage(currentPackageDTO)
+                .currentAddons(addonDTOs)
+                .build();
+    }
+
     // -------------------------------------------------------------------------
     // Employer — Job Statistics
     // -------------------------------------------------------------------------
@@ -512,8 +590,9 @@ public class CompanyServiceImpl implements CompanyService {
 
         long totalJobPosts = jobPostingRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
         long activeJobPosts = jobPostingRepository.countActiveByCompanyId(companyId);
-        long pendingJobPosts = jobPostingRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId, "pending_approval");
-        
+        long pendingJobPosts = jobPostingRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId,
+                "pending_approval");
+
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime sevenDaysLater = now.plusDays(7);
         long expiringJobPosts = jobPostingRepository.countExpiringByCompanyId(companyId, now, sevenDaysLater);
