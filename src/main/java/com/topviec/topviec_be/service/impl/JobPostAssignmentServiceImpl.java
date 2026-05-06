@@ -323,6 +323,61 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
     }
 
     // =========================================================================
+    // Tin chưa phân công
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getUnassignedJobPosts(Long companyId, String keyword, String status, Pageable pageable) {
+        // 1. Lấy tất cả jobPostId đang được phân công (active) trong công ty
+        List<Long> assignedJobPostIds = assignmentRepository.findAssignedJobPostIdsByCompanyId(companyId);
+
+        // 2. Query tin tuyển dụng KHÔNG nằm trong danh sách đã phân công
+        Page<JobPosting> pageJobPosts = jobPostingRepository.findAll(
+                (root, query, cb) -> {
+                    var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+                    predicates.add(cb.equal(root.get("companyId"), companyId));
+                    predicates.add(cb.isNull(root.get("deletedAt")));
+
+                    // Loại trừ các tin đã được phân công
+                    if (!assignedJobPostIds.isEmpty()) {
+                        predicates.add(cb.not(root.get("id").in(assignedJobPostIds)));
+                    }
+
+                    if (keyword != null && !keyword.trim().isEmpty()) {
+                        predicates.add(cb.like(cb.lower(root.get("title")),
+                                "%" + keyword.trim().toLowerCase() + "%"));
+                    }
+                    if (status != null && !status.trim().isEmpty()) {
+                        predicates.add(cb.equal(root.get("status"), status));
+                    }
+
+                    return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+                },
+                pageable);
+
+        // 3. Build response
+        List<Map<String, Object>> result = pageJobPosts.getContent().stream()
+                .map(jp -> {
+                    Map<String, Object> item = new java.util.LinkedHashMap<>();
+                    item.put("id", jp.getId());
+                    item.put("title", jp.getTitle());
+                    item.put("slug", jp.getSlug());
+                    item.put("status", jp.getStatus());
+                    item.put("workType", jp.getWorkType());
+                    item.put("headcount", jp.getHeadcount());
+                    item.put("publishedAt", jp.getPublishedAt());
+                    item.put("deadline", jp.getDeadline());
+                    item.put("createdAt", jp.getCreatedAt());
+                    return item;
+                })
+                .toList();
+
+        return buildPaginationResult(pageJobPosts, result);
+    }
+
+    // =========================================================================
     // Private helpers
     // =========================================================================
 

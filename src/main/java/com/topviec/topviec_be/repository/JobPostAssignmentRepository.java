@@ -74,4 +74,13 @@ public interface JobPostAssignmentRepository extends JpaRepository<JobPostAssign
             ORDER BY a.assignedAt DESC
             """)
     Page<JobPostAssignment> findActiveByCompanyId(@Param("companyId") Long companyId, Pageable pageable);
+
+    /** Lấy danh sách jobPostId đang được phân công (active) trong công ty. */
+    @Query("""
+            SELECT a.jobPostId FROM JobPostAssignment a
+            JOIN JobPosting jp ON a.jobPostId = jp.id
+            WHERE jp.companyId = :companyId AND a.revokedAt IS NULL
+            AND jp.deletedAt IS NULL
+            """)
+    List<Long> findAssignedJobPostIdsByCompanyId(@Param("companyId") Long companyId);
 }

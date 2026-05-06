@@ -104,6 +104,23 @@ public class EmployerJobPostAssignmentController {
         return ResponseEntity.ok(assignmentService.getCurrentAssignment(jobPostId, companyId));
     }
 
+    /**
+     * GET /employer/job-assignments/job-posts/unassigned
+     * Lấy danh sách tin tuyển dụng chưa được phân công cho member nào.
+     * Params: keyword, status
+     */
+    @GetMapping("/job-posts/unassigned")
+    public ResponseEntity<ResultPaginationDTO> getUnassignedJobPosts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
+
+        return ResponseEntity.ok(assignmentService.getUnassignedJobPosts(companyId, keyword, status, pageable));
+    }
+
     // =========================================================================
     // Quản lý theo NTD
     // =========================================================================
