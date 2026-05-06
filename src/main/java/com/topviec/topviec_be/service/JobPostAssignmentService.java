@@ -71,4 +71,16 @@ public interface JobPostAssignmentService {
      * @param companyId   ID công ty
      */
     ResJobPostAssignmentDTO revokeAssignment(ReqRevokeAssignmentDTO request, Long revokedBy, Long companyId);
+
+    // ── Tin chưa phân công ───────────────────────────────────────────────
+
+    /**
+     * Lấy danh sách tin tuyển dụng chưa được phân công cho member nào.
+     *
+     * @param companyId  ID công ty
+     * @param keyword    Tìm kiếm theo tiêu đề (optional)
+     * @param status     Lọc theo trạng thái tin (optional)
+     * @param pageable   Phân trang
+     */
+    ResultPaginationDTO getUnassignedJobPosts(Long companyId, String keyword, String status, Pageable pageable);
 }

@@ -19,17 +19,23 @@ import com.topviec.topviec_be.entity.Level;
 import com.topviec.topviec_be.entity.Skill;
 import com.topviec.topviec_be.enums.jobs.EditType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
+import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.JobPostAssignment;
+import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.ApplicationRepository;
+import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
 import com.topviec.topviec_be.repository.InterviewRoundRepository;
+import com.topviec.topviec_be.repository.JobPostAssignmentRepository;
 import com.topviec.topviec_be.repository.JobPostEditLogRepository;
 import com.topviec.topviec_be.repository.JobPostLocationRepository;
 import com.topviec.topviec_be.repository.JobPostSkillRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.LevelRepository;
 import com.topviec.topviec_be.repository.SkillRepository;
+import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.JobPostingService;
 import com.topviec.topviec_be.specification.JobPostingSpecification;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +67,9 @@ public class JobPostingServiceImpl implements JobPostingService {
     private final SkillRepository skillRepository;
     private final ApplicationRepository applicationRepository;
     private final InterviewRoundRepository interviewRoundRepository;
+    private final JobPostAssignmentRepository jobPostAssignmentRepository;
+    private final CompanyMemberRepository companyMemberRepository;
+    private final UserRepository userRepository;
 
     // -------------------------------------------------------------------------
     // Employer — Create
@@ -608,6 +617,35 @@ public class JobPostingServiceImpl implements JobPostingService {
             });
         }
 
+        // Batch load phân công tin tuyển dụng (chỉ cho Employer)
+        Map<Long, ResJobPostingSummary.AssignedRecruiterDTO> assignmentMap = new java.util.HashMap<>();
+        if (includeApplicationCount && !allJobIds.isEmpty()) {
+            List<JobPostAssignment> activeAssignments = jobPostAssignmentRepository
+                    .findActiveByJobPostIds(allJobIds);
+
+            if (!activeAssignments.isEmpty()) {
+                // Lấy email từ User
+                List<Long> assignedUserIds = activeAssignments.stream()
+                        .map(JobPostAssignment::getUserId).distinct().toList();
+                Map<Long, String> emailMap = userRepository.findAllById(assignedUserIds).stream()
+                        .collect(Collectors.toMap(User::getId, User::getEmail));
+
+                // Lấy jobTitle từ CompanyMember
+                Long firstCompanyId = jobs.get(0).getCompanyId();
+                Map<Long, String> jobTitleMap = new java.util.HashMap<>();
+                List<CompanyMember> members = companyMemberRepository
+                        .findByCompanyIdAndUserIds(firstCompanyId, assignedUserIds);
+                members.forEach(m -> jobTitleMap.put(m.getUserId(), m.getJobTitle()));
+
+                activeAssignments.forEach(a -> assignmentMap.put(a.getJobPostId(),
+                        ResJobPostingSummary.AssignedRecruiterDTO.builder()
+                                .userId(a.getUserId())
+                                .email(emailMap.get(a.getUserId()))
+                                .jobTitle(jobTitleMap.get(a.getUserId()))
+                                .build()));
+            }
+        }
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -622,7 +660,8 @@ public class JobPostingServiceImpl implements JobPostingService {
                         includeApplicationCount ? interviewRoundsCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount ? hiredCountMap.getOrDefault(j.getId(), 0) : null,
                         includeApplicationCount,
-                        locationMap.getOrDefault(j.getId(), java.util.Collections.emptyList())))
+                        locationMap.getOrDefault(j.getId(), java.util.Collections.emptyList()),
+                        assignmentMap.get(j.getId())))
                 .toList());
         return result;
     }
@@ -635,7 +674,8 @@ public class JobPostingServiceImpl implements JobPostingService {
             Integer interviewRoundsCount,
             Integer hiredCount,
             boolean includeDeletedAt,
-            List<ResJobPostingSummary.LocationDTO> locations) {
+            List<ResJobPostingSummary.LocationDTO> locations,
+            ResJobPostingSummary.AssignedRecruiterDTO assignedRecruiter) {
         Company company = companyMap.get(j.getCompanyId());
         Industry industry = industryMap.get(j.getIndustryId());
         Level level = levelMap.get(j.getLevelId());
@@ -682,6 +722,7 @@ public class JobPostingServiceImpl implements JobPostingService {
                 .createdAt(j.getCreatedAt())
                 .deletedAt(includeDeletedAt ? j.getDeletedAt() : null)
                 .locations(locations)
+                .assignedRecruiter(assignedRecruiter)
                 .build();
     }
 
