@@ -5,6 +5,7 @@ import com.topviec.topviec_be.dto.request.ReqRevokeAssignmentDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostAssignmentDTO;
 import com.topviec.topviec_be.dto.response.ResRecruiterWithAssignmentCountDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.JobPostAssignment;
 import com.topviec.topviec_be.entity.JobPosting;
@@ -13,10 +14,12 @@ import com.topviec.topviec_be.enums.companyMember.MemberRole;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.JobPostAssignmentRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.CompanyMemberService;
+import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.JobPostAssignmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +44,11 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
     private final CompanyMemberRepository companyMemberRepository;
     private final UserRepository userRepository;
     private final CompanyMemberService companyMemberService;
+    private final CompanyRepository companyRepository;
+    private final EmailService emailService;
+
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy");
 
     // =========================================================================
     // Giao việc
@@ -97,6 +106,9 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
         log.info("Phân công tin [{}] cho NTD userId [{}] bởi userId [{}] trong công ty [{}]",
                 jobPostId, userId, assignedBy, companyId);
+
+        // Gửi email thông báo cho member
+        sendAssignmentEmail(userId, assignedBy, companyId, jobPosting.getTitle(), request.getNote(), false);
 
         return toResponse(saved);
     }
@@ -221,6 +233,9 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
 
         log.info("Đổi phân công tin [{}] sang NTD userId [{}] bởi userId [{}] trong công ty [{}]",
                 jobPostId, newUserId, reassignedBy, companyId);
+
+        // Gửi email thông báo cho member mới
+        sendAssignmentEmail(newUserId, reassignedBy, companyId, jobPosting.getTitle(), request.getNote(), true);
 
         return toResponse(saved);
     }
@@ -418,6 +433,9 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
         log.info("Thu hồi phân công tin [{}] từ NTD userId [{}] bởi userId [{}]",
                 jobPostId, assignment.getUserId(), revokedBy);
 
+        // Gửi email thông báo thu hồi cho member
+        sendRevokeEmail(assignment.getUserId(), revokedBy, companyId, jobPosting.getTitle(), request.getNote());
+
         return toResponse(saved);
     }
 
@@ -532,5 +550,51 @@ public class JobPostAssignmentServiceImpl implements JobPostAssignmentService {
         result.setMeta(meta);
         result.setResult(content);
         return result;
+    }
+
+    /**
+     * Gửi email thông báo phân công (hoặc đổi phân công) cho member.
+     * Lỗi email không ảnh hưởng luồng chính.
+     */
+    private void sendAssignmentEmail(Long memberId, Long assignedById,
+                                     Long companyId, String jobTitle, String note, boolean isReassign) {
+        try {
+            String memberEmail = userRepository.findById(memberId).map(User::getEmail).orElse(null);
+            if (memberEmail == null) return;
+
+            String assignedByEmail = userRepository.findById(assignedById).map(User::getEmail).orElse("-");
+            String companyName = companyRepository.findById(companyId)
+                    .map(Company::getName).orElse("Công ty");
+            String assignedAt = LocalDateTime.now().format(DATE_TIME_FORMATTER);
+
+            emailService.sendJobAssignedEmail(
+                    memberEmail, companyName, jobTitle,
+                    assignedByEmail, assignedAt, note, isReassign);
+        } catch (Exception e) {
+            log.warn("Không gửi được email thông báo phân công cho userId [{}]: {}", memberId, e.getMessage());
+        }
+    }
+
+    /**
+     * Gửi email thông báo thu hồi phân công cho member.
+     * Lỗi email không ảnh hưởng luồng chính.
+     */
+    private void sendRevokeEmail(Long memberId, Long revokedById,
+                                  Long companyId, String jobTitle, String note) {
+        try {
+            String memberEmail = userRepository.findById(memberId).map(User::getEmail).orElse(null);
+            if (memberEmail == null) return;
+
+            String revokedByEmail = userRepository.findById(revokedById).map(User::getEmail).orElse("-");
+            String companyName = companyRepository.findById(companyId)
+                    .map(Company::getName).orElse("Công ty");
+            String revokedAt = LocalDateTime.now().format(DATE_TIME_FORMATTER);
+
+            emailService.sendJobRevokedEmail(
+                    memberEmail, companyName, jobTitle,
+                    revokedByEmail, revokedAt, note);
+        } catch (Exception e) {
+            log.warn("Không gửi được email thông báo thu hồi cho userId [{}]: {}", memberId, e.getMessage());
+        }
     }
 }

@@ -62,4 +62,21 @@ public interface EmailService {
     /** Nhắc nhở NTD gia hạn gói subscription sắp hết hạn */
     void sendSubscriptionExpiryReminder(String toEmail, String companyName, String packageName,
                                         String expiredAt, int daysRemaining);
+
+    // ── Phân công tin tuyển dụng ──────────────────────────────────────────────
+
+    /**
+     * Thông báo member được phân công (hoặc đổi phân công) một tin tuyển dụng.
+     *
+     * @param isReassign true nếu là đổi phân công, false nếu là phân công lần đầu
+     */
+    void sendJobAssignedEmail(String toEmail, String companyName, String jobTitle,
+                              String assignedByEmail, String assignedAt,
+                              String note, boolean isReassign);
+
+    /**
+     * Thông báo member bị thu hồi phân công tin tuyển dụng.
+     */
+    void sendJobRevokedEmail(String toEmail, String companyName, String jobTitle,
+                             String revokedByEmail, String revokedAt, String note);
 }
