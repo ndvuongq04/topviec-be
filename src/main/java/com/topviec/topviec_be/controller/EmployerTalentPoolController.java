@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqAddToTalentPoolDTO;
 import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateTalentPoolNoteDTO;
@@ -58,6 +61,7 @@ public class EmployerTalentPoolController {
      * NTD xem chi tiết UV (ngay cả khi chưa thêm vào talent pool)
      */
     @GetMapping("/candidates/{candidateUserId}")
+    @LogAction(LogActionType.VIEW_CANDIDATE_DETAIL)
     public ResponseEntity<ResTalentPoolCandidateDetailDTO> getCandidateDetail(
             @PathVariable Long candidateUserId) {
 
@@ -68,6 +72,7 @@ public class EmployerTalentPoolController {
     }
 
     @PatchMapping("/{talentPoolId}/note")
+    @LogAction(LogActionType.UPDATE_TALENT_POOL_NOTE)
     public ResponseEntity<Void> updateNote(
             @PathVariable Long talentPoolId,
             @RequestBody ReqUpdateTalentPoolNoteDTO request) {
@@ -80,6 +85,7 @@ public class EmployerTalentPoolController {
     }
 
     @DeleteMapping("/{talentPoolId}")
+    @LogAction(LogActionType.REMOVE_FROM_TALENT_POOL)
     public ResponseEntity<Void> removeFromTalentPool(@PathVariable Long talentPoolId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -94,6 +100,7 @@ public class EmployerTalentPoolController {
      * locationId: bắt buộc — ID địa chỉ mong muốn của ứng viên.
      */
     @GetMapping("/search-candidates")
+    @LogAction(LogActionType.SEARCH_CANDIDATES)
     public ResponseEntity<ResultPaginationDTO> searchCandidates(
             @RequestParam Integer locationId,
             @PageableDefault(size = 10) Pageable pageable) {
@@ -105,6 +112,7 @@ public class EmployerTalentPoolController {
     }
 
     @PostMapping
+    @LogAction(LogActionType.ADD_TO_TALENT_POOL)
     public ResponseEntity<ResTalentPoolDTO> addToTalentPool(
             @Valid @RequestBody ReqAddToTalentPoolDTO request) {
 
@@ -116,6 +124,7 @@ public class EmployerTalentPoolController {
     }
 
     @PostMapping("/{talentPoolId}/invite")
+    @LogAction(LogActionType.INVITE_FROM_TALENT_POOL)
     public ResponseEntity<ResApplicationDTO> invite(
             @PathVariable Long talentPoolId,
             @Valid @RequestBody ReqInviteFromTalentPoolDTO request) {

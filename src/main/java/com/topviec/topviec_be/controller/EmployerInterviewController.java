@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.*;
 import com.topviec.topviec_be.dto.response.*;
 import com.topviec.topviec_be.dto.response.ResEmployerInterviewStatisticsDTO;
@@ -31,6 +34,7 @@ public class EmployerInterviewController {
     // ── Vòng phỏng vấn ────────────────────────────────────────────────────────
 
     @PostMapping("/job-postings/{jobPostId}/interview-rounds")
+    @LogAction(LogActionType.CREATE_INTERVIEW_ROUND)
     public ResponseEntity<ResInterviewRoundDTO> createRound(
             @PathVariable Long jobPostId,
             @Valid @RequestBody ReqCreateInterviewRoundDTO request) {
@@ -54,6 +58,7 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/interview-rounds/{roundId}")
+    @LogAction(LogActionType.UPDATE_INTERVIEW_ROUND)
     public ResponseEntity<ResInterviewRoundDTO> updateRound(
             @PathVariable Long roundId,
             @Valid @RequestBody ReqUpdateInterviewRoundDTO request) {
@@ -65,6 +70,7 @@ public class EmployerInterviewController {
     }
 
     @DeleteMapping("/interview-rounds/{roundId}")
+    @LogAction(LogActionType.DELETE_INTERVIEW_ROUND)
     public ResponseEntity<Void> deleteRound(@PathVariable Long roundId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -76,6 +82,7 @@ public class EmployerInterviewController {
     // ── Lịch phỏng vấn ───────────────────────────────────────────────────────
 
     @PostMapping("/interview-rounds/{roundId}/schedules")
+    @LogAction(LogActionType.CREATE_INTERVIEW_SCHEDULE)
     public ResponseEntity<ResInterviewScheduleDTO> createSchedule(
             @PathVariable Long roundId,
             @Valid @RequestBody ReqCreateInterviewScheduleDTO request) {
@@ -124,6 +131,7 @@ public class EmployerInterviewController {
     }
 
     @PutMapping("/interview-schedules/{scheduleId}")
+    @LogAction(LogActionType.UPDATE_INTERVIEW_SCHEDULE)
     public ResponseEntity<ResInterviewScheduleDTO> updateSchedule(
             @PathVariable Long scheduleId,
             @Valid @RequestBody ReqUpdateInterviewScheduleDTO request) {
@@ -135,6 +143,7 @@ public class EmployerInterviewController {
     }
 
     @DeleteMapping("/interview-schedules/{scheduleId}")
+    @LogAction(LogActionType.DELETE_INTERVIEW_SCHEDULE)
     public ResponseEntity<Void> deleteSchedule(@PathVariable Long scheduleId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -155,6 +164,7 @@ public class EmployerInterviewController {
     // ── Kết quả phỏng vấn ────────────────────────────────────────────────────
 
     @PostMapping("/interview-schedules/{scheduleId}/results")
+    @LogAction(LogActionType.CREATE_INTERVIEW_RESULT)
     public ResponseEntity<ResInterviewResultDTO> createResult(
             @PathVariable Long scheduleId,
             @Valid @RequestBody ReqInterviewResultDTO request) {
@@ -239,6 +249,7 @@ public class EmployerInterviewController {
     // ── Offer ────────────────────────────────────────────────────────────────
 
     @PatchMapping("/applications/{applicationId}/offer")
+    @LogAction(LogActionType.SEND_OFFER)
     public ResponseEntity<ResEmployerApplicationDTO> updateOffer(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqOfferResultDTO request) {
@@ -262,6 +273,7 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/job-postings/{jobPostId}/start-interviewing")
+    @LogAction(LogActionType.START_INTERVIEW_PHASE)
     public ResponseEntity<Void> startInterviewing(
             @PathVariable Long jobPostId) {
 
@@ -273,6 +285,7 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/job-postings/{jobPostId}/complete")
+    @LogAction(LogActionType.COMPLETE_RECRUITMENT)
     public ResponseEntity<Void> completeRecruitment(
             @PathVariable Long jobPostId,
             @Valid @RequestBody ReqCompleteRecruitmentDTO request) {

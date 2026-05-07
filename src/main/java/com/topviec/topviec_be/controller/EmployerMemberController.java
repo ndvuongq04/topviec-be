@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqAddMemberDTO;
 import com.topviec.topviec_be.dto.request.ReqBatchMemberPermissionDTO;
 import com.topviec.topviec_be.dto.request.ReqToggleActionDTO;
@@ -56,6 +59,7 @@ public class EmployerMemberController {
      * companyId được lấy tự động từ công ty của người dùng hiện tại.
      */
     @PostMapping
+    @LogAction(LogActionType.ADD_MEMBER)
     @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:add')")
     public ResponseEntity<ResCompanyMemberDTO> addMember(
             @AuthenticationPrincipal Jwt jwt,
@@ -71,6 +75,7 @@ public class EmployerMemberController {
     }
 
     @PatchMapping("/{targetUserId}/permission")
+    @LogAction(LogActionType.UPDATE_MEMBER_PERMISSION)
     @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:permission')")
     public ResponseEntity<ResCompanyMemberDTO> updateMemberPermission(
             @AuthenticationPrincipal Jwt jwt,
@@ -132,6 +137,7 @@ public class EmployerMemberController {
     }
 
     @PatchMapping("/{targetUserId}/permissions/{actionCode}")
+    @LogAction(LogActionType.TOGGLE_MEMBER_ACTION_PERMISSION)
     public ResponseEntity<ResMemberPermissionDetailDTO> toggleMemberActionPermission(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long targetUserId,
@@ -173,6 +179,7 @@ public class EmployerMemberController {
     }
 
     @DeleteMapping("/{targetUserId}")
+    @LogAction(LogActionType.REMOVE_MEMBER)
     @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:delete')")
     public ResponseEntity<Void> removeMember(
             @AuthenticationPrincipal Jwt jwt,

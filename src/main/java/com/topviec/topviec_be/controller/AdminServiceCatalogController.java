@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqServiceDTO;
 import com.topviec.topviec_be.dto.response.ResAdminServiceStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResServiceDTO;
@@ -46,6 +49,7 @@ public class AdminServiceCatalogController {
     }
 
     @PostMapping
+    @LogAction(LogActionType.CREATE_SERVICE)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
@@ -54,6 +58,7 @@ public class AdminServiceCatalogController {
     }
 
     @PutMapping("/{id}")
+    @LogAction(LogActionType.UPDATE_SERVICE)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")

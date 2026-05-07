@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqRenameCvDTO;
 import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
@@ -32,6 +35,7 @@ public class CvController {
      * Upload CV từ máy tính (PDF/DOCX)
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @LogAction(LogActionType.UPLOAD_CV)
     public ResponseEntity<ResCvDTO> uploadCv(
             @RequestPart("file") MultipartFile file,
             @RequestParam("title") String title,
@@ -114,6 +118,7 @@ public class CvController {
      * Xóa CV (Soft delete)
      */
     @DeleteMapping("/{id}")
+    @LogAction(LogActionType.DELETE_CV)
     public ResponseEntity<Void> deleteCv(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -131,6 +136,7 @@ public class CvController {
      * update visibility
      */
     @PatchMapping("/{id}/share")
+    @LogAction(LogActionType.SHARE_CV)
     public ResponseEntity<ResCvDTO> shareCv(
             @PathVariable Long id,
             @Valid @RequestBody ReqShareCvDTO request,
@@ -157,6 +163,7 @@ public class CvController {
      * Xem CV công khai qua token
      */
     @GetMapping("/public/{shareToken}")
+    @LogAction(LogActionType.VIEW_PUBLIC_CV)
     public ResponseEntity<ResCvDTO> getPublicCv(@PathVariable String shareToken) {
         ResCvDTO data = cvService.getPublicCv(shareToken);
         return ResponseEntity.ok(data);

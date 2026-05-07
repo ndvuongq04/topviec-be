@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
 import com.topviec.topviec_be.dto.response.ResAdminOrderStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
@@ -50,6 +53,7 @@ public class AdminOrderController {
     }
 
     @PatchMapping("/{id}/status")
+    @LogAction(LogActionType.ADMIN_UPDATE_ORDER_STATUS)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")

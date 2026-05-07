@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
 import com.topviec.topviec_be.dto.request.ReqRenewSubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
@@ -40,6 +43,7 @@ public class EmployerServiceManagementController {
      * Gia hạn gói subscription hiện tại (cùng gói, nối thời gian, cộng dồn quota)
      */
     @PostMapping("/subscription/renew")
+    @LogAction(LogActionType.RENEW_SUBSCRIPTION)
     public ResponseEntity<ResSubscriptionRenewalDTO> renewSubscription(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqRenewSubscriptionDTO request) {
@@ -60,6 +64,7 @@ public class EmployerServiceManagementController {
      * Áp dụng dịch vụ lẻ cho một tin tuyển dụng
      */
     @PostMapping("/job-posts/{jobPostingId}/apply-addon")
+    @LogAction(LogActionType.APPLY_JOB_POST_ADDON)
     public ResponseEntity<ResJobPostAddonDTO> applyAddonToJobPost(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long jobPostingId,
@@ -74,6 +79,7 @@ public class EmployerServiceManagementController {
      * Service code được tự động xác định từ companyAddonId.
      */
     @PostMapping("/company/apply-branding")
+    @LogAction(LogActionType.APPLY_COMPANY_BRANDING)
     public ResponseEntity<ResCompanyBrandingDTO> applyBrandingToCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqApplyAddonDTO request) {

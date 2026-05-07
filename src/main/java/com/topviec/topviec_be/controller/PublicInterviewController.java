@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.dto.response.ResConfirmUpdateInfoDTO;
 import com.topviec.topviec_be.dto.response.ResInterviewHistoryDTO;
@@ -90,6 +93,7 @@ public class PublicInterviewController {
      * UV đã đăng nhập xác nhận lịch PV trực tiếp trên hệ thống (yêu cầu đăng nhập).
      */
     @PatchMapping("/{scheduleId}/confirm")
+    @LogAction(LogActionType.CONFIRM_INTERVIEW_SCHEDULE)
     public ResponseEntity<Map<String, String>> confirmScheduleByCandidate(
             @PathVariable Long scheduleId,
             @AuthenticationPrincipal Jwt jwt) {
@@ -114,6 +118,7 @@ public class PublicInterviewController {
      * UV xác nhận lịch PV NTT vừa cập nhật (Public, không cần Auth).
      */
     @PatchMapping("/confirm-update")
+    @LogAction(LogActionType.CONFIRM_UPDATED_INTERVIEW_SCHEDULE)
     public ResponseEntity<Map<String, String>> confirmUpdatedSchedule(
             @RequestParam String token) {
         String message = interviewService.confirmUpdatedSchedule(token);

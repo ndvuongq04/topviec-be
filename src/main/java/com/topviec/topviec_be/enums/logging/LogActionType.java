@@ -148,13 +148,18 @@ public enum LogActionType {
     // Business
     CREATE_INTERVIEW_ROUND(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW_ROUND"),
     CREATE_INTERVIEW_SCHEDULE(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
+    SEND_OFFER(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
     UPDATE_OFFER_RESULT(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
+    START_INTERVIEW_PHASE(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
     START_INTERVIEWING(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
     COMPLETE_RECRUITMENT(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
+    CONFIRM_INTERVIEW_SCHEDULE(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
     CANDIDATE_CONFIRM_INTERVIEW(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
+    CONFIRM_UPDATED_INTERVIEW_SCHEDULE(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
     CANDIDATE_CONFIRM_UPDATED_SCHEDULE(LogCategory.INTERVIEW, LogType.BUSINESS, Severity.MEDIUM, "INTERVIEW"),
 
     // Both (*)
+    CREATE_INTERVIEW_RESULT(LogCategory.INTERVIEW, LogType.BOTH, Severity.MEDIUM, "INTERVIEW"),
     RECORD_INTERVIEW_RESULT(LogCategory.INTERVIEW, LogType.BOTH, Severity.MEDIUM, "INTERVIEW"),
 
     // ════════════════════════════════════════════
@@ -172,14 +177,20 @@ public enum LogActionType {
     // ════════════════════════════════════════════
 
     CREATE_APPEAL(LogCategory.APPEAL, LogType.BOTH, Severity.HIGH, "APPEAL"),
+    EMPLOYER_SUBMIT_APPEAL(LogCategory.APPEAL, LogType.BOTH, Severity.HIGH, "APPEAL"),
+    RESPOND_TO_REPORT(LogCategory.APPEAL, LogType.BOTH, Severity.MEDIUM, "REPORT"),
 
     // ════════════════════════════════════════════
     // ADMIN_USER_MANAGEMENT (Audit)
     // ════════════════════════════════════════════
 
+    CREATE_ADMIN(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.CRITICAL, "ADMIN_USER"),
     CREATE_ADMIN_USER(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.CRITICAL, "ADMIN_USER"),
+    UPDATE_ADMIN(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.HIGH, "ADMIN_USER"),
     UPDATE_ADMIN_USER(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.HIGH, "ADMIN_USER"),
+    TOGGLE_ADMIN_ACTIVE(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.HIGH, "ADMIN_USER"),
     TOGGLE_ADMIN_USER_ACTIVE(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.HIGH, "ADMIN_USER"),
+    DELETE_ADMIN(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.CRITICAL, "ADMIN_USER"),
     DELETE_ADMIN_USER(LogCategory.ADMIN_USER_MANAGEMENT, LogType.AUDIT, Severity.CRITICAL, "ADMIN_USER"),
 
     // ════════════════════════════════════════════
@@ -187,6 +198,7 @@ public enum LogActionType {
     // ════════════════════════════════════════════
 
     // Audit
+    ADMIN_UPDATE_COMPANY(LogCategory.COMPANY_ADMIN, LogType.AUDIT, Severity.HIGH, "COMPANY"),
     UPDATE_COMPANY_BY_ADMIN(LogCategory.COMPANY_ADMIN, LogType.AUDIT, Severity.HIGH, "COMPANY"),
     DELETE_COMPANY(LogCategory.COMPANY_ADMIN, LogType.AUDIT, Severity.CRITICAL, "COMPANY"),
 
@@ -219,6 +231,7 @@ public enum LogActionType {
 
     // Audit
     REJECT_JOB_POSTING(LogCategory.MODERATION, LogType.AUDIT, Severity.HIGH, "JOB_POSTING"),
+    ADMIN_RESTORE_JOB_POSTING(LogCategory.MODERATION, LogType.AUDIT, Severity.HIGH, "JOB_POSTING"),
     RESTORE_JOB_POSTING_BY_ADMIN(LogCategory.MODERATION, LogType.AUDIT, Severity.HIGH, "JOB_POSTING"),
 
     // Business
@@ -260,6 +273,7 @@ public enum LogActionType {
     // ORDER_MANAGEMENT (Business)
     // ════════════════════════════════════════════
 
+    ADMIN_UPDATE_ORDER_STATUS(LogCategory.ORDER_MANAGEMENT, LogType.BUSINESS, Severity.MEDIUM, "ORDER"),
     UPDATE_ORDER_STATUS(LogCategory.ORDER_MANAGEMENT, LogType.BUSINESS, Severity.MEDIUM, "ORDER"),
 
     // ════════════════════════════════════════════

@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateOrderDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -47,6 +50,7 @@ public class EmployerOrderController {
     }
 
     @PostMapping
+    @LogAction(LogActionType.CREATE_ORDER)
     public ResponseEntity<ResOrderDTO> createOrder(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqCreateOrderDTO request) {
@@ -54,6 +58,7 @@ public class EmployerOrderController {
     }
 
     @PatchMapping("/{id}/cancel")
+    @LogAction(LogActionType.CANCEL_ORDER)
     public ResponseEntity<ResOrderDTO> cancelOrder(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {
