@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateReportDTO;
 import com.topviec.topviec_be.dto.response.ResReportDetailDTO;
 import com.topviec.topviec_be.dto.response.ResViolationReasonDTO;
@@ -30,6 +33,7 @@ public class CandidateReportController {
     private final ReportService reportService;
 
     @PostMapping
+    @LogAction(LogActionType.CREATE_REPORT)
     public ResponseEntity<ResReportDetailDTO> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqCreateReportDTO request) {

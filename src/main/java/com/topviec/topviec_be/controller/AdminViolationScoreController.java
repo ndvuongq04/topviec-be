@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqAdjustViolationScoreDTO;
 import com.topviec.topviec_be.dto.request.ReqResetViolationScoreDTO;
 import com.topviec.topviec_be.dto.request.ReqUnsuspendDTO;
@@ -56,6 +59,7 @@ public class AdminViolationScoreController {
      * Điều kiện: NTD không tái phạm nhóm B trong vòng 6 tháng gần nhất.
      */
     @PostMapping("/{employerId}/violation-score/reset")
+    @LogAction(LogActionType.RESET_VIOLATION_SCORE)
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
@@ -72,6 +76,7 @@ public class AdminViolationScoreController {
      * Giảm điểm vi phạm thủ công khi NTD chủ động khắc phục hậu quả.
      */
     @PatchMapping("/{employerId}/violation-score/adjust")
+    @LogAction(LogActionType.ADJUST_VIOLATION_SCORE)
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
@@ -102,6 +107,7 @@ public class AdminViolationScoreController {
      * và mở khóa tài khoản sớm nếu đang bị suspend.
      */
     @PostMapping("/{companyId}/unsuspend")
+    @LogAction(LogActionType.UNSUSPEND_COMPANY)
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")

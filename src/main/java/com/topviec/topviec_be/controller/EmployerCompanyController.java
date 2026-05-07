@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
@@ -44,6 +47,7 @@ public class EmployerCompanyController {
      * Nếu hồ sơ đang bị rejected → tự động chuyển về pending để admin duyệt lại.
      */
     @PatchMapping
+    @LogAction(LogActionType.UPDATE_COMPANY_PROFILE)
     public ResponseEntity<ResCompanyDTO> updateMyCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqUpdateCompanyDTO request) {

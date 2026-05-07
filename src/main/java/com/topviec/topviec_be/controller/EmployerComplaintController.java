@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateAppealDTO;
 import com.topviec.topviec_be.dto.request.ReqSubmitAppealDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
@@ -129,6 +132,7 @@ public class EmployerComplaintController {
      * NTD xác nhận đã sửa tin (nhóm A) → trigger tự đóng báo cáo.
      */
     @PostMapping("/reports/{id}/respond")
+    @LogAction(LogActionType.RESPOND_TO_REPORT)
     public ResponseEntity<ResEmployerComplaintDetailDTO> respondToReport(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {
@@ -142,6 +146,7 @@ public class EmployerComplaintController {
      * Chỉ kháng cáo được 1 lần mỗi báo cáo.
      */
     @PostMapping("/reports/{id}/appeal")
+    @LogAction(LogActionType.EMPLOYER_SUBMIT_APPEAL)
     public ResponseEntity<ResAppealDTO> submitAppeal(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id,

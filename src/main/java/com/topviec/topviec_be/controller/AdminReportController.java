@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqConfirmReportDTO;
 import com.topviec.topviec_be.dto.request.ReqProcessReportDTO;
 import com.topviec.topviec_be.dto.response.ResAdminReportStatisticsDTO;
@@ -91,6 +94,7 @@ public class AdminReportController {
     }
 
     @PatchMapping("/{id}/confirm")
+    @LogAction(LogActionType.CONFIRM_REPORT)
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
@@ -103,6 +107,7 @@ public class AdminReportController {
     }
 
     @PatchMapping("/{id}/process")
+    @LogAction(LogActionType.PROCESS_REPORT)
     @PreAuthorize("@adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")

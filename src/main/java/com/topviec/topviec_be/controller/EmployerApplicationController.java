@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -62,6 +65,7 @@ public class EmployerApplicationController {
      * NTD cập nhật trạng thái và/hoặc đánh giá (cho điểm, ghi chú, gán tag) CV ứng tuyển.
      */
     @PatchMapping("/{applicationId}")
+    @LogAction(LogActionType.UPDATE_APPLICATION)
     public ResponseEntity<ResEmployerApplicationDTO> updateApplication(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqUpdateApplicationDTO request) {

@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.CompanyFollowService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ public class CandidateCompanyFollowController {
      * Thêm công ty vào danh sách theo dõi
      */
     @PostMapping("/{companyId}/follow")
+    @LogAction(LogActionType.FOLLOW_COMPANY)
     public ResponseEntity<Map<String, String>> followCompany(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long companyId) {

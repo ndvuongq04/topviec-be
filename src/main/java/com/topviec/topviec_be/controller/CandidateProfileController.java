@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateCandidateProfileDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileVisibilityDTO;
@@ -25,6 +28,7 @@ public class CandidateProfileController {
      * Tạo hồ sơ cá nhân lần đầu.
      */
     @PostMapping
+    @LogAction(LogActionType.CREATE_CANDIDATE_PROFILE)
     public ResponseEntity<ResCandidateProfileDTO> createProfile(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqCreateCandidateProfileDTO request) {
@@ -50,6 +54,7 @@ public class CandidateProfileController {
      * Cập nhật hồ sơ cá nhân.
      */
     @PutMapping
+    @LogAction(LogActionType.UPDATE_CANDIDATE_PROFILE)
     public ResponseEntity<ResCandidateProfileDTO> updateProfile(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqUpdateCandidateProfileDTO request) {
@@ -63,6 +68,7 @@ public class CandidateProfileController {
      * Cập nhật trạng thái ẩn/hiện các thông tin nhạy cảm trong hồ sơ ứng viên.
      */
     @PatchMapping("/visibility")
+    @LogAction(LogActionType.UPDATE_CANDIDATE_VISIBILITY)
     public ResponseEntity<ResCandidateProfileDTO> updateVisibility(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqUpdateCandidateProfileVisibilityDTO request) {
@@ -76,6 +82,7 @@ public class CandidateProfileController {
      * Xóa mềm hồ sơ cá nhân.
      */
     @DeleteMapping
+    @LogAction(LogActionType.DELETE_CANDIDATE_PROFILE)
     public ResponseEntity<Void> deleteProfile(
             @AuthenticationPrincipal Jwt jwt) {
 

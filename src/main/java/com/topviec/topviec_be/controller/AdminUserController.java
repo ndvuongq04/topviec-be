@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateAdmin;
 import com.topviec.topviec_be.dto.request.ReqUpdateAdmin;
 import com.topviec.topviec_be.dto.response.ResAdminUser;
@@ -39,6 +42,7 @@ public class AdminUserController {
          * Chỉ super_admin được tạo admin mới
          */
         @PostMapping
+        @LogAction(LogActionType.CREATE_ADMIN)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
                         + "')")
         public ResponseEntity<ResAdminUser> createAdmin(
@@ -88,6 +92,7 @@ public class AdminUserController {
          * Chỉ super_admin được cập nhật thông tin admin
          */
         @PutMapping("/{id}")
+        @LogAction(LogActionType.UPDATE_ADMIN)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
                         + "')")
         public ResponseEntity<ResAdminUser> updateAdmin(
@@ -103,6 +108,7 @@ public class AdminUserController {
          * Chỉ super_admin được bật/tắt tài khoản
          */
         @PatchMapping("/{id}/toggle-active")
+        @LogAction(LogActionType.TOGGLE_ADMIN_ACTIVE)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
                         + "')")
         public ResponseEntity<ResAdminUser> toggleActive(
@@ -117,6 +123,7 @@ public class AdminUserController {
          * Chỉ super_admin được xóa admin
          */
         @DeleteMapping("/{id}")
+        @LogAction(LogActionType.DELETE_ADMIN)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
                         + "')")
         public ResponseEntity<Void> deleteAdmin(

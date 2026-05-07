@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -123,18 +126,21 @@ public class AuthController {
         }
 
         @PostMapping("/register/candidate")
+        @LogAction(LogActionType.REGISTER_CANDIDATE)
         public ResponseEntity<String> register(@Valid @RequestBody ReqRegisterCandidateDTO request) {
                 authService.registerCandidate(request);
                 return ResponseEntity.ok("Đăng ký thành công");
         }
 
         @PostMapping("/register/employer")
+        @LogAction(LogActionType.REGISTER_EMPLOYER)
         public ResponseEntity<String> registerEmployer(@Valid @RequestBody ReqRegisterEmployerDTO request) {
                 authService.registerEmployer(request);
                 return ResponseEntity.ok("Đăng ký thành công");
         }
 
         @GetMapping("/verify-email")
+        @LogAction(LogActionType.VERIFY_EMAIL)
         public ResponseEntity<String> verifyEmail(@RequestParam String token) {
                 authService.verifyEmail(token);
                 return ResponseEntity.ok("Xác thực email thành công!");
@@ -211,6 +217,7 @@ public class AuthController {
         }
 
         @PostMapping("/change-password")
+        @LogAction(LogActionType.CHANGE_PASSWORD)
         @PreAuthorize("isAuthenticated()")
         public ResponseEntity<String> changePassword(
                         @AuthenticationPrincipal Jwt jwt,

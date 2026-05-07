@@ -1,6 +1,10 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateJobPostingDTO;
+import com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateJobPostingDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
 import com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO;
@@ -35,6 +39,7 @@ public class EmployerJobPostingController {
      * Tạo tin tuyển dụng mới, mặc định trạng thái draft.
      */
     @PostMapping
+    @LogAction(LogActionType.CREATE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> create(
             @Valid @RequestBody ReqCreateJobPostingDTO request) {
 
@@ -81,6 +86,7 @@ public class EmployerJobPostingController {
      * Chỉnh sửa tin tuyển dụng.
      */
     @PutMapping("/{id}")
+    @LogAction(LogActionType.UPDATE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> update(
             @PathVariable Long id,
             @Valid @RequestBody ReqUpdateJobPostingDTO request) {
@@ -96,6 +102,7 @@ public class EmployerJobPostingController {
      * Tạm dừng tin tuyển dụng.
      */
     @PatchMapping("/{id}/pause")
+    @LogAction(LogActionType.PAUSE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> pause(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -107,6 +114,7 @@ public class EmployerJobPostingController {
      * Mở lại tin tuyển dụng.
      */
     @PatchMapping("/{id}/resume")
+    @LogAction(LogActionType.RESUME_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> resume(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -118,6 +126,7 @@ public class EmployerJobPostingController {
      * Đóng tin tuyển dụng.
      */
     @PatchMapping("/{id}/close")
+    @LogAction(LogActionType.CLOSE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> close(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -129,9 +138,10 @@ public class EmployerJobPostingController {
      * Gia hạn tin tuyển dụng.
      */
     @PatchMapping("/{id}/extend")
+    @LogAction(LogActionType.EXTEND_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> extend(
             @PathVariable Long id,
-            @Valid @RequestBody com.topviec.topviec_be.dto.request.ReqExtendJobPostDTO request) {
+            @Valid @RequestBody ReqExtendJobPostDTO request) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
         return ResponseEntity.ok(jobPostingService.extend(id, companyId, userId, request));
@@ -153,6 +163,7 @@ public class EmployerJobPostingController {
      * Gửi duyệt tin tuyển dụng.
      */
     @PatchMapping("/{id}/pending-approval")
+    @LogAction(LogActionType.SUBMIT_JOB_POSTING_APPROVAL)
     public ResponseEntity<ResJobPostingDetail> pendingApproval(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -164,6 +175,7 @@ public class EmployerJobPostingController {
      * Xóa mềm tin tuyển dụng (chỉ được phép khi tin KHÔNG ở trạng thái PUBLISHED).
      */
     @DeleteMapping("/{id}")
+    @LogAction(LogActionType.DELETE_JOB_POSTING)
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -176,6 +188,7 @@ public class EmployerJobPostingController {
      * Khôi phục tin đã xóa mềm về trạng thái DRAFT.
      */
     @PatchMapping("/{id}/restore")
+    @LogAction(LogActionType.RESTORE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> restore(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);

@@ -1,5 +1,7 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
 import com.topviec.topviec_be.dto.response.ResAdminCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResAdminCandidateStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -99,6 +101,7 @@ public class AdminCandidateController {
      * Nếu status hiện tại là locked_perm → chuyển thành active
      */
     @PatchMapping("/{userId}/toggle-status")
+    @LogAction(LogActionType.TOGGLE_CANDIDATE_STATUS)
     public ResponseEntity<String> toggleCandidateStatus(@PathVariable Long userId) {
         String newStatus = adminCandidateService.toggleCandidateStatus(userId);
         return ResponseEntity.ok(newStatus);

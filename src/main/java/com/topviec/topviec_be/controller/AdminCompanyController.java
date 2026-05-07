@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqRegisterEmployerDTO;
 import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
@@ -78,6 +81,7 @@ public class AdminCompanyController {
          * Kết hợp cả 2: { "action": "unsuspend", "name": "ABC Corp mới" }
          */
         @PatchMapping("/{id}")
+        @LogAction(LogActionType.ADMIN_UPDATE_COMPANY)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
                         + AdminRoleConstants.SUPER_ADMIN + "', '"
                         + AdminRoleConstants.CONTENT_MODERATOR + "')")
@@ -91,6 +95,7 @@ public class AdminCompanyController {
         }
 
         @DeleteMapping("/{id}")
+        @LogAction(LogActionType.DELETE_COMPANY)
         @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '"
                         + AdminRoleConstants.SUPER_ADMIN + "')")
         public ResponseEntity<Void> deleteCompany(

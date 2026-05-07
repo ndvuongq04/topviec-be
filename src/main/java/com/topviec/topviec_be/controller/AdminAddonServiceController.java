@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqAddonServiceDTO;
 import com.topviec.topviec_be.dto.response.ResAddonServiceDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -45,6 +48,7 @@ public class AdminAddonServiceController {
     }
 
     @PostMapping
+    @LogAction(LogActionType.CREATE_ADDON_SERVICE)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
@@ -54,6 +58,7 @@ public class AdminAddonServiceController {
     }
 
     @PutMapping("/{id}")
+    @LogAction(LogActionType.UPDATE_ADDON_SERVICE)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")

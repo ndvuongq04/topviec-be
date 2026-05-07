@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqCreateAppealDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.service.AppealService;
@@ -33,6 +36,7 @@ public class EmployerAppealController {
      * Chỉ được kháng cáo 1 lần mỗi báo cáo.
      */
     @PostMapping
+    @LogAction(LogActionType.CREATE_APPEAL)
     public ResponseEntity<ResAppealDTO> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqCreateAppealDTO request) {
