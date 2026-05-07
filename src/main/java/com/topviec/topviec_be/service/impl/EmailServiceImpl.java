@@ -203,6 +203,41 @@ public class EmailServiceImpl implements EmailService {
         sendHtmlEmail(toEmail, "[Topviec] Gói dịch vụ của bạn sắp hết hạn — Gia hạn ngay", htmlBody);
     }
 
+    @Override
+    public void sendJobAssignedEmail(String toEmail, String companyName, String jobTitle,
+                                     String assignedByEmail, String assignedAt,
+                                     String note, boolean isReassign) {
+        Context context = new Context();
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("assignedByEmail", assignedByEmail);
+        context.setVariable("assignedAt", assignedAt);
+        context.setVariable("note", note);
+        context.setVariable("isReassign", isReassign);
+        context.setVariable("dashboardLink", baseUrl + "/employer/assignments");
+
+        String subject = isReassign
+                ? "[Topviec] Bạn được đổi phân công quản lý tin tuyển dụng"
+                : "[Topviec] Bạn được phân công quản lý tin tuyển dụng mới";
+
+        String htmlBody = templateEngine.process("email/job-assigned", context);
+        sendHtmlEmail(toEmail, subject, htmlBody);
+    }
+
+    @Override
+    public void sendJobRevokedEmail(String toEmail, String companyName, String jobTitle,
+                                    String revokedByEmail, String revokedAt, String note) {
+        Context context = new Context();
+        context.setVariable("companyName", companyName);
+        context.setVariable("jobTitle", jobTitle);
+        context.setVariable("revokedByEmail", revokedByEmail);
+        context.setVariable("revokedAt", revokedAt);
+        context.setVariable("note", note);
+
+        String htmlBody = templateEngine.process("email/job-revoked", context);
+        sendHtmlEmail(toEmail, "[Topviec] Thông báo thu hồi phân công tin tuyển dụng", htmlBody);
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
         MimeMessage message = mailSender.createMimeMessage();
         try {
