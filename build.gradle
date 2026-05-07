@@ -32,6 +32,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+    // AOP (Logging Aspect) — Spring Boot 4.0 đổi tên từ starter-aop
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+
     // Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
