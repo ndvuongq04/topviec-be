@@ -1,10 +1,12 @@
 package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.response.*;
+import com.topviec.topviec_be.entity.AdminUser;
 import com.topviec.topviec_be.entity.AuditLog;
 import com.topviec.topviec_be.entity.BusinessEventLog;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.AuditLogRepository;
 import com.topviec.topviec_be.repository.BusinessEventLogRepository;
 import com.topviec.topviec_be.repository.UserRepository;
@@ -29,6 +31,7 @@ public class LogQueryServiceImpl implements LogQueryService {
     private final AuditLogRepository auditLogRepository;
     private final BusinessEventLogRepository businessEventLogRepository;
     private final UserRepository userRepository;
+    private final AdminUserRepository adminUserRepository;
 
     // ═══════════════════════════════════════════════
     // AUDIT LOG
@@ -47,15 +50,18 @@ public class LogQueryServiceImpl implements LogQueryService {
         Page<AuditLog> page = auditLogRepository.findByFilters(
                 userIds, action, category, severity, status, start, end, pageable);
 
-        // Batch load email cho tất cả userId trong trang
-        Map<Long, String> emailMap = loadEmailMap(page.getContent().stream()
+        // Batch load user info cho tất cả userId trong trang
+        List<Long> distinctUserIds = page.getContent().stream()
                 .map(AuditLog::getUserId)
                 .filter(Objects::nonNull)
                 .distinct()
-                .toList());
+                .toList();
+
+        Map<Long, String> emailMap = loadEmailMap(distinctUserIds);
+        Map<Long, String> roleMap = loadRoleMap(distinctUserIds);
 
         List<ResAuditLogDTO> dtos = page.getContent().stream()
-                .map(log -> toAuditLogDTO(log, emailMap))
+                .map(log -> toAuditLogDTO(log, emailMap, roleMap))
                 .toList();
 
         return buildPagination(page, dtos);
@@ -66,14 +72,19 @@ public class LogQueryServiceImpl implements LogQueryService {
         AuditLog log = auditLogRepository.findById(id)
                 .orElseThrow(() -> AppException.notFound("Audit log không tồn tại: " + id));
 
-        String email = log.getUserId() != null
-                ? userRepository.findById(log.getUserId()).map(User::getEmail).orElse(null)
-                : null;
+        String email = null;
+        String role = null;
+        if (log.getUserId() != null) {
+            User user = userRepository.findById(log.getUserId()).orElse(null);
+            email = user != null ? user.getEmail() : null;
+            role = resolveRole(log.getUserId(), user);
+        }
 
         return ResAuditLogDetailDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
                 .userEmail(email)
+                .userRole(role)
                 .action(log.getAction())
                 .category(log.getCategory())
                 .severity(log.getSeverity())
@@ -106,14 +117,17 @@ public class LogQueryServiceImpl implements LogQueryService {
         Page<BusinessEventLog> page = businessEventLogRepository.findByFilters(
                 userIds, action, category, status, start, end, pageable);
 
-        Map<Long, String> emailMap = loadEmailMap(page.getContent().stream()
+        List<Long> distinctUserIds = page.getContent().stream()
                 .map(BusinessEventLog::getUserId)
                 .filter(Objects::nonNull)
                 .distinct()
-                .toList());
+                .toList();
+
+        Map<Long, String> emailMap = loadEmailMap(distinctUserIds);
+        Map<Long, String> roleMap = loadRoleMap(distinctUserIds);
 
         List<ResBusinessEventLogDTO> dtos = page.getContent().stream()
-                .map(log -> toBusinessEventLogDTO(log, emailMap))
+                .map(log -> toBusinessEventLogDTO(log, emailMap, roleMap))
                 .toList();
 
         return buildPagination(page, dtos);
@@ -124,14 +138,19 @@ public class LogQueryServiceImpl implements LogQueryService {
         BusinessEventLog log = businessEventLogRepository.findById(id)
                 .orElseThrow(() -> AppException.notFound("Business event log không tồn tại: " + id));
 
-        String email = log.getUserId() != null
-                ? userRepository.findById(log.getUserId()).map(User::getEmail).orElse(null)
-                : null;
+        String email = null;
+        String role = null;
+        if (log.getUserId() != null) {
+            User user = userRepository.findById(log.getUserId()).orElse(null);
+            email = user != null ? user.getEmail() : null;
+            role = resolveRole(log.getUserId(), user);
+        }
 
         return ResBusinessEventLogDetailDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
                 .userEmail(email)
+                .userRole(role)
                 .action(log.getAction())
                 .category(log.getCategory())
                 .targetEntity(log.getTargetEntity())
@@ -155,11 +174,69 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .collect(Collectors.toMap(User::getId, User::getEmail, (a, b) -> a));
     }
 
-    private ResAuditLogDTO toAuditLogDTO(AuditLog log, Map<Long, String> emailMap) {
+    /**
+     * Batch load vai trò người dùng — tránh N+1.
+     *
+     * Logic:
+     *   - ADMIN  → lấy adminRole từ AdminUser (super_admin, content_moderator, ...)
+     *   - EMPLOYER / CANDIDATE → dùng userType làm role
+     *   - null / unknown → null
+     */
+    private Map<Long, String> loadRoleMap(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Map.of();
+
+        // Load tất cả User để biết userType
+        List<User> users = userRepository.findAllById(userIds);
+        Map<Long, String> roleMap = new HashMap<>();
+
+        // Tách ra danh sách admin userId để batch load AdminUser
+        List<Long> adminUserIds = users.stream()
+                .filter(u -> u.getUserType() != null
+                        && "ADMIN".equalsIgnoreCase(u.getUserType().name()))
+                .map(User::getId)
+                .toList();
+
+        // Batch load admin roles
+        Map<Long, String> adminRoleMap = new HashMap<>();
+        if (!adminUserIds.isEmpty()) {
+            adminUserRepository.findByUserIdIn(adminUserIds)
+                    .forEach(a -> adminRoleMap.put(a.getUser().getId(), a.getAdminRole()));
+        }
+
+        // Gán role cho từng user
+        for (User user : users) {
+            if (user.getUserType() == null) {
+                roleMap.put(user.getId(), null);
+            } else if ("ADMIN".equalsIgnoreCase(user.getUserType().name())) {
+                roleMap.put(user.getId(), adminRoleMap.getOrDefault(user.getId(), "admin"));
+            } else {
+                roleMap.put(user.getId(), user.getUserType().getValue());
+            }
+        }
+
+        return roleMap;
+    }
+
+    /**
+     * Resolve role cho 1 user đơn lẻ (dùng cho API xem chi tiết).
+     */
+    private String resolveRole(Long userId, User user) {
+        if (user == null || user.getUserType() == null) return null;
+
+        if ("ADMIN".equalsIgnoreCase(user.getUserType().name())) {
+            return adminUserRepository.findActiveByUserId(userId)
+                    .map(AdminUser::getAdminRole)
+                    .orElse("admin");
+        }
+        return user.getUserType().getValue();
+    }
+
+    private ResAuditLogDTO toAuditLogDTO(AuditLog log, Map<Long, String> emailMap, Map<Long, String> roleMap) {
         return ResAuditLogDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
                 .userEmail(log.getUserId() != null ? emailMap.get(log.getUserId()) : null)
+                .userRole(log.getUserId() != null ? roleMap.get(log.getUserId()) : null)
                 .action(log.getAction())
                 .category(log.getCategory())
                 .severity(log.getSeverity())
@@ -171,11 +248,12 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .build();
     }
 
-    private ResBusinessEventLogDTO toBusinessEventLogDTO(BusinessEventLog log, Map<Long, String> emailMap) {
+    private ResBusinessEventLogDTO toBusinessEventLogDTO(BusinessEventLog log, Map<Long, String> emailMap, Map<Long, String> roleMap) {
         return ResBusinessEventLogDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
                 .userEmail(log.getUserId() != null ? emailMap.get(log.getUserId()) : null)
+                .userRole(log.getUserId() != null ? roleMap.get(log.getUserId()) : null)
                 .action(log.getAction())
                 .category(log.getCategory())
                 .targetEntity(log.getTargetEntity())

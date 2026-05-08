@@ -47,4 +47,8 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, Long> {
             @Param("keyword") String keyword,
             @Param("adminRole") String adminRole,
             Pageable pageable);
+
+    /** Batch load admin users theo danh sách userId — dùng cho log role resolution */
+    @Query("SELECT a FROM AdminUser a WHERE a.user.id IN :userIds AND a.deletedAt IS NULL")
+    List<AdminUser> findByUserIdIn(@Param("userIds") List<Long> userIds);
 }

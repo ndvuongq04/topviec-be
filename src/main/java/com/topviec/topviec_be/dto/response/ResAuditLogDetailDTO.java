@@ -14,6 +14,7 @@ public class ResAuditLogDetailDTO {
     private Long id;
     private Long userId;
     private String userEmail;
+    private String userRole;
     private String action;
     private String category;
     private String severity;
