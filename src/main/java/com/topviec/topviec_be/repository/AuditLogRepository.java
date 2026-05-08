@@ -23,6 +23,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
      * @param category   category (null = all)
      * @param severity   severity (null = all)
      * @param status     SUCCESS/FAILURE (null = all)
+     * @param keyword    tìm kiếm trong action, targetEntity, description (null = all)
      * @param startDate  từ ngày (null = all)
      * @param endDate    đến ngày (null = all)
      */
@@ -33,6 +34,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             AND (:category IS NULL OR a.category = :category)
             AND (:severity IS NULL OR a.severity = :severity)
             AND (:status IS NULL OR a.status = :status)
+            AND (:keyword IS NULL
+                 OR LOWER(a.action) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(a.targetEntity) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(a.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
             AND (:startDate IS NULL OR a.createdAt >= :startDate)
             AND (:endDate IS NULL OR a.createdAt <= :endDate)
             ORDER BY a.createdAt DESC
@@ -43,6 +48,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             @Param("category") String category,
             @Param("severity") String severity,
             @Param("status") String status,
+            @Param("keyword") String keyword,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             Pageable pageable);

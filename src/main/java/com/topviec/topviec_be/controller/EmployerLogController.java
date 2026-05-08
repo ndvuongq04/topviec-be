@@ -61,7 +61,9 @@ public class EmployerLogController {
         List<Long> userIds = resolveAllowedUserIds(memberId);
 
         ResultPaginationDTO result = logQueryService.getAuditLogs(
-                userIds, action, category, severity, status, startDate, endDate, pageable);
+                userIds, action, category, severity, status,
+                null, null,
+                startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -96,7 +98,9 @@ public class EmployerLogController {
         List<Long> userIds = resolveAllowedUserIds(memberId);
 
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
-                userIds, action, category, status, startDate, endDate, pageable);
+                userIds, action, category, status,
+                null, null,
+                startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
     }

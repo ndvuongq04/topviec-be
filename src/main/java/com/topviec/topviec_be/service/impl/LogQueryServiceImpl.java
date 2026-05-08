@@ -5,6 +5,7 @@ import com.topviec.topviec_be.entity.AdminUser;
 import com.topviec.topviec_be.entity.AuditLog;
 import com.topviec.topviec_be.entity.BusinessEventLog;
 import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.AuditLogRepository;
@@ -41,14 +42,26 @@ public class LogQueryServiceImpl implements LogQueryService {
     public ResultPaginationDTO getAuditLogs(
             List<Long> userIds,
             String action, String category, String severity, String status,
+            String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
             Pageable pageable) {
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
 
+        // Áp dụng filter theo userRole nếu có
+        List<Long> finalUserIds = applyRoleFilter(userIds, userRole);
+
+        // Nếu lọc role mà không tìm thấy user nào → trả về rỗng
+        if (finalUserIds != null && finalUserIds.isEmpty()) {
+            return buildEmptyPagination(pageable);
+        }
+
+        String trimmedKeyword = trimToNull(keyword);
+
         Page<AuditLog> page = auditLogRepository.findByFilters(
-                userIds, action, category, severity, status, start, end, pageable);
+                finalUserIds, action, category, severity, status,
+                trimmedKeyword, start, end, pageable);
 
         // Batch load user info cho tất cả userId trong trang
         List<Long> distinctUserIds = page.getContent().stream()
@@ -108,14 +121,24 @@ public class LogQueryServiceImpl implements LogQueryService {
     public ResultPaginationDTO getBusinessEventLogs(
             List<Long> userIds,
             String action, String category, String status,
+            String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
             Pageable pageable) {
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
 
+        List<Long> finalUserIds = applyRoleFilter(userIds, userRole);
+
+        if (finalUserIds != null && finalUserIds.isEmpty()) {
+            return buildEmptyPagination(pageable);
+        }
+
+        String trimmedKeyword = trimToNull(keyword);
+
         Page<BusinessEventLog> page = businessEventLogRepository.findByFilters(
-                userIds, action, category, status, start, end, pageable);
+                finalUserIds, action, category, status,
+                trimmedKeyword, start, end, pageable);
 
         List<Long> distinctUserIds = page.getContent().stream()
                 .map(BusinessEventLog::getUserId)
@@ -185,25 +208,21 @@ public class LogQueryServiceImpl implements LogQueryService {
     private Map<Long, String> loadRoleMap(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return Map.of();
 
-        // Load tất cả User để biết userType
         List<User> users = userRepository.findAllById(userIds);
         Map<Long, String> roleMap = new HashMap<>();
 
-        // Tách ra danh sách admin userId để batch load AdminUser
         List<Long> adminUserIds = users.stream()
                 .filter(u -> u.getUserType() != null
                         && "ADMIN".equalsIgnoreCase(u.getUserType().name()))
                 .map(User::getId)
                 .toList();
 
-        // Batch load admin roles
         Map<Long, String> adminRoleMap = new HashMap<>();
         if (!adminUserIds.isEmpty()) {
             adminUserRepository.findByUserIdIn(adminUserIds)
                     .forEach(a -> adminRoleMap.put(a.getUser().getId(), a.getAdminRole()));
         }
 
-        // Gán role cho từng user
         for (User user : users) {
             if (user.getUserType() == null) {
                 roleMap.put(user.getId(), null);
@@ -229,6 +248,49 @@ public class LogQueryServiceImpl implements LogQueryService {
                     .orElse("admin");
         }
         return user.getUserType().getValue();
+    }
+
+    /**
+     * Áp dụng filter theo userRole:
+     *   - Nếu userRole == null → giữ nguyên userIds
+     *   - Nếu userRole là admin sub-role (super_admin, content_moderator...) → tìm userId từ AdminUser
+     *   - Nếu userRole là userType (employer, candidate) → tìm userId từ User.userType
+     *
+     * Kết quả được giao (intersect) với userIds hiện có nếu userIds != null.
+     */
+    private List<Long> applyRoleFilter(List<Long> currentUserIds, String userRole) {
+        if (userRole == null || userRole.isBlank()) {
+            return currentUserIds;
+        }
+
+        String role = userRole.trim().toLowerCase();
+        List<Long> roleUserIds;
+
+        // Kiểm tra có phải userType cấp cao (employer, candidate, admin) không
+        if ("employer".equals(role) || "candidate".equals(role)) {
+            UserType type = UserType.fromValue(role);
+            roleUserIds = userRepository.findAllByUserType(type);
+        } else {
+            // Đây là admin sub-role (super_admin, content_moderator, support_admin, finance_admin)
+            roleUserIds = adminUserRepository.findAllByRole(role).stream()
+                    .map(a -> a.getUser().getId())
+                    .toList();
+        }
+
+        // Intersect với userIds hiện tại nếu có
+        if (currentUserIds == null) {
+            return roleUserIds;
+        }
+
+        Set<Long> currentSet = new HashSet<>(currentUserIds);
+        return roleUserIds.stream()
+                .filter(currentSet::contains)
+                .toList();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
     }
 
     private ResAuditLogDTO toAuditLogDTO(AuditLog log, Map<Long, String> emailMap, Map<Long, String> roleMap) {
@@ -271,5 +333,13 @@ public class LogQueryServiceImpl implements LogQueryService {
                 page.getTotalPages(),
                 page.getTotalElements());
         return new ResultPaginationDTO(meta, data);
+    }
+
+    private ResultPaginationDTO buildEmptyPagination(Pageable pageable) {
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                0, 0L);
+        return new ResultPaginationDTO(meta, List.of());
     }
 }

@@ -10,10 +10,11 @@ public interface LogQueryService {
 
     // ═══════ AUDIT LOG ═══════
 
-    /** Danh sách audit log — có filter */
+    /** Danh sách audit log — có filter + keyword search + role filter */
     ResultPaginationDTO getAuditLogs(
             List<Long> userIds,
             String action, String category, String severity, String status,
+            String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
             Pageable pageable);
 
@@ -22,10 +23,11 @@ public interface LogQueryService {
 
     // ═══════ BUSINESS EVENT LOG ═══════
 
-    /** Danh sách business event log — có filter */
+    /** Danh sách business event log — có filter + keyword search + role filter */
     ResultPaginationDTO getBusinessEventLogs(
             List<Long> userIds,
             String action, String category, String status,
+            String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
             Pageable pageable);
 

@@ -25,6 +25,8 @@ import java.util.List;
  * Phân quyền:
  *   - SUPER_ADMIN : xem tất cả log, có thể lọc theo userId bất kỳ.
  *   - Admin phụ   : chỉ xem log của chính mình — userId param bị bỏ qua.
+ *
+ * Filter: userId, action, category, severity, status, keyword, userRole, date range
  */
 @RestController
 @RequestMapping("/admin/logs")
@@ -39,7 +41,7 @@ public class AdminLogController {
     // ═══════════════════════════════════════════════
 
     /**
-     * Danh sách audit log — phân trang + filter.
+     * Danh sách audit log — phân trang + filter + keyword search + role filter.
      * SUPER_ADMIN: có thể lọc userId tùy ý hoặc lấy tất cả.
      * Admin phụ: tự động chỉ xem log của chính mình.
      */
@@ -50,6 +52,8 @@ public class AdminLogController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String userRole,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -57,7 +61,9 @@ public class AdminLogController {
         List<Long> userIds = resolveAllowedUserIds(userId);
 
         ResultPaginationDTO result = logQueryService.getAuditLogs(
-                userIds, action, category, severity, status, startDate, endDate, pageable);
+                userIds, action, category, severity, status,
+                keyword, userRole,
+                startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -79,7 +85,7 @@ public class AdminLogController {
     // ═══════════════════════════════════════════════
 
     /**
-     * Danh sách business event log — phân trang + filter.
+     * Danh sách business event log — phân trang + filter + keyword search + role filter.
      */
     @GetMapping("/business")
     public ResponseEntity<ResultPaginationDTO> getBusinessEventLogs(
@@ -87,6 +93,8 @@ public class AdminLogController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String userRole,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -94,7 +102,9 @@ public class AdminLogController {
         List<Long> userIds = resolveAllowedUserIds(userId);
 
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
-                userIds, action, category, status, startDate, endDate, pageable);
+                userIds, action, category, status,
+                keyword, userRole,
+                startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
     }
