@@ -201,8 +201,60 @@ public class LogQueryServiceImpl implements LogQueryService {
     }
 
     // ═══════════════════════════════════════════════
+    // STATISTICS — Admin Dashboard
+    // ═══════════════════════════════════════════════
+
+    @Override
+    public ResAdminLogStatisticsDTO getAdminLogStatistics() {
+        // 1. Lấy tất cả userId của admin (không lấy employer/candidate)
+        List<Long> adminUserIds = adminUserRepository.findAllActiveAdminUserIds();
+
+        if (adminUserIds.isEmpty()) {
+            return ResAdminLogStatisticsDTO.builder()
+                    .totalLogs(0)
+                    .criticalLogs(0)
+                    .systemErrors(0)
+                    .activeAdmins(0)
+                    .build();
+        }
+
+        // 2. Tổng log all-time của tất cả admin (audit + business)
+        long totalAudit = auditLogRepository.countByUserIdIn(adminUserIds);
+        long totalBusiness = businessEventLogRepository.countByUserIdIn(adminUserIds);
+        long totalLogs = totalAudit + totalBusiness;
+
+        // 3. Xác định khoảng thời gian hôm nay
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime todayEnd = today.plusDays(1).atStartOfDay();
+
+        // 4. Log có mức độ nghiêm trọng (severity = HIGH hoặc CRITICAL) — chỉ audit log có severity
+        List<String> criticalSeverities = List.of("HIGH", "CRITICAL");
+        long criticalLogs = auditLogRepository
+                .countByUserIdsAndSeveritiesAndDateRange(adminUserIds, criticalSeverities, todayStart, todayEnd);
+
+        // 5. Lỗi hệ thống (status = FAILURE)
+        long auditErrors = auditLogRepository
+                .countByUserIdsAndStatusAndDateRange(adminUserIds, "FAILURE", todayStart, todayEnd);
+        long businessErrors = businessEventLogRepository
+                .countByUserIdsAndStatusAndDateRange(adminUserIds, "FAILURE", todayStart, todayEnd);
+        long systemErrors = auditErrors + businessErrors;
+
+        // 6. Số admin đang active trong hệ thống
+        long activeAdmins = adminUserIds.size();
+
+        return ResAdminLogStatisticsDTO.builder()
+                .totalLogs(totalLogs)
+                .criticalLogs(criticalLogs)
+                .systemErrors(systemErrors)
+                .activeAdmins(activeAdmins)
+                .build();
+    }
+
+    // ═══════════════════════════════════════════════
     // HELPERS
     // ═══════════════════════════════════════════════
+
 
     /** Batch load email bằng findAllById — tránh N+1 */
     private Map<Long, String> loadEmailMap(List<Long> userIds) {

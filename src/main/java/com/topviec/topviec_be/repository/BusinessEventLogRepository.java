@@ -36,4 +36,48 @@ public interface BusinessEventLogRepository extends JpaRepository<BusinessEventL
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             Pageable pageable);
+
+    /** Đếm tổng business event log all-time của danh sách userId */
+    @Query("SELECT COUNT(b) FROM BusinessEventLog b WHERE b.userId IN :userIds")
+    long countByUserIdIn(@Param("userIds") List<Long> userIds);
+
+    // ═══════ STATISTICS — Admin Dashboard ═══════
+
+    /** Đếm tổng business event log của danh sách admin trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(b) FROM BusinessEventLog b
+            WHERE b.userId IN :userIds
+            AND b.createdAt >= :startDate
+            AND b.createdAt < :endDate
+            """)
+    long countByUserIdsAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    /** Đếm business event log FAILURE của admin trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(b) FROM BusinessEventLog b
+            WHERE b.userId IN :userIds
+            AND b.status = :status
+            AND b.createdAt >= :startDate
+            AND b.createdAt < :endDate
+            """)
+    long countByUserIdsAndStatusAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("status") String status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    /** Lấy danh sách userId distinct có business event log trong khoảng thời gian */
+    @Query("""
+            SELECT DISTINCT b.userId FROM BusinessEventLog b
+            WHERE b.userId IN :userIds
+            AND b.createdAt >= :startDate
+            AND b.createdAt < :endDate
+            """)
+    List<Long> findDistinctUserIdsByUserIdsAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 }

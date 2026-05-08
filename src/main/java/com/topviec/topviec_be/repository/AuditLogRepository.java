@@ -55,4 +55,62 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     /** Đếm log theo userId — dùng cho thống kê */
     long countByUserId(Long userId);
+
+    /** Đếm tổng audit log all-time của danh sách userId */
+    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.userId IN :userIds")
+    long countByUserIdIn(@Param("userIds") List<Long> userIds);
+
+    // ═══════ STATISTICS — Admin Dashboard ═══════
+
+    /** Đếm tổng audit log của danh sách admin trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(a) FROM AuditLog a
+            WHERE a.userId IN :userIds
+            AND a.createdAt >= :startDate
+            AND a.createdAt < :endDate
+            """)
+    long countByUserIdsAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    /** Đếm audit log có severity = HIGH hoặc CRITICAL của admin trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(a) FROM AuditLog a
+            WHERE a.userId IN :userIds
+            AND a.severity IN :severities
+            AND a.createdAt >= :startDate
+            AND a.createdAt < :endDate
+            """)
+    long countByUserIdsAndSeveritiesAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("severities") List<String> severities,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    /** Đếm audit log FAILURE của admin trong khoảng thời gian */
+    @Query("""
+            SELECT COUNT(a) FROM AuditLog a
+            WHERE a.userId IN :userIds
+            AND a.status = :status
+            AND a.createdAt >= :startDate
+            AND a.createdAt < :endDate
+            """)
+    long countByUserIdsAndStatusAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("status") String status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    /** Lấy danh sách userId distinct có audit log trong khoảng thời gian */
+    @Query("""
+            SELECT DISTINCT a.userId FROM AuditLog a
+            WHERE a.userId IN :userIds
+            AND a.createdAt >= :startDate
+            AND a.createdAt < :endDate
+            """)
+    List<Long> findDistinctUserIdsByUserIdsAndDateRange(
+            @Param("userIds") List<Long> userIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 }

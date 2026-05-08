@@ -37,6 +37,25 @@ public class AdminLogController {
     private final LogQueryService logQueryService;
 
     // ═══════════════════════════════════════════════
+    // STATISTICS — Dashboard KPI
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Thống kê log cho Admin Dashboard — chỉ lấy log của admin.
+     *
+     * Trả về:
+     *   1. totalLogs        — tổng log (audit + business) all-time
+     *   2. criticalLogs     — số log severity HIGH/CRITICAL
+     *   3. systemErrors     — số log FAILURE
+     *   4. activeAdmins     — số admin đang active trong hệ thống
+     */
+    @GetMapping("/statistics")
+    public ResponseEntity<ResAdminLogStatisticsDTO> getLogStatistics() {
+        ResAdminLogStatisticsDTO statistics = logQueryService.getAdminLogStatistics();
+        return ResponseEntity.ok(statistics);
+    }
+
+    // ═══════════════════════════════════════════════
     // AUDIT LOG
     // ═══════════════════════════════════════════════
 

@@ -51,4 +51,8 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, Long> {
     /** Batch load admin users theo danh sách userId — dùng cho log role resolution */
     @Query("SELECT a FROM AdminUser a WHERE a.user.id IN :userIds AND a.deletedAt IS NULL")
     List<AdminUser> findByUserIdIn(@Param("userIds") List<Long> userIds);
+
+    /** Lấy tất cả userId của admin đang active — dùng cho log statistics */
+    @Query("SELECT a.user.id FROM AdminUser a WHERE a.isActive = true AND a.deletedAt IS NULL")
+    List<Long> findAllActiveAdminUserIds();
 }
