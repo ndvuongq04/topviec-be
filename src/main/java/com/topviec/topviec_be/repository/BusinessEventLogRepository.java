@@ -80,4 +80,14 @@ public interface BusinessEventLogRepository extends JpaRepository<BusinessEventL
             @Param("userIds") List<Long> userIds,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    /** Đếm business event log của danh sách user thuộc các category cụ thể */
+    @Query("""
+            SELECT COUNT(b) FROM BusinessEventLog b
+            WHERE b.userId IN :userIds
+            AND b.category IN :categories
+            """)
+    long countByUserIdsAndCategories(
+            @Param("userIds") List<Long> userIds,
+            @Param("categories") List<String> categories);
 }

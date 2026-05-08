@@ -113,4 +113,14 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             @Param("userIds") List<Long> userIds,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    /** Đếm audit log của danh sách user thuộc các category cụ thể */
+    @Query("""
+            SELECT COUNT(a) FROM AuditLog a
+            WHERE a.userId IN :userIds
+            AND a.category IN :categories
+            """)
+    long countByUserIdsAndCategories(
+            @Param("userIds") List<Long> userIds,
+            @Param("categories") List<String> categories);
 }

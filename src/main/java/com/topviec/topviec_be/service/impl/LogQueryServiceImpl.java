@@ -6,6 +6,7 @@ import com.topviec.topviec_be.entity.AuditLog;
 import com.topviec.topviec_be.entity.BusinessEventLog;
 import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.User;
+import com.topviec.topviec_be.enums.logging.LogCategory;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
@@ -14,6 +15,7 @@ import com.topviec.topviec_be.repository.BusinessEventLogRepository;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.LogQueryService;
+import com.topviec.topviec_be.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -248,6 +250,73 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .criticalLogs(criticalLogs)
                 .systemErrors(systemErrors)
                 .activeAdmins(activeAdmins)
+                .build();
+    }
+
+    // ═══════════════════════════════════════════════
+    // STATISTICS — Employer Dashboard
+    // ═══════════════════════════════════════════════
+
+    @Override
+    public ResEmployerLogStatisticsDTO getEmployerLogStatistics() {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        // 1. Lấy thông tin công ty của user hiện tại
+        CompanyMember currentMember = companyMemberRepository.findFirstByUserIdAndStatusAndDeletedAtIsNull(currentUserId, "active")
+                .orElseThrow(() -> AppException.forbidden("Bạn không thuộc công ty nào hoặc tài khoản chưa kích hoạt"));
+
+        Long companyId = currentMember.getCompanyId();
+
+        // 2. Lấy danh sách userId của tất cả member active trong công ty
+        List<Long> memberUserIds = companyMemberRepository.findAllActiveByCompanyId(companyId)
+                .stream()
+                .map(CompanyMember::getUserId)
+                .toList();
+
+        if (memberUserIds.isEmpty()) {
+            return ResEmployerLogStatisticsDTO.builder()
+                    .totalActivity(0)
+                    .candidateProcessing(0)
+                    .dataUpdates(0)
+                    .activeMembers(0)
+                    .build();
+        }
+
+        // 3. Tổng hoạt động (audit + business) của công ty
+        long totalAudit = auditLogRepository.countByUserIdIn(memberUserIds);
+        long totalBusiness = businessEventLogRepository.countByUserIdIn(memberUserIds);
+        long totalActivity = totalAudit + totalBusiness;
+
+        // 4. Xử lý ứng viên (Application, Interview, Talent Pool, CV Management)
+        List<String> candidateCategories = List.of(
+                LogCategory.APPLICATION.name(),
+                LogCategory.APPLICATION_REVIEW.name(),
+                LogCategory.INTERVIEW.name(),
+                LogCategory.TALENT_POOL.name(),
+                LogCategory.CV_MANAGEMENT.name()
+        );
+        long candidateAudit = auditLogRepository.countByUserIdsAndCategories(memberUserIds, candidateCategories);
+        long candidateBusiness = businessEventLogRepository.countByUserIdsAndCategories(memberUserIds, candidateCategories);
+        long candidateProcessing = candidateAudit + candidateBusiness;
+
+        // 5. Cập nhật dữ liệu (Job Management, Company Management, Member Management)
+        List<String> dataCategories = List.of(
+                LogCategory.JOB_MANAGEMENT.name(),
+                LogCategory.COMPANY_MANAGEMENT.name(),
+                LogCategory.MEMBER_MANAGEMENT.name()
+        );
+        long dataAudit = auditLogRepository.countByUserIdsAndCategories(memberUserIds, dataCategories);
+        long dataBusiness = businessEventLogRepository.countByUserIdsAndCategories(memberUserIds, dataCategories);
+        long dataUpdates = dataAudit + dataBusiness;
+
+        // 6. Số thành viên đang hoạt động trong công ty
+        long activeMembers = memberUserIds.size();
+
+        return ResEmployerLogStatisticsDTO.builder()
+                .totalActivity(totalActivity)
+                .candidateProcessing(candidateProcessing)
+                .dataUpdates(dataUpdates)
+                .activeMembers(activeMembers)
                 .build();
     }
 

@@ -39,6 +39,25 @@ public class EmployerLogController {
     private final CompanyMemberRepository companyMemberRepository;
 
     // ═══════════════════════════════════════════════
+    // STATISTICS — Dashboard KPI
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Thống kê log cho Employer Dashboard.
+     *
+     * Trả về:
+     *   1. totalActivity       — thể hiện quy mô tương tác chung của công ty
+     *   2. candidateProcessing  — tập trung vào các hành động thực tế trên hồ sơ ứng viên
+     *   3. dataUpdates         — giám sát các thay đổi về tin đăng và thông tin công ty
+     *   4. activeMembers       — các employer đang hoạt động trong công ty
+     */
+    @GetMapping("/statistics")
+    public ResponseEntity<ResEmployerLogStatisticsDTO> getLogStatistics() {
+        ResEmployerLogStatisticsDTO statistics = logQueryService.getEmployerLogStatistics();
+        return ResponseEntity.ok(statistics);
+    }
+
+    // ═══════════════════════════════════════════════
     // AUDIT LOG
     // ═══════════════════════════════════════════════
 

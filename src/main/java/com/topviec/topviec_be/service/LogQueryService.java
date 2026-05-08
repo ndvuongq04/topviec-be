@@ -46,4 +46,7 @@ public interface LogQueryService {
 
     /** Thống kê log hôm nay cho Admin Dashboard — chỉ lấy log của admin, không lấy employer */
     ResAdminLogStatisticsDTO getAdminLogStatistics();
+
+    /** Thống kê log cho Employer Dashboard */
+    ResEmployerLogStatisticsDTO getEmployerLogStatistics();
 }
