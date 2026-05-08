@@ -54,6 +54,7 @@ public class EmployerLogController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -62,7 +63,7 @@ public class EmployerLogController {
 
         ResultPaginationDTO result = logQueryService.getAuditLogs(
                 userIds, action, category, severity, status,
-                null, null,
+                keyword, null,
                 startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
@@ -91,6 +92,7 @@ public class EmployerLogController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -99,7 +101,7 @@ public class EmployerLogController {
 
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
                 userIds, action, category, status,
-                null, null,
+                keyword, null,
                 startDate, endDate, pageable);
 
         return ResponseEntity.ok(result);
