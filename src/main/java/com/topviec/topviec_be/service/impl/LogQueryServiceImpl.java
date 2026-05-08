@@ -4,12 +4,14 @@ import com.topviec.topviec_be.dto.response.*;
 import com.topviec.topviec_be.entity.AdminUser;
 import com.topviec.topviec_be.entity.AuditLog;
 import com.topviec.topviec_be.entity.BusinessEventLog;
+import com.topviec.topviec_be.entity.CompanyMember;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.AuditLogRepository;
 import com.topviec.topviec_be.repository.BusinessEventLogRepository;
+import com.topviec.topviec_be.repository.CompanyMemberRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.LogQueryService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class LogQueryServiceImpl implements LogQueryService {
     private final BusinessEventLogRepository businessEventLogRepository;
     private final UserRepository userRepository;
     private final AdminUserRepository adminUserRepository;
+    private final CompanyMemberRepository companyMemberRepository;
 
     // ═══════════════════════════════════════════════
     // AUDIT LOG
@@ -44,6 +47,7 @@ public class LogQueryServiceImpl implements LogQueryService {
             String action, String category, String severity, String status,
             String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
+            Long companyId,
             Pageable pageable) {
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
@@ -71,7 +75,7 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .toList();
 
         Map<Long, String> emailMap = loadEmailMap(distinctUserIds);
-        Map<Long, String> roleMap = loadRoleMap(distinctUserIds);
+        Map<Long, String> roleMap = loadRoleMap(distinctUserIds, companyId);
 
         List<ResAuditLogDTO> dtos = page.getContent().stream()
                 .map(log -> toAuditLogDTO(log, emailMap, roleMap))
@@ -82,6 +86,11 @@ public class LogQueryServiceImpl implements LogQueryService {
 
     @Override
     public ResAuditLogDetailDTO getAuditLogDetail(Long id) {
+        return getAuditLogDetail(id, null);
+    }
+
+    @Override
+    public ResAuditLogDetailDTO getAuditLogDetail(Long id, Long companyId) {
         AuditLog log = auditLogRepository.findById(id)
                 .orElseThrow(() -> AppException.notFound("Audit log không tồn tại: " + id));
 
@@ -90,7 +99,7 @@ public class LogQueryServiceImpl implements LogQueryService {
         if (log.getUserId() != null) {
             User user = userRepository.findById(log.getUserId()).orElse(null);
             email = user != null ? user.getEmail() : null;
-            role = resolveRole(log.getUserId(), user);
+            role = resolveRole(log.getUserId(), user, companyId);
         }
 
         return ResAuditLogDetailDTO.builder()
@@ -123,6 +132,7 @@ public class LogQueryServiceImpl implements LogQueryService {
             String action, String category, String status,
             String keyword, String userRole,
             LocalDate startDate, LocalDate endDate,
+            Long companyId,
             Pageable pageable) {
 
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
@@ -147,7 +157,7 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .toList();
 
         Map<Long, String> emailMap = loadEmailMap(distinctUserIds);
-        Map<Long, String> roleMap = loadRoleMap(distinctUserIds);
+        Map<Long, String> roleMap = loadRoleMap(distinctUserIds, companyId);
 
         List<ResBusinessEventLogDTO> dtos = page.getContent().stream()
                 .map(log -> toBusinessEventLogDTO(log, emailMap, roleMap))
@@ -158,6 +168,11 @@ public class LogQueryServiceImpl implements LogQueryService {
 
     @Override
     public ResBusinessEventLogDetailDTO getBusinessEventLogDetail(Long id) {
+        return getBusinessEventLogDetail(id, null);
+    }
+
+    @Override
+    public ResBusinessEventLogDetailDTO getBusinessEventLogDetail(Long id, Long companyId) {
         BusinessEventLog log = businessEventLogRepository.findById(id)
                 .orElseThrow(() -> AppException.notFound("Business event log không tồn tại: " + id));
 
@@ -166,7 +181,7 @@ public class LogQueryServiceImpl implements LogQueryService {
         if (log.getUserId() != null) {
             User user = userRepository.findById(log.getUserId()).orElse(null);
             email = user != null ? user.getEmail() : null;
-            role = resolveRole(log.getUserId(), user);
+            role = resolveRole(log.getUserId(), user, companyId);
         }
 
         return ResBusinessEventLogDetailDTO.builder()
@@ -200,14 +215,46 @@ public class LogQueryServiceImpl implements LogQueryService {
     /**
      * Batch load vai trò người dùng — tránh N+1.
      *
-     * Logic:
-     *   - ADMIN  → lấy adminRole từ AdminUser (super_admin, content_moderator, ...)
-     *   - EMPLOYER / CANDIDATE → dùng userType làm role
-     *   - null / unknown → null
+     * Nếu companyId != null (context Employer):
+     *   → lấy vai trò từ CompanyMember (owner, manager, recruiter, viewer)
+     *
+     * Nếu companyId == null (context Admin):
+     *   → ADMIN  → lấy adminRole từ AdminUser (super_admin, content_moderator, ...)
+     *   → EMPLOYER / CANDIDATE → dùng userType làm role
      */
-    private Map<Long, String> loadRoleMap(List<Long> userIds) {
+    private Map<Long, String> loadRoleMap(List<Long> userIds, Long companyId) {
         if (userIds == null || userIds.isEmpty()) return Map.of();
 
+        // ── Employer context: lấy vai trò trong công ty ──
+        if (companyId != null) {
+            return loadMemberRoleMap(userIds, companyId);
+        }
+
+        // ── Admin context: lấy vai trò hệ thống ──
+        return loadSystemRoleMap(userIds);
+    }
+
+    /**
+     * Batch load member role từ CompanyMember — dùng cho Employer context.
+     */
+    private Map<Long, String> loadMemberRoleMap(List<Long> userIds, Long companyId) {
+        List<CompanyMember> members = companyMemberRepository
+                .findByCompanyIdAndUserIds(companyId, userIds);
+
+        Map<Long, String> roleMap = new HashMap<>();
+        for (CompanyMember m : members) {
+            String roleName = m.getMemberRole() != null
+                    ? m.getMemberRole().getValue()
+                    : "member";
+            roleMap.put(m.getUserId(), roleName);
+        }
+        return roleMap;
+    }
+
+    /**
+     * Batch load system role — dùng cho Admin context.
+     */
+    private Map<Long, String> loadSystemRoleMap(List<Long> userIds) {
         List<User> users = userRepository.findAllById(userIds);
         Map<Long, String> roleMap = new HashMap<>();
 
@@ -239,7 +286,15 @@ public class LogQueryServiceImpl implements LogQueryService {
     /**
      * Resolve role cho 1 user đơn lẻ (dùng cho API xem chi tiết).
      */
-    private String resolveRole(Long userId, User user) {
+    private String resolveRole(Long userId, User user, Long companyId) {
+        // Employer context: lấy vai trò trong công ty
+        if (companyId != null) {
+            return companyMemberRepository.findByCompanyIdAndUserId(companyId, userId)
+                    .map(m -> m.getMemberRole() != null ? m.getMemberRole().getValue() : "member")
+                    .orElse(null);
+        }
+
+        // Admin context
         if (user == null || user.getUserType() == null) return null;
 
         if ("ADMIN".equalsIgnoreCase(user.getUserType().name())) {
@@ -251,12 +306,7 @@ public class LogQueryServiceImpl implements LogQueryService {
     }
 
     /**
-     * Áp dụng filter theo userRole:
-     *   - Nếu userRole == null → giữ nguyên userIds
-     *   - Nếu userRole là admin sub-role (super_admin, content_moderator...) → tìm userId từ AdminUser
-     *   - Nếu userRole là userType (employer, candidate) → tìm userId từ User.userType
-     *
-     * Kết quả được giao (intersect) với userIds hiện có nếu userIds != null.
+     * Áp dụng filter theo userRole (chỉ dùng cho Admin context).
      */
     private List<Long> applyRoleFilter(List<Long> currentUserIds, String userRole) {
         if (userRole == null || userRole.isBlank()) {
@@ -266,18 +316,15 @@ public class LogQueryServiceImpl implements LogQueryService {
         String role = userRole.trim().toLowerCase();
         List<Long> roleUserIds;
 
-        // Kiểm tra có phải userType cấp cao (employer, candidate, admin) không
         if ("employer".equals(role) || "candidate".equals(role)) {
             UserType type = UserType.fromValue(role);
             roleUserIds = userRepository.findAllByUserType(type);
         } else {
-            // Đây là admin sub-role (super_admin, content_moderator, support_admin, finance_admin)
             roleUserIds = adminUserRepository.findAllByRole(role).stream()
                     .map(a -> a.getUser().getId())
                     .toList();
         }
 
-        // Intersect với userIds hiện tại nếu có
         if (currentUserIds == null) {
             return roleUserIds;
         }

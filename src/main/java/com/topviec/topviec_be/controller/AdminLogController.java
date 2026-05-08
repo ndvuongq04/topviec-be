@@ -63,7 +63,7 @@ public class AdminLogController {
         ResultPaginationDTO result = logQueryService.getAuditLogs(
                 userIds, action, category, severity, status,
                 keyword, userRole,
-                startDate, endDate, pageable);
+                startDate, endDate, null, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -104,7 +104,7 @@ public class AdminLogController {
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
                 userIds, action, category, status,
                 keyword, userRole,
-                startDate, endDate, pageable);
+                startDate, endDate, null, pageable);
 
         return ResponseEntity.ok(result);
     }
