@@ -26,7 +26,7 @@ import java.util.List;
  *   - OWNER / MANAGER: xem log của tất cả member trong công ty + chính mình
  *   - RECRUITER / VIEWER: chỉ xem log của chính mình
  *
- * Filter: memberId (chỉ member cùng company), action, category, severity, status, date range
+ * Filter: memberId, action, category, severity, status, keyword, date range
  */
 @RestController
 @RequestMapping("/employer/logs")
@@ -54,14 +54,19 @@ public class EmployerLogController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        List<Long> userIds = resolveAllowedUserIds(memberId);
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
+        List<Long> userIds = resolveAllowedUserIds(currentUserId, companyId, memberId);
 
         ResultPaginationDTO result = logQueryService.getAuditLogs(
-                userIds, action, category, severity, status, startDate, endDate, pageable);
+                userIds, action, category, severity, status,
+                keyword, null,
+                startDate, endDate, companyId, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -71,10 +76,13 @@ public class EmployerLogController {
      */
     @GetMapping("/audit/{id}")
     public ResponseEntity<ResAuditLogDetailDTO> getAuditLogDetail(@PathVariable Long id) {
-        ResAuditLogDetailDTO detail = logQueryService.getAuditLogDetail(id);
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
+
+        ResAuditLogDetailDTO detail = logQueryService.getAuditLogDetail(id, companyId);
 
         // Kiểm tra log thuộc phạm vi cho phép
-        validateLogAccess(detail.getUserId());
+        validateLogAccess(detail.getUserId(), currentUserId, companyId);
 
         return ResponseEntity.ok(detail);
     }
@@ -89,23 +97,31 @@ public class EmployerLogController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        List<Long> userIds = resolveAllowedUserIds(memberId);
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
+        List<Long> userIds = resolveAllowedUserIds(currentUserId, companyId, memberId);
 
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
-                userIds, action, category, status, startDate, endDate, pageable);
+                userIds, action, category, status,
+                keyword, null,
+                startDate, endDate, companyId, pageable);
 
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/business/{id}")
     public ResponseEntity<ResBusinessEventLogDetailDTO> getBusinessEventLogDetail(@PathVariable Long id) {
-        ResBusinessEventLogDetailDTO detail = logQueryService.getBusinessEventLogDetail(id);
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
 
-        validateLogAccess(detail.getUserId());
+        ResBusinessEventLogDetailDTO detail = logQueryService.getBusinessEventLogDetail(id, companyId);
+
+        validateLogAccess(detail.getUserId(), currentUserId, companyId);
 
         return ResponseEntity.ok(detail);
     }
@@ -122,10 +138,7 @@ public class EmployerLogController {
      *
      * Nếu memberId được truyền vào → kiểm tra member đó thuộc company.
      */
-    private List<Long> resolveAllowedUserIds(Long requestedMemberId) {
-        Long currentUserId = SecurityUtil.getCurrentUserId();
-        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
-
+    private List<Long> resolveAllowedUserIds(Long currentUserId, Long companyId, Long requestedMemberId) {
         CompanyMember currentMember = companyMemberRepository
                 .findByCompanyIdAndUserId(companyId, currentUserId)
                 .orElseThrow(() -> AppException.forbidden("Bạn không phải thành viên công ty"));
@@ -160,11 +173,8 @@ public class EmployerLogController {
      * Kiểm tra userId của log có thuộc phạm vi cho phép không.
      * Dùng cho API xem chi tiết.
      */
-    private void validateLogAccess(Long logUserId) {
+    private void validateLogAccess(Long logUserId, Long currentUserId, Long companyId) {
         if (logUserId == null) return; // system log — cho phép
-
-        Long currentUserId = SecurityUtil.getCurrentUserId();
-        Long companyId = companyService.getCompanyIdByUserId(currentUserId);
 
         CompanyMember currentMember = companyMemberRepository
                 .findByCompanyIdAndUserId(companyId, currentUserId)

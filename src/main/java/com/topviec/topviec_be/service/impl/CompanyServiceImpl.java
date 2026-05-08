@@ -468,9 +468,8 @@ public class CompanyServiceImpl implements CompanyService {
     @Override
     @Transactional(readOnly = true)
     public Long getCompanyIdByUserId(Long userId) {
-        return companyRepository.findByCreatedBy(userId)
-                .orElseThrow(() -> AppException.notFound("Bạn chưa có hồ sơ công ty"))
-                .getId();
+        // Dùng chung findByCreatedByOrThrow để hỗ trợ cả OWNER lẫn Member
+        return findByCreatedByOrThrow(userId).getId();
     }
 
     // -------------------------------------------------------------------------

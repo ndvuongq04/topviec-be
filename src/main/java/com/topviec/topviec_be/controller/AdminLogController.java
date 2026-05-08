@@ -2,15 +2,18 @@ package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.dto.response.*;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
-import com.topviec.topviec_be.enums.users.UserType;
-import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.service.LogQueryService;
+import com.topviec.topviec_be.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -19,13 +22,11 @@ import java.util.List;
 /**
  * Admin Log Controller — xem log hoạt động hệ thống.
  *
- * Phạm vi: Admin thấy log của admin khác + chính mình + toàn hệ thống (trừ NTD).
- * Tức là lấy log theo userId mà user_type IN (ADMIN, CANDIDATE) hoặc userId IS NULL (system).
+ * Phân quyền:
+ *   - SUPER_ADMIN : xem tất cả log, có thể lọc theo userId bất kỳ.
+ *   - Admin phụ   : chỉ xem log của chính mình — userId param bị bỏ qua.
  *
- * Filter:
- *  - userId: lọc theo userId cụ thể
- *  - action, category, severity, status: filter trực tiếp
- *  - startDate, endDate: lọc theo khoảng thời gian
+ * Filter: userId, action, category, severity, status, keyword, userRole, date range
  */
 @RestController
 @RequestMapping("/admin/logs")
@@ -34,48 +35,49 @@ import java.util.List;
 public class AdminLogController {
 
     private final LogQueryService logQueryService;
-    private final UserRepository userRepository;
 
     // ═══════════════════════════════════════════════
     // AUDIT LOG
     // ═══════════════════════════════════════════════
 
     /**
-     * Danh sách audit log — thông tin cơ bản, phân trang + filter.
-     * Admin xem log trừ NTD → truyền userIds = tất cả admin + candidate + null.
+     * Danh sách audit log — phân trang + filter + keyword search + role filter.
+     * SUPER_ADMIN: có thể lọc userId tùy ý hoặc lấy tất cả.
+     * Admin phụ: tự động chỉ xem log của chính mình.
      */
     @GetMapping("/audit")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
     public ResponseEntity<ResultPaginationDTO> getAuditLogs(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String userRole,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        // Nếu chỉ định userId cụ thể → lọc theo userId đó
-        // Nếu không chỉ định → null (lấy tất cả, không giới hạn theo NTD ở tầng query
-        // vì audit log ít khi chứa employer-only actions)
-        List<Long> userIds = userId != null ? List.of(userId) : null;
+        List<Long> userIds = resolveAllowedUserIds(userId);
 
         ResultPaginationDTO result = logQueryService.getAuditLogs(
-                userIds, action, category, severity, status, startDate, endDate, pageable);
+                userIds, action, category, severity, status,
+                keyword, userRole,
+                startDate, endDate, null, pageable);
 
         return ResponseEntity.ok(result);
     }
 
     /**
      * Chi tiết 1 audit log — bao gồm IP, user agent, error message.
+     * SUPER_ADMIN: xem bất kỳ log nào.
+     * Admin phụ: chỉ xem log của chính mình.
      */
     @GetMapping("/audit/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
     public ResponseEntity<ResAuditLogDetailDTO> getAuditLogDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(logQueryService.getAuditLogDetail(id));
+        ResAuditLogDetailDTO detail = logQueryService.getAuditLogDetail(id);
+        validateLogAccess(detail.getUserId());
+        return ResponseEntity.ok(detail);
     }
 
     // ═══════════════════════════════════════════════
@@ -83,24 +85,26 @@ public class AdminLogController {
     // ═══════════════════════════════════════════════
 
     /**
-     * Danh sách business event log — phân trang + filter.
+     * Danh sách business event log — phân trang + filter + keyword search + role filter.
      */
     @GetMapping("/business")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
     public ResponseEntity<ResultPaginationDTO> getBusinessEventLogs(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String userRole,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        List<Long> userIds = userId != null ? List.of(userId) : null;
+        List<Long> userIds = resolveAllowedUserIds(userId);
 
         ResultPaginationDTO result = logQueryService.getBusinessEventLogs(
-                userIds, action, category, status, startDate, endDate, pageable);
+                userIds, action, category, status,
+                keyword, userRole,
+                startDate, endDate, null, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -109,9 +113,52 @@ public class AdminLogController {
      * Chi tiết 1 business event log — bao gồm metadata JSON.
      */
     @GetMapping("/business/{id}")
-    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-            + AdminRoleConstants.SUPER_ADMIN + "')")
     public ResponseEntity<ResBusinessEventLogDetailDTO> getBusinessEventLogDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(logQueryService.getBusinessEventLogDetail(id));
+        ResBusinessEventLogDetailDTO detail = logQueryService.getBusinessEventLogDetail(id);
+        validateLogAccess(detail.getUserId());
+        return ResponseEntity.ok(detail);
+    }
+
+    // ═══════════════════════════════════════════════
+    // HELPERS — Quyền truy cập log
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Xác định danh sách userId được phép xem log:
+     *   - SUPER_ADMIN → null (không giới hạn) hoặc List.of(requestedUserId) nếu có param.
+     *   - Admin phụ   → luôn là List.of(currentUserId), bỏ qua requestedUserId.
+     */
+    private List<Long> resolveAllowedUserIds(Long requestedUserId) {
+        if (isSuperAdmin()) {
+            return requestedUserId != null ? List.of(requestedUserId) : null;
+        }
+        // Admin phụ: chỉ xem log chính mình
+        return List.of(SecurityUtil.getCurrentUserId());
+    }
+
+    /**
+     * Kiểm tra quyền xem chi tiết 1 log:
+     *   - SUPER_ADMIN → pass hết.
+     *   - Admin phụ   → chỉ được xem log của chính mình.
+     */
+    private void validateLogAccess(Long logUserId) {
+        if (isSuperAdmin()) return;
+        if (logUserId == null) return; // system log — cho phép
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (!currentUserId.equals(logUserId)) {
+            throw AppException.forbidden("Bạn chỉ được xem log của chính mình");
+        }
+    }
+
+    /**
+     * Đọc claim adminRole từ JWT để kiểm tra có phải SUPER_ADMIN không.
+     */
+    private boolean isSuperAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Jwt jwt)) return false;
+        return AdminRoleConstants.SUPER_ADMIN.equalsIgnoreCase(jwt.getClaimAsString("adminRole"));
     }
 }
