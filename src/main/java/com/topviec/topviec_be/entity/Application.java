@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -50,18 +51,22 @@ public class Application {
     @Column(name = "cv_snapshot", nullable = false, columnDefinition = "json")
     private Object cvSnapshot;
 
+    @Trackable(label = "Trạng thái đơn")
     @Column(name = "status", nullable = false, length = 30)
     private String status;
 
     @Column(name = "apply_method", nullable = false, length = 20)
     private String applyMethod;
 
+    @Trackable(label = "Đánh giá của NTD")
     @Column(name = "recruiter_rating")
     private Integer recruiterRating;
 
+    @Trackable(label = "Ghi chú NTD")
     @Column(name = "recruiter_note", columnDefinition = "TEXT")
     private String recruiterNote;
 
+    @Trackable(label = "Tags")
     @Column(name = "recruiter_tags", columnDefinition = "TEXT")
     private String recruiterTags;
 

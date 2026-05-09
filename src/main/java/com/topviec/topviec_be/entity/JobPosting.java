@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -26,55 +27,70 @@ public class JobPosting {
     @Column(name = "created_by_user_id", nullable = false)
     private Long createdByUserId;
 
+    @Trackable(label = "Tiêu đề")
     @Column(name = "title", nullable = false)
     private String title;
 
     @Column(name = "slug", nullable = false, unique = true)
     private String slug;
 
+    @Trackable(label = "Mô tả công việc")
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
+    @Trackable(label = "Yêu cầu")
     @Column(name = "requirements", nullable = false, columnDefinition = "TEXT")
     private String requirements;
 
+    @Trackable(label = "Quyền lợi")
     @Column(name = "benefits", columnDefinition = "TEXT")
     private String benefits;
 
+    @Trackable(label = "Ngành nghề")
     @Column(name = "industry_id", nullable = false)
     private Long industryId;
 
+    @Trackable(label = "Cấp bậc")
     @Column(name = "level_id", nullable = false)
     private Long levelId;
 
+    @Trackable(label = "Kinh nghiệm tối thiểu (năm)")
     @Column(name = "experience_years_min", nullable = false)
     private Integer experienceYearsMin;
 
+    @Trackable(label = "Kinh nghiệm tối đa (năm)")
     @Column(name = "experience_years_max")
     private Integer experienceYearsMax;
 
+    @Trackable(label = "Lương tối thiểu")
     @Column(name = "salary_min")
     private Long salaryMin;
 
+    @Trackable(label = "Lương tối đa")
     @Column(name = "salary_max")
     private Long salaryMax;
 
+    @Trackable(label = "Lương thỏa thuận")
     @Column(name = "salary_negotiable", nullable = false)
     private Boolean salaryNegotiable;
 
     // Dùng String — nhất quán với pattern toàn project
     // Giá trị hợp lệ: full_time | part_time | remote | hybrid | freelance (WorkType
     // enum)
+    @Trackable(label = "Hình thức làm việc")
     @Column(name = "work_type", nullable = false, length = 20)
     private String workType;
 
+    @Trackable(label = "Số lượng tuyển")
     @Column(name = "headcount", nullable = false)
     private Integer headcount;
 
+    @Trackable(label = "Hạn nộp hồ sơ")
     @Column(name = "deadline", nullable = false)
     private LocalDateTime deadline;
 
     // Giá trị hợp lệ: xem JobPostStatus enum
+    @Trackable(label = "Trạng thái")
     @Column(name = "status", nullable = false, length = 30)
     private String status;
 

@@ -8,6 +8,7 @@ import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import com.topviec.topviec_be.enums.companyMember.MemberRole;
 
 import jakarta.persistence.Column;
@@ -57,9 +58,11 @@ public class CompanyMember {
     private Map<String, List<String>> permissions;
     // { "grant": [], "revoke": [] }
 
+    @Trackable(label = "Chức danh")
     @Column(name = "job_title")
     private String jobTitle;
 
+    @Trackable(label = "Trạng thái")
     @Column(nullable = false)
     private String status; // pending | active | deactivated
 

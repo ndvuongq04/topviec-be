@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -26,21 +27,27 @@ public class Interview {
     @Column(name = "slot_id")
     private Long slotId;
 
+    @Trackable(label = "Thời gian phỏng vấn")
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
+    @Trackable(label = "Thời lượng (phút)")
     @Column(name = "duration_minutes")
     private Integer durationMinutes;
 
+    @Trackable(label = "Hình thức phỏng vấn")
     @Column(name = "interview_type", length = 20)
     private String interviewType;
 
+    @Trackable(label = "Địa điểm")
     @Column(name = "location", columnDefinition = "TEXT")
     private String location;
 
+    @Trackable(label = "Link họp online")
     @Column(name = "meeting_link", columnDefinition = "TEXT")
     private String meetingLink;
 
+    @Trackable(label = "Trạng thái")
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 

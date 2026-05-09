@@ -13,6 +13,7 @@ import com.topviec.topviec_be.repository.OrderRepository;
 import com.topviec.topviec_be.repository.ServicePackageRepository;
 import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.service.ServiceCatalogService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -103,6 +104,9 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
             throw AppException.badRequest("Mã dịch vụ đã tồn tại, vui lòng chọn mã khác.");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(service);
+
         service.setCode(reqDTO.getCode());
         service.setName(reqDTO.getName());
         service.setCategory(reqDTO.getCategory());
@@ -112,7 +116,12 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
             service.setIsActive(reqDTO.getIsActive());
         }
 
-        return mapToDTO(serviceRepository.save(service));
+        Services saved = serviceRepository.save(service);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        return mapToDTO(saved);
     }
 
     // ── Admin statistics ──────────────────────────────────────────────────────

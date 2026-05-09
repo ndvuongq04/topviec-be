@@ -22,6 +22,7 @@ public class ResBusinessEventLogDetailDTO {
     private Long targetId;
     private String targetName;
     private Map<String, Object> metadata;
+    private Boolean hasChanges;
     private String status;
     private Long durationMs;
     private LocalDateTime createdAt;

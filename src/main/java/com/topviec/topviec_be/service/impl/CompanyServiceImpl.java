@@ -26,6 +26,7 @@ import com.topviec.topviec_be.entity.ServicePackage;
 import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.entity.CompanyAddon;
@@ -84,6 +85,9 @@ public class CompanyServiceImpl implements CompanyService {
             throw AppException.badRequest("Công ty đã bị xóa");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(company);
+
         applyUpdate(company, request, userId);
 
         // Nếu đang rejected → chuyển về pending để admin duyệt lại
@@ -92,7 +96,12 @@ public class CompanyServiceImpl implements CompanyService {
             company.setRejectionReason(null);
         }
 
-        return toResponse(companyRepository.save(company));
+        Company saved = companyRepository.save(company);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------
@@ -175,6 +184,9 @@ public class CompanyServiceImpl implements CompanyService {
             ReqAdminUpdateCompanyDTO request) {
 
         Company company = findByIdOrThrow(companyId);
+
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(company);
 
         // Bước 1: Xử lý action status nếu có
         if (request.getAction() != null && !request.getAction().isBlank()) {
@@ -280,7 +292,12 @@ public class CompanyServiceImpl implements CompanyService {
             company.setSocialLinks(request.getSocialLinks());
 
         company.setUpdatedBy(adminId);
-        return toResponse(companyRepository.save(company));
+        Company saved = companyRepository.save(company);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------
