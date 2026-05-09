@@ -20,6 +20,7 @@ public class ResBusinessEventLogDetailDTO {
     private String category;
     private String targetEntity;
     private Long targetId;
+    private String targetName;
     private Map<String, Object> metadata;
     private String status;
     private Long durationMs;

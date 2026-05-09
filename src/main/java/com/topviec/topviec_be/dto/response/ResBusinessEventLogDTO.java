@@ -19,6 +19,7 @@ public class ResBusinessEventLogDTO {
     private String category;
     private String targetEntity;
     private Long targetId;
+    private String targetName;
     private String status;
     private Long durationMs;
     private LocalDateTime createdAt;

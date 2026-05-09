@@ -3,6 +3,7 @@ package com.topviec.topviec_be.controller;
 import com.topviec.topviec_be.dto.response.*;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.service.LogQueryService;
 import com.topviec.topviec_be.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import java.util.List;
 public class AdminLogController {
 
     private final LogQueryService logQueryService;
+    private final AdminUserRepository adminUserRepository;
 
     // ═══════════════════════════════════════════════
     // STATISTICS — Dashboard KPI
@@ -61,7 +63,7 @@ public class AdminLogController {
 
     /**
      * Danh sách audit log — phân trang + filter + keyword search + role filter.
-     * SUPER_ADMIN: có thể lọc userId tùy ý hoặc lấy tất cả.
+     * SUPER_ADMIN: có thể lọc userId tùy ý hoặc lấy tất cả admin logs.
      * Admin phụ: tự động chỉ xem log của chính mình.
      */
     @GetMapping("/audit")
@@ -89,7 +91,7 @@ public class AdminLogController {
 
     /**
      * Chi tiết 1 audit log — bao gồm IP, user agent, error message.
-     * SUPER_ADMIN: xem bất kỳ log nào.
+     * SUPER_ADMIN: xem bất kỳ log nào của admin.
      * Admin phụ: chỉ xem log của chính mình.
      */
     @GetMapping("/audit/{id}")
@@ -144,12 +146,16 @@ public class AdminLogController {
 
     /**
      * Xác định danh sách userId được phép xem log:
-     *   - SUPER_ADMIN → null (không giới hạn) hoặc List.of(requestedUserId) nếu có param.
+     *   - SUPER_ADMIN → lấy tất cả admin IDs nếu không truyền userId cụ thể.
      *   - Admin phụ   → luôn là List.of(currentUserId), bỏ qua requestedUserId.
      */
     private List<Long> resolveAllowedUserIds(Long requestedUserId) {
         if (isSuperAdmin()) {
-            return requestedUserId != null ? List.of(requestedUserId) : null;
+            if (requestedUserId != null) {
+                return List.of(requestedUserId);
+            }
+            // Trả về tất cả Admin IDs thay vì null để tránh lấy log của Employer/Candidate
+            return adminUserRepository.findAllActiveAdminUserIds();
         }
         // Admin phụ: chỉ xem log chính mình
         return List.of(SecurityUtil.getCurrentUserId());
