@@ -26,6 +26,7 @@ import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.ApplicationService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -228,6 +229,9 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw AppException.badRequest("Chỉ được phép thay đổi CV khi đơn ứng tuyển ở trạng thái chờ xử lý (PENDING)");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(application);
+
         Cvs cv = cvsRepository.findById(request.getCvId())
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
         if (!cv.getUserId().equals(candidateUserId)) {
@@ -236,6 +240,9 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         application.setCvId(request.getCvId());
         Application saved = applicationRepository.save(application);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
 
         Company company = saved.getJobPosting() != null
                 ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
@@ -419,6 +426,9 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw AppException.forbidden("Bạn không có quyền sửa đơn ứng tuyển này");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(application);
+
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
             ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
@@ -447,6 +457,10 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         Application saved = applicationRepository.save(application);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
         return toEmployerResponse(saved);
     }
 

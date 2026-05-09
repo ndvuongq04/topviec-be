@@ -38,6 +38,7 @@ import com.topviec.topviec_be.repository.SkillRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.JobPostingService;
 import com.topviec.topviec_be.specification.JobPostingSpecification;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -220,6 +221,9 @@ public class JobPostingServiceImpl implements JobPostingService {
         validateEditable(jobPosting);
         saveEditLog(jobPosting, updatedByUserId);
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(jobPosting);
+
         if (!jobPosting.getTitle().equals(request.getTitle())) {
             jobPosting.setSlug(generateUniqueSlugExclude(request.getTitle(), id));
         }
@@ -263,6 +267,9 @@ public class JobPostingServiceImpl implements JobPostingService {
             saveSkills(id, request.getSkills());
         }
 
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(updated).apply();
+
         return toDetailResponse(updated);
     }
 
@@ -281,9 +288,11 @@ public class JobPostingServiceImpl implements JobPostingService {
             throw AppException.badRequest("Chỉ có thể tạm dừng tin khi đang ở trạng thái PUBLISHED");
         }
         saveEditLog(jobPosting, updatedByUserId);
+        ChangeTracker tracker = ChangeTracker.of(jobPosting);
         jobPosting.setStatus(JobPostStatus.PAUSED.getValue());
         jobPosting.setUpdatedBy(updatedByUserId);
         JobPosting saved = jobPostingRepository.save(jobPosting);
+        tracker.compare(saved).apply();
         return toDetailResponse(saved);
     }
 
@@ -298,9 +307,11 @@ public class JobPostingServiceImpl implements JobPostingService {
             throw AppException.badRequest("Chỉ có thể mở lại tin khi đang ở trạng thái PAUSED");
         }
         saveEditLog(jobPosting, updatedByUserId);
+        ChangeTracker tracker = ChangeTracker.of(jobPosting);
         jobPosting.setStatus(JobPostStatus.PUBLISHED.getValue());
         jobPosting.setUpdatedBy(updatedByUserId);
         JobPosting saved = jobPostingRepository.save(jobPosting);
+        tracker.compare(saved).apply();
         return toDetailResponse(saved);
     }
 

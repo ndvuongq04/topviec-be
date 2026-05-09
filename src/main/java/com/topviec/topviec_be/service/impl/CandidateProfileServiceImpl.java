@@ -9,6 +9,7 @@ import com.topviec.topviec_be.enums.candidateProfile.PreferredWorkType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.service.CandidateProfileService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -133,6 +134,9 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         System.out.println("min=" + salaryMin + ", max=" + salaryMax + ", negotiable=" + salaryNegotiable);
         validateSalaryRange(salaryMin, salaryMax, salaryNegotiable);
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(profile);
+
         // Chỉ update field nào có giá trị trong request (null = giữ nguyên)
         if (request.getFullName() != null)
             profile.setFullName(request.getFullName());
@@ -181,6 +185,9 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
 
         profile = candidateProfileRepository.save(profile);
 
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(profile).apply();
+
         // Tính lại % hoàn thiện
         int pct = calculateCompletionPct(profile);
         candidateProfileRepository.updateProfileCompletionPct(userId, pct);
@@ -194,6 +201,9 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
     public ResCandidateProfileDTO updateVisibility(Long userId, ReqUpdateCandidateProfileVisibilityDTO request) {
         CandidateProfile profile = findByUserIdOrThrow(userId);
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(profile);
+
         profile.setHidePhone(request.getHidePhone());
         profile.setHideEmail(request.getHideEmail());
         profile.setHideDateOfBirth(request.getHideDateOfBirth());
@@ -201,6 +211,10 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         profile.setUpdatedBy(userId);
 
         profile = candidateProfileRepository.save(profile);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(profile).apply();
+
         return toResponse(profile);
     }
 

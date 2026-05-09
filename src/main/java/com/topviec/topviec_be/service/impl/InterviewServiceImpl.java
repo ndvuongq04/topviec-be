@@ -11,6 +11,7 @@ import com.topviec.topviec_be.repository.*;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.service.TokenService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -161,6 +162,9 @@ public class InterviewServiceImpl implements InterviewService {
             }
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(round);
+
         if (request.getRoundName() != null) {
             round.setRoundName(request.getRoundName());
         }
@@ -187,6 +191,9 @@ public class InterviewServiceImpl implements InterviewService {
 
         round.setUpdatedBy(userId);
         round = roundRepository.save(round);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(round).apply();
 
         if (request.getInterviewers() != null && !request.getInterviewers().isEmpty()) {
             interviewerRepository.deleteByRoundId(roundId);
@@ -773,6 +780,9 @@ public class InterviewServiceImpl implements InterviewService {
             throw AppException.badRequest("Buổi phỏng vấn đã diễn ra, không thể sửa");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(interview);
+
         LocalDateTime oldScheduledAt = interview.getScheduledAt();
 
         if (request.getScheduledAt() != null) {
@@ -804,6 +814,9 @@ public class InterviewServiceImpl implements InterviewService {
 
         interview.setUpdatedBy(userId);
         interview = interviewRepository.save(interview);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(interview).apply();
 
         log.info("📧 Gửi email thông báo thay đổi lịch PV schedule={}", scheduleId);
 

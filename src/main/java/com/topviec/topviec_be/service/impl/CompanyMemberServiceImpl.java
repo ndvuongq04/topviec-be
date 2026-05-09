@@ -28,6 +28,7 @@ import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.CompanyMemberService;
 import com.topviec.topviec_be.service.EmailService;
 import com.topviec.topviec_be.service.TokenService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -199,6 +200,9 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
                     .badRequest("Owner không thể tự xóa quyền của mình. Phải chuyển Owner cho cộng sự trước.");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(targetMember);
+
         // 4. Update role & custom permissions
         Long newRoleId = req.getRoleId();
         RoleDefault newRoleDefault = roleDefaultRepository.findById(newRoleId)
@@ -217,6 +221,9 @@ public class CompanyMemberServiceImpl implements CompanyMemberService {
         }
 
         CompanyMember savedMember = companyMemberRepository.save(targetMember);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(savedMember).apply();
 
         // 5. Ghi Log
         PermissionChangeType changeType = (oldRole != newRole) ? PermissionChangeType.ROLE_CHANGE

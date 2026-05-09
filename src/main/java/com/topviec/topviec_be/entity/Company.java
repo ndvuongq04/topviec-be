@@ -1,6 +1,6 @@
 package com.topviec.topviec_be.entity;
 
-import com.topviec.topviec_be.enums.company.CompanySize;
+import com.topviec.topviec_be.annotation.Trackable;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
 import jakarta.persistence.*;
@@ -51,15 +51,18 @@ public class Company {
     @Column(name = "slug", nullable = false, unique = true, length = 255)
     private String slug;
 
+    @Trackable(label = "Tên công ty")
     @Column(name = "name", nullable = false, length = 300)
     private String name;
 
+    @Trackable(label = "Logo")
     @Column(name = "logo_url", length = 512)
     private String logoUrl;
 
     @Column(name = "cover_url", length = 512)
     private String coverUrl;
 
+    @Trackable(label = "Mô tả công ty")
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
@@ -67,6 +70,7 @@ public class Company {
      * Lĩnh vực hoạt động chính.
      * FK → industries.id
      */
+    @Trackable(label = "Lĩnh vực hoạt động")
     @Column(name = "industry_id", nullable = false)
     private Long industryId;
 
@@ -74,21 +78,27 @@ public class Company {
      * Quy mô công ty.
      * Giá trị hợp lệ: {@code 1-50}, {@code 51-200}, {@code 201-500}, {@code 500+}
      */
+    @Trackable(label = "Quy mô công ty")
     @Column(name = "company_size", nullable = false, length = 20)
     private String companySize;
 
+    @Trackable(label = "Năm thành lập")
     @Column(name = "founded_year", columnDefinition = "SMALLINT")
     private Integer foundedYear;
 
+    @Trackable(label = "Website")
     @Column(name = "website", length = 512)
     private String website;
 
+    @Trackable(label = "Email")
     @Column(name = "email", length = 255)
     private String email;
 
+    @Trackable(label = "Số điện thoại")
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @Trackable(label = "Địa chỉ")
     @Column(name = "address", length = 512)
     private String address;
 
@@ -105,6 +115,7 @@ public class Company {
     @Column(name = "business_license_url", length = 512)
     private String businessLicenseUrl;
 
+    @Trackable(label = "Văn hóa công ty")
     @Column(name = "culture", columnDefinition = "TEXT")
     private String culture;
 
@@ -127,6 +138,7 @@ public class Company {
      * Giá trị hợp lệ: {@code pending} | {@code verified} | {@code rejected}.
      * Default: {@code pending}.
      */
+    @Trackable(label = "Trạng thái xét duyệt")
     @Column(name = "verification_status", nullable = false, length = 20)
     @Builder.Default
     private String verificationStatus = VerificationStatus.PENDING.getValue();
@@ -155,6 +167,7 @@ public class Company {
      * {@code deleted}.
      * Default: {@code pending}.
      */
+    @Trackable(label = "Trạng thái hoạt động")
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = CompanyStatus.PENDING.getValue();

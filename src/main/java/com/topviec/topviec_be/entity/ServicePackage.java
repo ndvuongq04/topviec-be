@@ -1,5 +1,7 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.topviec.topviec_be.enums.services.BillingCycle;
 import jakarta.persistence.*;
@@ -23,6 +25,7 @@ public class ServicePackage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Trackable(label = "Tên gói")
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
@@ -33,12 +36,15 @@ public class ServicePackage {
     @Column(name = "billing_cycle", length = 20)
     private BillingCycle billingCycle;
 
+    @Trackable(label = "Giá")
     @Column(name = "price", precision = 15, scale = 2)
     private BigDecimal price;
 
+    @Trackable(label = "Mô tả")
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Trackable(label = "Trạng thái kích hoạt")
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;

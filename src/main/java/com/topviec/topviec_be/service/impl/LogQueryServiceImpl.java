@@ -201,6 +201,14 @@ public class LogQueryServiceImpl implements LogQueryService {
             role = resolveRole(log.getUserId(), user, companyId);
         }
 
+        boolean hasChanges = false;
+        if (log.getMetadata() != null && log.getMetadata().containsKey("changedFields")) {
+            Object changedFieldsObj = log.getMetadata().get("changedFields");
+            if (changedFieldsObj instanceof List) {
+                hasChanges = !((List<?>) changedFieldsObj).isEmpty();
+            }
+        }
+
         return ResBusinessEventLogDetailDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
@@ -211,6 +219,7 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .targetEntity(log.getTargetEntity())
                 .targetId(log.getTargetId())
                 .targetName(resolveTargetName(log.getTargetEntity(), log.getTargetId()))
+                .hasChanges(hasChanges)
                 .metadata(log.getMetadata())
                 .status(log.getStatus())
                 .durationMs(log.getDurationMs())
@@ -289,7 +298,8 @@ public class LogQueryServiceImpl implements LogQueryService {
         Long currentUserId = SecurityUtil.getCurrentUserId();
 
         // 1. Lấy thông tin công ty và role của user hiện tại
-        CompanyMember currentMember = companyMemberRepository.findFirstByUserIdAndStatusAndDeletedAtIsNull(currentUserId, "active")
+        CompanyMember currentMember = companyMemberRepository
+                .findFirstByUserIdAndStatusAndDeletedAtIsNull(currentUserId, "active")
                 .orElseThrow(() -> AppException.forbidden("Bạn không thuộc công ty nào hoặc tài khoản chưa kích hoạt"));
 
         Long companyId = currentMember.getCompanyId();
@@ -332,18 +342,17 @@ public class LogQueryServiceImpl implements LogQueryService {
                 LogCategory.APPLICATION_REVIEW.name(),
                 LogCategory.INTERVIEW.name(),
                 LogCategory.TALENT_POOL.name(),
-                LogCategory.CV_MANAGEMENT.name()
-        );
+                LogCategory.CV_MANAGEMENT.name());
         long candidateAudit = auditLogRepository.countByUserIdsAndCategories(targetUserIds, candidateCategories);
-        long candidateBusiness = businessEventLogRepository.countByUserIdsAndCategories(targetUserIds, candidateCategories);
+        long candidateBusiness = businessEventLogRepository.countByUserIdsAndCategories(targetUserIds,
+                candidateCategories);
         long candidateProcessing = candidateAudit + candidateBusiness;
 
         // 6. Cập nhật dữ liệu (Job Management, Company Management, Member Management)
         List<String> dataCategories = List.of(
                 LogCategory.JOB_MANAGEMENT.name(),
                 LogCategory.COMPANY_MANAGEMENT.name(),
-                LogCategory.MEMBER_MANAGEMENT.name()
-        );
+                LogCategory.MEMBER_MANAGEMENT.name());
         long dataAudit = auditLogRepository.countByUserIdsAndCategories(targetUserIds, dataCategories);
         long dataBusiness = businessEventLogRepository.countByUserIdsAndCategories(targetUserIds, dataCategories);
         long dataUpdates = dataAudit + dataBusiness;
@@ -360,10 +369,10 @@ public class LogQueryServiceImpl implements LogQueryService {
     // HELPERS
     // ═══════════════════════════════════════════════
 
-
     /** Batch load email bằng findAllById — tránh N+1 */
     private Map<Long, String> loadEmailMap(List<Long> userIds) {
-        if (userIds == null || userIds.isEmpty()) return Map.of();
+        if (userIds == null || userIds.isEmpty())
+            return Map.of();
 
         return userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEmail, (a, b) -> a));
@@ -373,14 +382,15 @@ public class LogQueryServiceImpl implements LogQueryService {
      * Batch load vai trò người dùng — tránh N+1.
      *
      * Nếu companyId != null (context Employer):
-     *   → lấy vai trò từ CompanyMember (owner, manager, recruiter, viewer)
+     * → lấy vai trò từ CompanyMember (owner, manager, recruiter, viewer)
      *
      * Nếu companyId == null (context Admin):
-     *   → ADMIN  → lấy adminRole từ AdminUser (super_admin, content_moderator, ...)
-     *   → EMPLOYER / CANDIDATE → dùng userType làm role
+     * → ADMIN → lấy adminRole từ AdminUser (super_admin, content_moderator, ...)
+     * → EMPLOYER / CANDIDATE → dùng userType làm role
      */
     private Map<Long, String> loadRoleMap(List<Long> userIds, Long companyId) {
-        if (userIds == null || userIds.isEmpty()) return Map.of();
+        if (userIds == null || userIds.isEmpty())
+            return Map.of();
 
         // ── Employer context: lấy vai trò trong công ty ──
         if (companyId != null) {
@@ -452,7 +462,8 @@ public class LogQueryServiceImpl implements LogQueryService {
         }
 
         // Admin context
-        if (user == null || user.getUserType() == null) return null;
+        if (user == null || user.getUserType() == null)
+            return null;
 
         if ("ADMIN".equalsIgnoreCase(user.getUserType().name())) {
             return adminUserRepository.findActiveByUserId(userId)
@@ -493,7 +504,8 @@ public class LogQueryServiceImpl implements LogQueryService {
     }
 
     private String trimToNull(String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank())
+            return null;
         return value.trim();
     }
 
@@ -515,7 +527,16 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .build();
     }
 
-    private ResBusinessEventLogDTO toBusinessEventLogDTO(BusinessEventLog log, Map<Long, String> emailMap, Map<Long, String> roleMap) {
+    private ResBusinessEventLogDTO toBusinessEventLogDTO(BusinessEventLog log, Map<Long, String> emailMap,
+            Map<Long, String> roleMap) {
+        boolean hasChanges = false;
+        if (log.getMetadata() != null && log.getMetadata().containsKey("changedFields")) {
+            Object changedFieldsObj = log.getMetadata().get("changedFields");
+            if (changedFieldsObj instanceof List) {
+                hasChanges = !((List<?>) changedFieldsObj).isEmpty();
+            }
+        }
+
         return ResBusinessEventLogDTO.builder()
                 .id(log.getId())
                 .userId(log.getUserId())
@@ -526,6 +547,7 @@ public class LogQueryServiceImpl implements LogQueryService {
                 .targetEntity(log.getTargetEntity())
                 .targetId(log.getTargetId())
                 .targetName(resolveTargetName(log.getTargetEntity(), log.getTargetId()))
+                .hasChanges(hasChanges)
                 .status(log.getStatus())
                 .durationMs(log.getDurationMs())
                 .createdAt(log.getCreatedAt())
@@ -553,7 +575,8 @@ public class LogQueryServiceImpl implements LogQueryService {
      * Giải quyết tên hiển thị (Target Name) dựa vào Entity Type và ID.
      */
     private String resolveTargetName(String entityType, Long entityId) {
-        if (entityId == null || entityType == null) return null;
+        if (entityId == null || entityType == null)
+            return null;
 
         try {
             switch (entityType.toUpperCase()) {
@@ -587,8 +610,10 @@ public class LogQueryServiceImpl implements LogQueryService {
                 case "APPLICATION":
                     return applicationRepository.findById(entityId)
                             .map(app -> {
-                                String title = app.getJobPosting() != null ? app.getJobPosting().getTitle() : "Job #" + app.getJobPostId();
-                                String candidate = app.getCandidate() != null ? app.getCandidate().getEmail() : "User #" + app.getCandidateUserId();
+                                String title = app.getJobPosting() != null ? app.getJobPosting().getTitle()
+                                        : "Job #" + app.getJobPostId();
+                                String candidate = app.getCandidate() != null ? app.getCandidate().getEmail()
+                                        : "User #" + app.getCandidateUserId();
                                 return title + " - " + candidate;
                             })
                             .orElse("Application #" + entityId);
@@ -596,12 +621,14 @@ public class LogQueryServiceImpl implements LogQueryService {
                 case "INTERVIEW":
                     return interviewRepository.findById(entityId)
                             .map(i -> {
-                                String title = (i.getApplication() != null && i.getApplication().getJobPosting() != null)
-                                        ? i.getApplication().getJobPosting().getTitle()
-                                        : "Interview";
-                                String candidate = (i.getApplication() != null && i.getApplication().getCandidate() != null)
-                                        ? i.getApplication().getCandidate().getEmail()
-                                        : "Candidate";
+                                String title = (i.getApplication() != null
+                                        && i.getApplication().getJobPosting() != null)
+                                                ? i.getApplication().getJobPosting().getTitle()
+                                                : "Interview";
+                                String candidate = (i.getApplication() != null
+                                        && i.getApplication().getCandidate() != null)
+                                                ? i.getApplication().getCandidate().getEmail()
+                                                : "Candidate";
                                 return "Phỏng vấn: " + title + " (" + candidate + ")";
                             })
                             .orElse("Interview #" + entityId);
@@ -623,7 +650,8 @@ public class LogQueryServiceImpl implements LogQueryService {
 
                 case "SUBSCRIPTION":
                     return companySubscriptionRepository.findById(entityId)
-                            .map(sub -> (sub.getServicePackage() != null) ? sub.getServicePackage().getName() : "Subscription #" + sub.getId())
+                            .map(sub -> (sub.getServicePackage() != null) ? sub.getServicePackage().getName()
+                                    : "Subscription #" + sub.getId())
                             .orElse("Subscription #" + entityId);
 
                 case "SERVICE":
@@ -654,7 +682,8 @@ public class LogQueryServiceImpl implements LogQueryService {
                 case "TALENT_POOL":
                     return talentPoolRepository.findById(entityId)
                             .map(tp -> {
-                                String candidate = tp.getCandidateUser() != null ? tp.getCandidateUser().getEmail() : "User #" + tp.getCandidateUserId();
+                                String candidate = tp.getCandidateUser() != null ? tp.getCandidateUser().getEmail()
+                                        : "User #" + tp.getCandidateUserId();
                                 return "Talent Pool: " + candidate;
                             })
                             .orElse("Talent Pool #" + entityId);

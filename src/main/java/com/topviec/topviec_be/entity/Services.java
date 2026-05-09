@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import com.topviec.topviec_be.enums.services.ServiceCategory;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,6 +23,7 @@ public class Services {
     @Column(name = "code", length = 100, unique = true, nullable = false)
     private String code;
 
+    @Trackable(label = "Tên dịch vụ")
     @Column(name = "name", length = 255, nullable = false)
     private String name;
 
@@ -29,12 +31,15 @@ public class Services {
     @Column(name = "category", length = 50)
     private ServiceCategory category;
 
+    @Trackable(label = "Đơn vị")
     @Column(name = "unit", length = 50)
     private String unit;
 
+    @Trackable(label = "Mô tả")
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Trackable(label = "Trạng thái kích hoạt")
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
