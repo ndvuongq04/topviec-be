@@ -20,6 +20,7 @@ public class ResAuditLogDetailDTO {
     private String severity;
     private String targetEntity;
     private Long targetId;
+    private String targetName;
     private String description;
     private String ipAddress;
     private String userAgent;
