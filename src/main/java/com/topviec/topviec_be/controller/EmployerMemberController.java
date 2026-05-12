@@ -138,6 +138,7 @@ public class EmployerMemberController {
 
     @PatchMapping("/{targetUserId}/permissions/{actionCode}")
     @LogAction(LogActionType.TOGGLE_MEMBER_ACTION_PERMISSION)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'member:permission')")
     public ResponseEntity<ResMemberPermissionDetailDTO> toggleMemberActionPermission(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long targetUserId,

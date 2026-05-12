@@ -35,6 +35,7 @@ public class EmployerTalentPoolController {
     private final CompanyService companyService;
 
     @GetMapping
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:save_pool')")
     public ResponseEntity<ResultPaginationDTO> getTalentPool(
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String search,
@@ -47,6 +48,7 @@ public class EmployerTalentPoolController {
     }
 
     @GetMapping("/{talentPoolId}")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:view_profile')")
     public ResponseEntity<ResTalentPoolCandidateDetailDTO> getTalentPoolCandidateDetail(
             @PathVariable Long talentPoolId) {
 
@@ -62,6 +64,7 @@ public class EmployerTalentPoolController {
      */
     @GetMapping("/candidates/{candidateUserId}")
     @LogAction(LogActionType.VIEW_CANDIDATE_DETAIL)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:view_profile')")
     public ResponseEntity<ResTalentPoolCandidateDetailDTO> getCandidateDetail(
             @PathVariable Long candidateUserId) {
 
@@ -73,6 +76,7 @@ public class EmployerTalentPoolController {
 
     @PatchMapping("/{talentPoolId}/note")
     @LogAction(LogActionType.UPDATE_TALENT_POOL_NOTE)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:save_pool')")
     public ResponseEntity<Void> updateNote(
             @PathVariable Long talentPoolId,
             @RequestBody ReqUpdateTalentPoolNoteDTO request) {
@@ -86,6 +90,7 @@ public class EmployerTalentPoolController {
 
     @DeleteMapping("/{talentPoolId}")
     @LogAction(LogActionType.REMOVE_FROM_TALENT_POOL)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:save_pool')")
     public ResponseEntity<Void> removeFromTalentPool(@PathVariable Long talentPoolId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -101,6 +106,7 @@ public class EmployerTalentPoolController {
      */
     @GetMapping("/search-candidates")
     @LogAction(LogActionType.SEARCH_CANDIDATES)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:search')")
     public ResponseEntity<ResultPaginationDTO> searchCandidates(
             @RequestParam Integer locationId,
             @PageableDefault(size = 10) Pageable pageable) {
@@ -113,6 +119,7 @@ public class EmployerTalentPoolController {
 
     @PostMapping
     @LogAction(LogActionType.ADD_TO_TALENT_POOL)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:save_pool')")
     public ResponseEntity<ResTalentPoolDTO> addToTalentPool(
             @Valid @RequestBody ReqAddToTalentPoolDTO request) {
 
@@ -125,6 +132,7 @@ public class EmployerTalentPoolController {
 
     @PostMapping("/{talentPoolId}/invite")
     @LogAction(LogActionType.INVITE_FROM_TALENT_POOL)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'talent:invite')")
     public ResponseEntity<ResApplicationDTO> invite(
             @PathVariable Long talentPoolId,
             @Valid @RequestBody ReqInviteFromTalentPoolDTO request) {

@@ -30,6 +30,7 @@ public class EmployerOrderController {
     private final OrderService orderService;
 
     @GetMapping
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:invoice')")
     public ResponseEntity<ResultPaginationDTO> getMyOrders(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String search,
@@ -43,6 +44,7 @@ public class EmployerOrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:invoice')")
     public ResponseEntity<ResOrderDTO> getOrderById(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {
@@ -51,6 +53,7 @@ public class EmployerOrderController {
 
     @PostMapping
     @LogAction(LogActionType.CREATE_ORDER)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:purchase')")
     public ResponseEntity<ResOrderDTO> createOrder(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqCreateOrderDTO request) {
@@ -59,6 +62,7 @@ public class EmployerOrderController {
 
     @PatchMapping("/{id}/cancel")
     @LogAction(LogActionType.CANCEL_ORDER)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:invoice')")
     public ResponseEntity<ResOrderDTO> cancelOrder(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long id) {

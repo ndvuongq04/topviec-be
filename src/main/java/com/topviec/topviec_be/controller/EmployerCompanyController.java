@@ -48,6 +48,7 @@ public class EmployerCompanyController {
      */
     @PatchMapping
     @LogAction(LogActionType.UPDATE_COMPANY_PROFILE)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'company:edit')")
     public ResponseEntity<ResCompanyDTO> updateMyCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqUpdateCompanyDTO request) {
@@ -61,6 +62,7 @@ public class EmployerCompanyController {
      * Employer xem thống kê tin tuyển dụng của công ty mình.
      */
     @GetMapping("/job-statistics")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job:view_all')")
     public ResponseEntity<ResEmployerJobStatisticsDTO> getJobStatistics(
             @AuthenticationPrincipal Jwt jwt) {
         
