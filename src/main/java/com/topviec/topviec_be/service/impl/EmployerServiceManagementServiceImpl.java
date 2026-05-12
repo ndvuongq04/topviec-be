@@ -52,7 +52,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -129,17 +131,47 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 Long companyId = getCompanyId(userId);
 
                 List<CompanyAddon> addons = companyAddonRepository
-                                .findByCompanyIdOrderByCreatedAtDesc(companyId);
+                                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
 
-                return addons.stream().map(addon -> {
-                        AddonService addonSvc = addonServiceRepository.findById(addon.getAddonServiceId()).orElse(null);
+                // Gộp các addon cùng addonServiceId: cộng dồn số lượng, giữ nguyên bản ghi riêng trong DB
+                Map<Long, List<CompanyAddon>> grouped = addons.stream()
+                                .collect(Collectors.groupingBy(CompanyAddon::getAddonServiceId,
+                                                LinkedHashMap::new, Collectors.toList()));
+
+                return grouped.entrySet().stream().map(entry -> {
+                        Long addonServiceId = entry.getKey();
+                        List<CompanyAddon> group = entry.getValue();
+
+                        // Tổng hợp số lượng
+                        int totalQty = group.stream().mapToInt(CompanyAddon::getQuantityTotal).sum();
+                        int remainingQty = group.stream().mapToInt(CompanyAddon::getQuantityRemaining).sum();
+                        List<Long> ids = group.stream().map(CompanyAddon::getId).collect(Collectors.toList());
+
+                        // Lấy thông tin addon service
+                        CompanyAddon representative = group.get(0); // bản ghi mới nhất (đã sort desc)
+                        AddonService addonSvc = addonServiceRepository.findById(addonServiceId).orElse(null);
                         Services svc = addonSvc != null
                                         ? serviceRepository.findById(addonSvc.getServiceId()).orElse(null)
                                         : null;
 
+                        // expiredAt: lấy ngày xa nhất
+                        LocalDateTime latestExpiry = group.stream()
+                                        .map(CompanyAddon::getExpiredAt)
+                                        .filter(e -> e != null)
+                                        .max(LocalDateTime::compareTo)
+                                        .orElse(null);
+
+                        // startedAt: lấy ngày sớm nhất
+                        LocalDateTime earliestStart = group.stream()
+                                        .map(CompanyAddon::getStartedAt)
+                                        .filter(s -> s != null)
+                                        .min(LocalDateTime::compareTo)
+                                        .orElse(null);
+
                         return ResCompanyAddonDTO.builder()
-                                        .id(addon.getId())
-                                        .addonServiceId(addon.getAddonServiceId())
+                                        .id(representative.getId())
+                                        .addonServiceId(addonServiceId)
+                                        .companyAddonIds(ids)
                                         .addonName(addonSvc != null ? addonSvc.getName() : null)
                                         .addonCode(addonSvc != null ? addonSvc.getCode() : null)
                                         .addonQuantity(addonSvc != null ? addonSvc.getQuantity() : null)
@@ -150,12 +182,12 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                         .serviceCategoryName(svc != null && svc.getCategory() != null
                                                         ? svc.getCategory().getValue()
                                                         : null)
-                                        .status(addon.getStatus())
-                                        .quantityTotal(addon.getQuantityTotal())
-                                        .quantityRemaining(addon.getQuantityRemaining())
-                                        .startedAt(addon.getStartedAt())
-                                        .expiredAt(addon.getExpiredAt())
-                                        .createdAt(addon.getCreatedAt())
+                                        .status(SubscriptionStatus.ACTIVE)
+                                        .quantityTotal(totalQty)
+                                        .quantityRemaining(remainingQty)
+                                        .startedAt(earliestStart)
+                                        .expiredAt(latestExpiry)
+                                        .createdAt(representative.getCreatedAt())
                                         .build();
                 }).collect(Collectors.toList());
         }

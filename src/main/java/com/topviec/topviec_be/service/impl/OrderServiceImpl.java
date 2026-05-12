@@ -198,10 +198,9 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> AppException.notFound("Khong tim thay goi dich vu can thu hoi."));
         List<SubscriptionUsage> usages = subscriptionUsageRepository.findByCompanySubscriptionId(subscription.getId());
 
-        boolean hasUsage = usages.stream().anyMatch(usage ->
-                usage.getQuantityRemaining() == null
-                        || usage.getQuantityTotal() == null
-                        || !usage.getQuantityRemaining().equals(usage.getQuantityTotal()));
+        boolean hasUsage = usages.stream().anyMatch(usage -> usage.getQuantityRemaining() == null
+                || usage.getQuantityTotal() == null
+                || !usage.getQuantityRemaining().equals(usage.getQuantityTotal()));
         if (hasUsage) {
             throw AppException.badRequest("Goi dich vu da duoc su dung, khong du dieu kien hoan tien.");
         }
@@ -368,8 +367,8 @@ public class OrderServiceImpl implements OrderService {
     private void applyPaymentResult(Order order, Map<String, String> params) {
         boolean successful = "00".equals(params.get("vnp_ResponseCode"))
                 && ("00".equals(params.get("vnp_TransactionStatus"))
-                || params.get("vnp_TransactionStatus") == null
-                || params.get("vnp_TransactionStatus").isBlank());
+                        || params.get("vnp_TransactionStatus") == null
+                        || params.get("vnp_TransactionStatus").isBlank());
 
         order.setVnpayResponseCode(params.get("vnp_ResponseCode"));
         order.setVnpayTransactionNo(params.get("vnp_TransactionNo"));
@@ -430,7 +429,8 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         CompanySubscription savedSubscription = companySubscriptionRepository.save(subscription);
-        List<ServicePackageDetail> details = servicePackageDetailRepository.findByServicePackageId(servicePackage.getId());
+        List<ServicePackageDetail> details = servicePackageDetailRepository
+                .findByServicePackageId(servicePackage.getId());
 
         for (ServicePackageDetail detail : details) {
             Services service = serviceRepository.findById(detail.getServiceId()).orElse(null);
@@ -459,7 +459,8 @@ public class OrderServiceImpl implements OrderService {
                 .quantityTotal(quantity * addonService.getQuantity())
                 .quantityRemaining(quantity * addonService.getQuantity())
                 .startedAt(startedAt)
-                .expiredAt(addonService.getDurationDays() != null ? startedAt.plusDays(addonService.getDurationDays()) : null)
+                .expiredAt(addonService.getDurationDays() != null ? startedAt.plusDays(addonService.getDurationDays())
+                        : null)
                 .build());
     }
 
@@ -488,7 +489,8 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private boolean isRefundEligible(Order order) {
-        if (order.getType() != OrderType.SUBSCRIPTION || order.getStatus() != OrderStatus.PAID || order.getPaidAt() == null) {
+        if (order.getType() != OrderType.SUBSCRIPTION || order.getStatus() != OrderStatus.PAID
+                || order.getPaidAt() == null) {
             return false;
         }
         if (order.getPaidAt().isBefore(LocalDateTime.now().minusDays(7))) {
@@ -501,10 +503,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         List<SubscriptionUsage> usages = subscriptionUsageRepository.findByCompanySubscriptionId(subscription.getId());
-        return usages.stream().allMatch(usage ->
-                usage.getQuantityTotal() != null
-                        && usage.getQuantityRemaining() != null
-                        && usage.getQuantityTotal().equals(usage.getQuantityRemaining()));
+        return usages.stream().allMatch(usage -> usage.getQuantityTotal() != null
+                && usage.getQuantityRemaining() != null
+                && usage.getQuantityTotal().equals(usage.getQuantityRemaining()));
     }
 
     private boolean isValidVnpayAmount(Order order, String rawAmount) {
@@ -561,9 +562,11 @@ public class OrderServiceImpl implements OrderService {
                 case "today":
                     return isStart ? now.toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
                 case "last7days":
-                    return isStart ? now.minusDays(7).toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
+                    return isStart ? now.minusDays(7).toLocalDate().atStartOfDay()
+                            : now.toLocalDate().atTime(23, 59, 59);
                 case "thismonth":
-                    return isStart ? now.withDayOfMonth(1).toLocalDate().atStartOfDay() : now.toLocalDate().atTime(23, 59, 59);
+                    return isStart ? now.withDayOfMonth(1).toLocalDate().atStartOfDay()
+                            : now.toLocalDate().atTime(23, 59, 59);
                 default:
                     break;
             }
