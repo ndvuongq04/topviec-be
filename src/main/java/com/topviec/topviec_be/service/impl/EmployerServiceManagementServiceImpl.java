@@ -133,35 +133,38 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 List<CompanyAddon> addons = companyAddonRepository
                                 .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
 
-                // Gộp các addon cùng addonServiceId: cộng dồn số lượng, giữ nguyên bản ghi riêng trong DB
-                Map<Long, List<CompanyAddon>> grouped = addons.stream()
-                                .collect(Collectors.groupingBy(CompanyAddon::getAddonServiceId,
-                                                LinkedHashMap::new, Collectors.toList()));
+                // Gộp theo addon code: cùng code thì cộng dồn số lượng, khác code thì giữ riêng
+                Map<String, List<CompanyAddon>> grouped = new LinkedHashMap<>();
+                Map<String, AddonService> addonSvcMap = new LinkedHashMap<>();
+
+                for (CompanyAddon addon : addons) {
+                        AddonService addonSvc = addonServiceRepository.findById(addon.getAddonServiceId())
+                                        .orElse(null);
+                        if (addonSvc == null) continue;
+
+                        String addonCode = addonSvc.getCode();
+                        grouped.computeIfAbsent(addonCode, k -> new ArrayList<>()).add(addon);
+                        addonSvcMap.putIfAbsent(addonCode, addonSvc);
+                }
 
                 return grouped.entrySet().stream().map(entry -> {
-                        Long addonServiceId = entry.getKey();
+                        String addonCode = entry.getKey();
                         List<CompanyAddon> group = entry.getValue();
+                        AddonService addonSvc = addonSvcMap.get(addonCode);
+                        Services svc = serviceRepository.findById(addonSvc.getServiceId()).orElse(null);
 
-                        // Tổng hợp số lượng
                         int totalQty = group.stream().mapToInt(CompanyAddon::getQuantityTotal).sum();
                         int remainingQty = group.stream().mapToInt(CompanyAddon::getQuantityRemaining).sum();
                         List<Long> ids = group.stream().map(CompanyAddon::getId).collect(Collectors.toList());
 
-                        // Lấy thông tin addon service
-                        CompanyAddon representative = group.get(0); // bản ghi mới nhất (đã sort desc)
-                        AddonService addonSvc = addonServiceRepository.findById(addonServiceId).orElse(null);
-                        Services svc = addonSvc != null
-                                        ? serviceRepository.findById(addonSvc.getServiceId()).orElse(null)
-                                        : null;
+                        CompanyAddon representative = group.get(0);
 
-                        // expiredAt: lấy ngày xa nhất
                         LocalDateTime latestExpiry = group.stream()
                                         .map(CompanyAddon::getExpiredAt)
                                         .filter(e -> e != null)
                                         .max(LocalDateTime::compareTo)
                                         .orElse(null);
 
-                        // startedAt: lấy ngày sớm nhất
                         LocalDateTime earliestStart = group.stream()
                                         .map(CompanyAddon::getStartedAt)
                                         .filter(s -> s != null)
@@ -170,11 +173,11 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
 
                         return ResCompanyAddonDTO.builder()
                                         .id(representative.getId())
-                                        .addonServiceId(addonServiceId)
+                                        .addonServiceId(representative.getAddonServiceId())
                                         .companyAddonIds(ids)
-                                        .addonName(addonSvc != null ? addonSvc.getName() : null)
-                                        .addonCode(addonSvc != null ? addonSvc.getCode() : null)
-                                        .addonQuantity(addonSvc != null ? addonSvc.getQuantity() : null)
+                                        .addonName(addonSvc.getName())
+                                        .addonCode(addonCode)
+                                        .addonQuantity(addonSvc.getQuantity())
                                         .serviceId(svc != null ? svc.getId() : null)
                                         .serviceCode(svc != null ? svc.getCode() : null)
                                         .serviceName(svc != null ? svc.getName() : null)

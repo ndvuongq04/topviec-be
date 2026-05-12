@@ -16,4 +16,6 @@ public interface CompanyAddonRepository extends JpaRepository<CompanyAddon, Long
     List<CompanyAddon> findByCompanyIdAndStatusOrderByCreatedAtDesc(Long companyId, SubscriptionStatus status);
 
     Optional<CompanyAddon> findByOrderId(Long orderId);
+
+    Optional<CompanyAddon> findByOrderIdAndAddonServiceId(Long orderId, Long addonServiceId);
 }

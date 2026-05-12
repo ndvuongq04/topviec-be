@@ -81,8 +81,10 @@ public class OrderServiceImpl implements OrderService {
             throw AppException.badRequest("He thong hien chi ho tro thanh toan ngay qua VNPay.");
         }
 
-        PurchaseContext purchase = buildPurchaseContext(request);
-        BigDecimal totalAmount = purchase.unitPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
+        List<NormalizedOrderItem> normalizedItems = normalizeOrderItems(request);
+        BigDecimal totalAmount = normalizedItems.stream()
+                .map(NormalizedOrderItem::totalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Order order = Order.builder()
                 .companyId(companyId)
@@ -96,18 +98,20 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        OrderItem savedItem = orderItemRepository.save(OrderItem.builder()
-                .orderId(savedOrder.getId())
-                .itemType(purchase.itemType())
-                .servicePackageId(purchase.servicePackage() != null ? purchase.servicePackage().getId() : null)
-                .addonServiceId(purchase.addonService() != null ? purchase.addonService().getId() : null)
-                .quantity(request.getQuantity())
-                .unitPrice(purchase.unitPrice())
-                .totalPrice(totalAmount)
-                .billingCycle(purchase.servicePackage() != null ? purchase.servicePackage().getBillingCycle() : null)
-                .durationDays(purchase.addonService() != null ? purchase.addonService().getDurationDays() : null)
-                .build());
-        savedOrder.setOrderItems(new ArrayList<>(List.of(savedItem)));
+        List<OrderItem> savedItems = orderItemRepository.saveAll(normalizedItems.stream()
+                .map(item -> OrderItem.builder()
+                        .orderId(savedOrder.getId())
+                        .itemType(item.itemType())
+                        .servicePackageId(item.servicePackage() != null ? item.servicePackage().getId() : null)
+                        .addonServiceId(item.addonService() != null ? item.addonService().getId() : null)
+                        .quantity(item.quantity())
+                        .unitPrice(item.unitPrice())
+                        .totalPrice(item.totalPrice())
+                        .billingCycle(item.servicePackage() != null ? item.servicePackage().getBillingCycle() : null)
+                        .durationDays(item.addonService() != null ? item.addonService().getDurationDays() : null)
+                        .build())
+                .collect(Collectors.toList()));
+        savedOrder.setOrderItems(savedItems);
 
         return mapToDTO(savedOrder);
     }
@@ -346,22 +350,69 @@ public class OrderServiceImpl implements OrderService {
         return buildPaginationResult(page, pageable);
     }
 
-    private PurchaseContext buildPurchaseContext(ReqCreateOrderDTO request) {
-        if (request.getType() == OrderType.SUBSCRIPTION) {
-            ServicePackage servicePackage = servicePackageRepository.findById(request.getPackageId())
-                    .orElseThrow(() -> AppException.notFound("Khong tim thay goi dich vu."));
-            if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
-                throw AppException.badRequest("Goi dich vu nay khong con hoat dong.");
-            }
-            return new PurchaseContext(OrderItemType.SUBSCRIPTION, servicePackage.getPrice(), servicePackage, null);
+    private List<NormalizedOrderItem> normalizeOrderItems(ReqCreateOrderDTO request) {
+        List<ReqCreateOrderDTO.Item> requestItems = new ArrayList<>();
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            requestItems.addAll(request.getItems());
         }
 
-        AddonService addonService = addonServiceRepository.findById(request.getPackageId())
-                .orElseThrow(() -> AppException.notFound("Khong tim thay dich vu le."));
-        if (addonService.getIsActive() == null || !addonService.getIsActive()) {
-            throw AppException.badRequest("Dich vu le nay khong con hoat dong.");
+        if (requestItems.isEmpty() && request.getPackageId() != null) {
+            ReqCreateOrderDTO.Item legacyItem = new ReqCreateOrderDTO.Item();
+            legacyItem.setPackageId(request.getPackageId());
+            legacyItem.setQuantity(request.getQuantity() != null ? request.getQuantity() : 1);
+            requestItems.add(legacyItem);
         }
-        return new PurchaseContext(OrderItemType.ADDON, addonService.getPrice(), null, addonService);
+
+        if (requestItems.isEmpty()) {
+            throw AppException.badRequest("Don hang phai co it nhat 1 san pham.");
+        }
+
+        if (request.getType() == OrderType.SUBSCRIPTION && requestItems.size() > 1) {
+            throw AppException.badRequest("Don hang goi dich vu chi duoc mua 1 goi moi lan.");
+        }
+
+        List<NormalizedOrderItem> normalizedItems = new ArrayList<>();
+        for (ReqCreateOrderDTO.Item requestItem : requestItems) {
+            if (requestItem.getPackageId() == null) {
+                throw AppException.badRequest("ID goi khong duoc de trong.");
+            }
+            if (requestItem.getQuantity() == null || requestItem.getQuantity() < 1) {
+                throw AppException.badRequest("So luong toi thieu la 1.");
+            }
+
+            if (request.getType() == OrderType.SUBSCRIPTION) {
+                ServicePackage servicePackage = servicePackageRepository.findById(requestItem.getPackageId())
+                        .orElseThrow(() -> AppException.notFound("Khong tim thay goi dich vu."));
+                if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
+                    throw AppException.badRequest("Goi dich vu nay khong con hoat dong.");
+                }
+                BigDecimal unitPrice = servicePackage.getPrice();
+                normalizedItems.add(new NormalizedOrderItem(
+                        OrderItemType.SUBSCRIPTION,
+                        requestItem.getQuantity(),
+                        unitPrice,
+                        unitPrice.multiply(BigDecimal.valueOf(requestItem.getQuantity())),
+                        servicePackage,
+                        null));
+                continue;
+            }
+
+            AddonService addonService = addonServiceRepository.findById(requestItem.getPackageId())
+                    .orElseThrow(() -> AppException.notFound("Khong tim thay dich vu le."));
+            if (addonService.getIsActive() == null || !addonService.getIsActive()) {
+                throw AppException.badRequest("Dich vu le nay khong con hoat dong.");
+            }
+            BigDecimal unitPrice = addonService.getPrice();
+            normalizedItems.add(new NormalizedOrderItem(
+                    OrderItemType.ADDON,
+                    requestItem.getQuantity(),
+                    unitPrice,
+                    unitPrice.multiply(BigDecimal.valueOf(requestItem.getQuantity())),
+                    null,
+                    addonService));
+        }
+
+        return normalizedItems;
     }
 
     private void applyPaymentResult(Order order, Map<String, String> params) {
@@ -404,7 +455,8 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
             if (item.getItemType() == OrderItemType.ADDON && item.getAddonServiceId() != null) {
-                boolean alreadyActivated = companyAddonRepository.findByOrderId(order.getId()).isPresent();
+                boolean alreadyActivated = companyAddonRepository
+                        .findByOrderIdAndAddonServiceId(order.getId(), item.getAddonServiceId()).isPresent();
                 if (!alreadyActivated) {
                     AddonService addonService = addonServiceRepository.findById(item.getAddonServiceId())
                             .orElseThrow(() -> AppException.notFound("Khong tim thay dich vu le."));
@@ -710,9 +762,11 @@ public class OrderServiceImpl implements OrderService {
                 .build();
     }
 
-    private record PurchaseContext(
+    private record NormalizedOrderItem(
             OrderItemType itemType,
+            Integer quantity,
             BigDecimal unitPrice,
+            BigDecimal totalPrice,
             ServicePackage servicePackage,
             AddonService addonService) {
     }
