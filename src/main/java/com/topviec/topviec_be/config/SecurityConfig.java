@@ -43,6 +43,8 @@ public class SecurityConfig {
                         "/skills/**",
                         "/locations/**",
                         "/levels/**",
+                        "/payment/vnpay/ipn",
+                        "/payment/vnpay/return",
         };
 
         @Bean

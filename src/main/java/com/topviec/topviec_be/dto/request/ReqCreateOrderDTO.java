@@ -9,16 +9,18 @@ import lombok.Data;
 @Data
 public class ReqCreateOrderDTO {
 
-    @NotNull(message = "Loại order không được để trống")
+    @NotNull(message = "Loai order khong duoc de trong")
     private OrderType type;
 
-    @NotNull(message = "ID gói không được để trống")
+    @NotNull(message = "ID goi khong duoc de trong")
     private Long packageId;
 
-    @NotNull(message = "Số lượng không được để trống")
-    @Min(value = 1, message = "Số lượng tối thiểu là 1")
+    @NotNull(message = "So luong khong duoc de trong")
+    @Min(value = 1, message = "So luong toi thieu la 1")
     private Integer quantity;
 
-    @NotNull(message = "Phương thức thanh toán không được để trống")
+    @NotNull(message = "Phuong thuc thanh toan khong duoc de trong")
     private PaymentMethod paymentMethod;
+
+    private Boolean payNow;
 }

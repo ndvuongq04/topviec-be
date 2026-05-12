@@ -8,6 +8,8 @@ public enum OrderStatus {
     PAID("paid"),
     FAILED("failed"),
     CANCELLED("cancelled"),
+    REFUND_REQUESTED("refund_requested"),
+    REFUND_REJECTED("refund_rejected"),
     REFUNDED("refunded");
 
     private final String value;

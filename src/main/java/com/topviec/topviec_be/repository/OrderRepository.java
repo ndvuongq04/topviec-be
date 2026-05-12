@@ -11,12 +11,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
     Page<Order> findByCompanyIdOrderByCreatedAtDesc(Long companyId, Pageable pageable);
     Page<Order> findByStatusOrderByCreatedAtDesc(OrderStatus status, Pageable pageable);
     Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Optional<Order> findByOrderCode(String orderCode);
 
     /** Doanh thu trung bình trên mỗi đơn hàng đã thanh toán */
     @Query("SELECT COALESCE(AVG(o.totalAmount), 0) FROM Order o WHERE o.status = :status")
