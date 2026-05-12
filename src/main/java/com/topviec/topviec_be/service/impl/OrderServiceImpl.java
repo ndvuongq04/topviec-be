@@ -641,7 +641,7 @@ public class OrderServiceImpl implements OrderService {
 
     private ResultPaginationDTO buildPaginationResult(Page<Order> page, Pageable pageable) {
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(page.getTotalPages());
         meta.setTotals(page.getTotalElements());

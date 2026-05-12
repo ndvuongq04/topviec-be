@@ -42,7 +42,7 @@ public class AddonServiceServiceImpl implements AddonServiceService {
         Page<AddonService> page = addonServiceRepository.searchAll(category, keyword, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(page.getTotalPages());
         meta.setTotals(page.getTotalElements());

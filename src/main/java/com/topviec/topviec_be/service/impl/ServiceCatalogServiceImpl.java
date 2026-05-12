@@ -48,7 +48,7 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
         Page<Services> page = serviceRepository.searchAll(category, keyword, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(page.getTotalPages());
         meta.setTotals(page.getTotalElements());
