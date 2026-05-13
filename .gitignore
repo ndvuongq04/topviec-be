@@ -38,4 +38,5 @@ out/
 
 .env
 .env.production
-!.env.example    # Cho phép commit file này
+!.env.example
+uploads/

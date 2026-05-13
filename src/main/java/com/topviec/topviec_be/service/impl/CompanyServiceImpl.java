@@ -11,6 +11,7 @@ import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.enums.company.CompanySize;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
+import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
@@ -26,6 +27,7 @@ import com.topviec.topviec_be.entity.ServicePackage;
 import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
+import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.ChangeTracker;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
@@ -58,6 +60,7 @@ public class CompanyServiceImpl implements CompanyService {
     private final CompanyAddonRepository companyAddonRepository;
     private final SubscriptionUsageRepository subscriptionUsageRepository;
     private final ServiceRepository serviceRepository;
+    private final FileStorageService fileStorageService;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -77,6 +80,9 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional
     public ResCompanyDTO updateMyCompany(Long userId, ReqUpdateCompanyDTO request) {
         Company company = findByCreatedByOrThrow(userId);
+        String oldLogoUrl = company.getLogoUrl();
+        String oldCoverUrl = company.getCoverUrl();
+        String oldBusinessLicenseUrl = company.getBusinessLicenseUrl();
 
         if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
             throw AppException.badRequest("Công ty đang bị tạm khóa, không thể cập nhật hồ sơ");
@@ -100,6 +106,10 @@ public class CompanyServiceImpl implements CompanyService {
 
         // CDC: So sánh + ghi vào log context
         tracker.compare(saved).apply();
+
+        deleteReplacedFile(oldLogoUrl, saved.getLogoUrl(), FileUploadType.COMPANY_LOGO);
+        deleteReplacedFile(oldCoverUrl, saved.getCoverUrl(), FileUploadType.COMPANY_COVER);
+        deleteReplacedFile(oldBusinessLicenseUrl, saved.getBusinessLicenseUrl(), FileUploadType.BUSINESS_LICENSE);
 
         return toResponse(saved);
     }
@@ -184,6 +194,9 @@ public class CompanyServiceImpl implements CompanyService {
             ReqAdminUpdateCompanyDTO request) {
 
         Company company = findByIdOrThrow(companyId);
+        String oldLogoUrl = company.getLogoUrl();
+        String oldCoverUrl = company.getCoverUrl();
+        String oldBusinessLicenseUrl = company.getBusinessLicenseUrl();
 
         // CDC: Snapshot trước khi sửa
         ChangeTracker tracker = ChangeTracker.of(company);
@@ -296,6 +309,10 @@ public class CompanyServiceImpl implements CompanyService {
 
         // CDC: So sánh + ghi vào log context
         tracker.compare(saved).apply();
+
+        deleteReplacedFile(oldLogoUrl, saved.getLogoUrl(), FileUploadType.COMPANY_LOGO);
+        deleteReplacedFile(oldCoverUrl, saved.getCoverUrl(), FileUploadType.COMPANY_COVER);
+        deleteReplacedFile(oldBusinessLicenseUrl, saved.getBusinessLicenseUrl(), FileUploadType.BUSINESS_LICENSE);
 
         return toResponse(saved);
     }
@@ -682,5 +699,15 @@ public class CompanyServiceImpl implements CompanyService {
                 .pendingJobPosts(pendingJobPosts)
                 .expiringJobPosts(expiringJobPosts)
                 .build();
+    }
+
+    private void deleteReplacedFile(String oldFileUrl, String newFileUrl, FileUploadType type) {
+        if (oldFileUrl == null || oldFileUrl.isBlank()) {
+            return;
+        }
+        if (oldFileUrl.equals(newFileUrl)) {
+            return;
+        }
+        fileStorageService.deleteFile(oldFileUrl, type);
     }
 }

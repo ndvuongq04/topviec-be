@@ -38,4 +38,7 @@ public interface CvsRepository extends JpaRepository<Cvs, Long> {
 
     @Query("SELECT c FROM Cvs c WHERE c.id = :id AND c.deletedAt IS NULL")
     Optional<Cvs> findActiveById(@Param("id") Long id);
+
+    @Query("SELECT COUNT(c) FROM Cvs c WHERE c.fileUrl = :fileUrl AND c.deletedAt IS NULL")
+    long countActiveByFileUrl(@Param("fileUrl") String fileUrl);
 }

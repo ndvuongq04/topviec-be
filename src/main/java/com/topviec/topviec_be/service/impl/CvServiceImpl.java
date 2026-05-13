@@ -12,8 +12,8 @@ import com.topviec.topviec_be.enums.cvs.CvVisibility;
 import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CvsRepository;
-import com.topviec.topviec_be.service.CloudinaryService;
 import com.topviec.topviec_be.service.CvService;
+import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ import java.util.List;
 public class CvServiceImpl implements CvService {
 
     private final CvsRepository cvsRepository;
-    private final CloudinaryService cloudinaryService;
+    private final FileStorageService fileStorageService;
     private final FileValidator fileValidator;
     private final StringRedisTemplate redisTemplate;
 
@@ -58,7 +58,7 @@ public class CvServiceImpl implements CvService {
         }
 
         // ④ Upload file lên Cloudinary
-        String fileUrl = cloudinaryService.uploadFile(file, userId, FileUploadType.CV);
+        String fileUrl = fileStorageService.uploadFile(file, userId, FileUploadType.CV);
 
         // ⑤ Nếu isDefault = true hoặc CV đầu tiên → tắt CV mặc định cũ
         boolean shouldBeDefault = request.isDefault() || currentCount == 0;
@@ -185,6 +185,10 @@ public class CvServiceImpl implements CvService {
         cv.setDeletedAt(LocalDateTime.now());
         cv.setUpdatedBy(userId);
         cvsRepository.save(cv);
+
+        if (cv.getFileUrl() != null && cvsRepository.countActiveByFileUrl(cv.getFileUrl()) == 0) {
+            fileStorageService.deleteFile(cv.getFileUrl(), FileUploadType.CV);
+        }
     }
 
     @Override
