@@ -1,16 +1,26 @@
 package com.topviec.topviec_be.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
+import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
+import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
 import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
+import com.topviec.topviec_be.entity.CvTemplate;
 import com.topviec.topviec_be.entity.Cvs;
 import com.topviec.topviec_be.enums.cvs.CvParseStatus;
 import com.topviec.topviec_be.enums.cvs.CvType;
 import com.topviec.topviec_be.enums.cvs.CvVisibility;
 import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.CvTemplateRepository;
 import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.FileStorageService;
@@ -31,9 +41,11 @@ import java.util.List;
 public class CvServiceImpl implements CvService {
 
     private final CvsRepository cvsRepository;
+    private final CvTemplateRepository cvTemplateRepository;
     private final FileStorageService fileStorageService;
     private final FileValidator fileValidator;
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     private static final int MAX_CV_PER_USER = 5;
 
@@ -41,35 +53,26 @@ public class CvServiceImpl implements CvService {
     @Transactional
     public ResCvDTO uploadCv(Long userId, MultipartFile file, ReqUploadCvDTO request) {
 
-        // ① Validate file (format + size)
         fileValidator.validate(file, FileUploadType.CV);
 
-        // ② Kiểm tra giới hạn 5 CV
         long currentCount = cvsRepository.countByUserId(userId);
         if (currentCount >= MAX_CV_PER_USER) {
             throw AppException.badRequest(
                     "Đã đạt giới hạn " + MAX_CV_PER_USER + " CV, vui lòng xóa CV cũ trước");
         }
 
-        // ③ Kiểm tra tên CV trùng
         if (cvsRepository.existsByUserIdAndTitle(userId, request.getTitle())) {
             throw AppException.conflict(
                     "Tên CV '" + request.getTitle() + "' đã tồn tại");
         }
 
-        // ④ Upload file lên Cloudinary
         String fileUrl = fileStorageService.uploadFile(file, userId, FileUploadType.CV);
 
-        // ⑤ Nếu isDefault = true hoặc CV đầu tiên → tắt CV mặc định cũ
         boolean shouldBeDefault = request.isDefault() || currentCount == 0;
         if (shouldBeDefault) {
-            cvsRepository.findDefaultByUserId(userId).ifPresent(oldDefault -> {
-                oldDefault.setIsDefault(false);
-                cvsRepository.save(oldDefault);
-            });
+            clearCurrentDefaultCv(userId);
         }
 
-        // ⑥ Tạo entity và lưu DB
         Cvs cv = Cvs.builder()
                 .userId(userId)
                 .title(request.getTitle())
@@ -89,6 +92,43 @@ public class CvServiceImpl implements CvService {
     }
 
     @Override
+    @Transactional
+    public ResCvOnlineDetailDTO createOnlineCv(Long userId, ReqCreateOnlineCvDTO request) {
+        long currentCount = cvsRepository.countByUserId(userId);
+        if (currentCount >= MAX_CV_PER_USER) {
+            throw AppException.badRequest("Đã đạt giới hạn " + MAX_CV_PER_USER + " CV");
+        }
+
+        String title = request.getTitle().trim();
+        if (cvsRepository.existsByUserIdAndTitle(userId, title)) {
+            throw AppException.conflict("Tên CV '" + title + "' đã tồn tại");
+        }
+
+        CvTemplate template = findActiveTemplateOrThrow(request.getTemplateId());
+        boolean shouldBeDefault = Boolean.TRUE.equals(request.getIsDefault()) || currentCount == 0;
+        if (shouldBeDefault) {
+            clearCurrentDefaultCv(userId);
+        }
+
+        Cvs cv = Cvs.builder()
+                .userId(userId)
+                .title(title)
+                .cvType(CvType.online)
+                .templateId(template.getId())
+                .extraData(toExtraDataJson(request.getExtraData()))
+                .pdfUrl(null)
+                .isDefault(shouldBeDefault)
+                .visibility(CvVisibility.private_cv)
+                .parseStatus(CvParseStatus.skipped)
+                .viewCount(0)
+                .createdBy(userId)
+                .updatedBy(userId)
+                .build();
+
+        return mapToOnlineDetail(cvsRepository.save(cv), template);
+    }
+
+    @Override
     public List<ResCvDTO> getMyCvs(Long userId) {
         return cvsRepository.findAllByUserId(userId)
                 .stream()
@@ -101,6 +141,14 @@ public class CvServiceImpl implements CvService {
         Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
         return mapToDTO(cv);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResCvOnlineDetailDTO getOnlineCvById(Long userId, Long id) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        return mapToOnlineDetail(cv, template);
     }
 
     @Override
@@ -120,6 +168,26 @@ public class CvServiceImpl implements CvService {
 
     @Override
     @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCv(Long userId, Long id, ReqUpdateOnlineCvDTO request) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        String title = request.getTitle().trim();
+
+        if (!cv.getTitle().equals(title) && cvsRepository.existsByUserIdAndTitle(userId, title)) {
+            throw AppException.conflict("Tên CV '" + title + "' đã tồn tại");
+        }
+
+        cv.setTitle(title);
+        cv.setExtraData(toExtraDataJson(request.getExtraData()));
+        cv.setPdfUrl(null);
+        cv.setUpdatedBy(userId);
+
+        Cvs saved = cvsRepository.save(cv);
+        CvTemplate template = findTemplateByIdOrThrow(saved.getTemplateId());
+        return mapToOnlineDetail(saved, template);
+    }
+
+    @Override
+    @Transactional
     public ResCvDTO setDefaultCv(Long userId, Long id) {
         Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
@@ -128,15 +196,24 @@ public class CvServiceImpl implements CvService {
             return mapToDTO(cv);
         }
 
-        // Tắt mặc định cũ
-        cvsRepository.findDefaultByUserId(userId).ifPresent(old -> {
-            old.setIsDefault(false);
-            cvsRepository.save(old);
-        });
+        clearCurrentDefaultCv(userId);
 
         cv.setIsDefault(true);
         cv.setUpdatedBy(userId);
         return mapToDTO(cvsRepository.save(cv));
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO changeOnlineCvTemplate(Long userId, Long id, ReqChangeOnlineCvTemplateDTO request) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findActiveTemplateOrThrow(request.getTemplateId());
+
+        cv.setTemplateId(template.getId());
+        cv.setPdfUrl(null);
+        cv.setUpdatedBy(userId);
+
+        return mapToOnlineDetail(cvsRepository.save(cv), template);
     }
 
     @Override
@@ -160,8 +237,10 @@ public class CvServiceImpl implements CvService {
                 .userId(userId)
                 .title(newTitle)
                 .cvType(original.getCvType())
+                .templateId(original.getTemplateId())
                 .fileUrl(original.getFileUrl())
                 .pdfUrl(original.getPdfUrl())
+                .extraData(original.getExtraData())
                 .isDefault(false)
                 .visibility(original.getVisibility())
                 .parseStatus(original.getParseStatus())
@@ -203,18 +282,20 @@ public class CvServiceImpl implements CvService {
     }
 
     @Override
-    public ResShareTokenDTO createShareToken(Long userId, Long id,
-            ReqCreateShareTokenDTO request) {
+    public ResShareTokenDTO createShareToken(Long userId, Long id, ReqCreateShareTokenDTO request) {
         Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
 
         long minutes = 0;
-        if (request.getDays() != null)
+        if (request.getDays() != null) {
             minutes += request.getDays() * 24 * 60;
-        if (request.getHours() != null)
+        }
+        if (request.getHours() != null) {
             minutes += request.getHours() * 60;
-        if (request.getMinutes() != null)
+        }
+        if (request.getMinutes() != null) {
             minutes += request.getMinutes();
+        }
 
         if (minutes <= 0) {
             throw AppException.badRequest("Thời gian phải lớn hơn 0");
@@ -252,11 +333,60 @@ public class CvServiceImpl implements CvService {
         return mapToDTO(cv);
     }
 
+    private void clearCurrentDefaultCv(Long userId) {
+        cvsRepository.findDefaultByUserId(userId).ifPresent(oldDefault -> {
+            oldDefault.setIsDefault(false);
+            cvsRepository.save(oldDefault);
+        });
+    }
+
+    private Cvs findOwnedOnlineCvOrThrow(Long userId, Long id) {
+        Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
+        if (cv.getCvType() != CvType.online) {
+            throw AppException.badRequest("CV này không phải CV online");
+        }
+        return cv;
+    }
+
+    private CvTemplate findActiveTemplateOrThrow(Long templateId) {
+        return cvTemplateRepository.findActiveById(templateId)
+                .orElseThrow(() -> AppException.badRequest("Template không tồn tại hoặc không active"));
+    }
+
+    private CvTemplate findTemplateByIdOrThrow(Long templateId) {
+        if (templateId == null) {
+            throw AppException.badRequest("CV online chưa có template");
+        }
+        return cvTemplateRepository.findActiveOrInactiveById(templateId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy template của CV"));
+    }
+
+    private String toExtraDataJson(CvOnlineExtraDataDTO extraData) {
+        try {
+            return objectMapper.writeValueAsString(extraData == null ? CvOnlineExtraDataDTO.empty() : extraData);
+        } catch (JsonProcessingException ex) {
+            throw AppException.badRequest("Không thể serialize dữ liệu CV online");
+        }
+    }
+
+    private CvOnlineExtraDataDTO parseExtraData(String extraDataJson) {
+        if (extraDataJson == null || extraDataJson.isBlank()) {
+            return CvOnlineExtraDataDTO.empty();
+        }
+        try {
+            return objectMapper.readValue(extraDataJson, CvOnlineExtraDataDTO.class);
+        } catch (JsonProcessingException ex) {
+            throw AppException.badRequest("Dữ liệu CV online không đúng schema JSON");
+        }
+    }
+
     private ResCvDTO mapToDTO(Cvs cv) {
         return ResCvDTO.builder()
                 .id(cv.getId())
                 .title(cv.getTitle())
                 .cvType(cv.getCvType())
+                .templateId(cv.getTemplateId())
                 .fileUrl(cv.getFileUrl())
                 .pdfUrl(cv.getPdfUrl())
                 .isDefault(cv.getIsDefault())
@@ -268,6 +398,40 @@ public class CvServiceImpl implements CvService {
                 .createdBy(cv.getCreatedBy())
                 .createdAt(cv.getCreatedAt())
                 .updatedAt(cv.getUpdatedAt())
+                .build();
+    }
+
+    private ResCvOnlineDetailDTO mapToOnlineDetail(Cvs cv, CvTemplate template) {
+        return ResCvOnlineDetailDTO.builder()
+                .id(cv.getId())
+                .title(cv.getTitle())
+                .cvType(cv.getCvType())
+                .templateId(cv.getTemplateId())
+                .template(mapTemplateDetail(template))
+                .extraData(parseExtraData(cv.getExtraData()))
+                .pdfUrl(cv.getPdfUrl())
+                .isDefault(cv.getIsDefault())
+                .visibility(cv.getVisibility())
+                .parseStatus(cv.getParseStatus())
+                .viewCount(cv.getViewCount())
+                .createdAt(cv.getCreatedAt())
+                .updatedAt(cv.getUpdatedAt())
+                .build();
+    }
+
+    private ResCvTemplateDetailDTO mapTemplateDetail(CvTemplate template) {
+        return ResCvTemplateDetailDTO.builder()
+                .id(template.getId())
+                .name(template.getName())
+                .slug(template.getSlug())
+                .description(template.getDescription())
+                .thumbnailUrl(template.getThumbnailUrl())
+                .htmlContent(template.getHtmlContent())
+                .cssContent(template.getCssContent())
+                .isActive(template.getIsActive())
+                .isDefault(template.getIsDefault())
+                .createdAt(template.getCreatedAt())
+                .updatedAt(template.getUpdatedAt())
                 .build();
     }
 }

@@ -1,13 +1,17 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
+import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
 import com.topviec.topviec_be.enums.logging.LogActionType;
 
 import com.topviec.topviec_be.dto.request.ReqRenameCvDTO;
 import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
 import com.topviec.topviec_be.service.CvService;
 import jakarta.validation.Valid;
@@ -51,6 +55,14 @@ public class CvController {
         return ResponseEntity.status(HttpStatus.CREATED).body(data);
     }
 
+    @PostMapping("/online")
+    public ResponseEntity<ResCvOnlineDetailDTO> createOnlineCv(
+            @Valid @RequestBody ReqCreateOnlineCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvOnlineDetailDTO data = cvService.createOnlineCv(extractUserId(jwt), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(data);
+    }
+
     /**
      * GET /api/v1/cvs
      * Lấy danh sách CV của user đang đăng nhập
@@ -74,6 +86,29 @@ public class CvController {
         ResCvDTO data = cvService.getCvById(extractUserId(jwt), id);
 
         return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/online/{id}")
+    public ResponseEntity<ResCvOnlineDetailDTO> getOnlineCvById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvById(extractUserId(jwt), id));
+    }
+
+    @PutMapping("/online/{id}")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCv(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqUpdateOnlineCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCv(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/template")
+    public ResponseEntity<ResCvOnlineDetailDTO> changeOnlineCvTemplate(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqChangeOnlineCvTemplateDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.changeOnlineCvTemplate(extractUserId(jwt), id, request));
     }
 
     /**
