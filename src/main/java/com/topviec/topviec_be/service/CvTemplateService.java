@@ -7,6 +7,7 @@ import com.topviec.topviec_be.dto.response.ResCvTemplateDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -16,7 +17,7 @@ public interface CvTemplateService {
 
     ResCvTemplateDetailDTO getAdminTemplateDetail(Long id);
 
-    ResCvTemplateDetailDTO createTemplate(Long adminUserId, ReqCreateCvTemplateDTO request);
+    ResCvTemplateDetailDTO createTemplate(Long adminUserId, ReqCreateCvTemplateDTO request, MultipartFile thumbnail);
 
     ResCvTemplateDetailDTO updateTemplateMetadata(Long adminUserId, Long id, ReqUpdateCvTemplateDTO request);
 

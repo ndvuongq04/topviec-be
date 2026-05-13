@@ -12,11 +12,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/admin/cv-templates")
@@ -46,15 +48,16 @@ public class AdminCvTemplateController {
         return ResponseEntity.ok(cvTemplateService.getAdminTemplateDetail(id));
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.CONTENT_MODERATOR + "')")
     public ResponseEntity<ResCvTemplateDetailDTO> createTemplate(
-            @Valid @RequestBody ReqCreateCvTemplateDTO request,
+            @Valid @ModelAttribute ReqCreateCvTemplateDTO request,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(cvTemplateService.createTemplate(extractUserId(jwt), request));
+                .body(cvTemplateService.createTemplate(extractUserId(jwt), request, thumbnail));
     }
 
     @PutMapping("/{id}")

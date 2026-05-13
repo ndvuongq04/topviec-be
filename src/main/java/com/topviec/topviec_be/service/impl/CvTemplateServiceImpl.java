@@ -8,15 +8,19 @@ import com.topviec.topviec_be.dto.response.ResCvTemplateDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.CvTemplate;
+import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CvTemplateRepository;
 import com.topviec.topviec_be.service.CvTemplateService;
+import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.ChangeTracker;
+import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,6 +30,8 @@ import java.util.stream.Collectors;
 public class CvTemplateServiceImpl implements CvTemplateService {
 
     private final CvTemplateRepository cvTemplateRepository;
+    private final FileStorageService fileStorageService;
+    private final FileValidator fileValidator;
 
     @Override
     @Transactional(readOnly = true)
@@ -56,7 +62,7 @@ public class CvTemplateServiceImpl implements CvTemplateService {
 
     @Override
     @Transactional
-    public ResCvTemplateDetailDTO createTemplate(Long adminUserId, ReqCreateCvTemplateDTO request) {
+    public ResCvTemplateDetailDTO createTemplate(Long adminUserId, ReqCreateCvTemplateDTO request, MultipartFile thumbnail) {
         validateSlugUnique(request.getSlug(), null);
         validateContent(request.getHtmlContent(), request.getCssContent());
 
@@ -72,11 +78,13 @@ public class CvTemplateServiceImpl implements CvTemplateService {
             clearCurrentDefault();
         }
 
+        String thumbnailUrl = resolveThumbnailUrl(adminUserId, request.getThumbnailUrl(), thumbnail);
+
         CvTemplate template = CvTemplate.builder()
                 .name(request.getName().trim())
                 .slug(request.getSlug().trim())
                 .description(trimToNull(request.getDescription()))
-                .thumbnailUrl(trimToNull(request.getThumbnailUrl()))
+                .thumbnailUrl(thumbnailUrl)
                 .htmlContent(request.getHtmlContent())
                 .cssContent(request.getCssContent())
                 .isActive(isActive)
@@ -230,6 +238,15 @@ public class CvTemplateServiceImpl implements CvTemplateService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveThumbnailUrl(Long adminUserId, String thumbnailUrl, MultipartFile thumbnail) {
+        if (thumbnail == null || thumbnail.isEmpty()) {
+            return trimToNull(thumbnailUrl);
+        }
+
+        fileValidator.validate(thumbnail, FileUploadType.CV_TEMPLATE_THUMBNAIL);
+        return fileStorageService.uploadFile(thumbnail, adminUserId, FileUploadType.CV_TEMPLATE_THUMBNAIL);
     }
 
     private ResCvTemplateDTO toSummaryDTO(CvTemplate template) {

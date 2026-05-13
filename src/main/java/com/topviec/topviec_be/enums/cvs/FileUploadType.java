@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 public enum FileUploadType {
     CV("files/cvs", "user"),
     AVATAR("images/avatars", "user"),
+    CV_TEMPLATE_THUMBNAIL("images/cv-template-thumbnails", "admin"),
     COMPANY_LOGO("images/company-logos", "company"),
     COMPANY_COVER("images/company-covers", "company"),
     BUSINESS_LICENSE("images/business-licenses", "company");

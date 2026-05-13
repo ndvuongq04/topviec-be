@@ -40,7 +40,7 @@ public class FileUploadController {
         validateRole(jwt, type);
 
         Long ownerId = switch (type) {
-            case CV, AVATAR -> userId;
+            case CV, AVATAR, CV_TEMPLATE_THUMBNAIL -> userId;
             case COMPANY_LOGO, COMPANY_COVER, BUSINESS_LICENSE -> companyService.getCompanyIdByUserId(userId);
         };
 
@@ -56,12 +56,17 @@ public class FileUploadController {
     private void validateRole(Jwt jwt, FileUploadType type) {
         String role = jwt.getClaimAsString("role");
         boolean isCandidateType = type == FileUploadType.CV || type == FileUploadType.AVATAR;
+        boolean isAdminType = type == FileUploadType.CV_TEMPLATE_THUMBNAIL;
 
         if (isCandidateType && !"CANDIDATE".equalsIgnoreCase(role)) {
             throw AppException.forbidden("Ban khong co quyen upload loai file nay");
         }
 
-        if (!isCandidateType && !"EMPLOYER".equalsIgnoreCase(role)) {
+        if (isAdminType && !"ADMIN".equalsIgnoreCase(role)) {
+            throw AppException.forbidden("Ban khong co quyen upload loai file nay");
+        }
+
+        if (!isCandidateType && !isAdminType && !"EMPLOYER".equalsIgnoreCase(role)) {
             throw AppException.forbidden("Ban khong co quyen upload loai file nay");
         }
     }
