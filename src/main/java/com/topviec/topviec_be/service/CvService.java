@@ -10,7 +10,9 @@ import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvPdfExportDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
+import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
@@ -41,6 +43,10 @@ public interface CvService {
     ResCvOnlineEditorPayloadDTO getOnlineCvEditorPayloadByTemplate(Long userId, Long templateId);
 
     ResCvOnlineEditorPayloadDTO getOnlineCvEditorPayloadById(Long userId, Long id);
+
+    ResCvPdfExportDTO exportOnlineCvPdf(Long userId, Long id);
+
+    Resource downloadOnlineCvPdf(Long userId, Long id);
 
     ResCvOnlineDetailDTO createOnlineCv(Long userId, ReqCreateOnlineCvDTO request);
 

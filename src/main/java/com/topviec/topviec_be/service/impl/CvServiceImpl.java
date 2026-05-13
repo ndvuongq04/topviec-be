@@ -2,6 +2,7 @@ package com.topviec.topviec_be.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.topviec.topviec_be.cvonline.CvOnlineTemplateRenderer;
 import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
@@ -12,6 +13,7 @@ import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvPdfExportDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
 import com.topviec.topviec_be.entity.CandidateProfile;
@@ -29,9 +31,11 @@ import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.FileStorageService;
+import com.topviec.topviec_be.service.PdfGenerationService;
 import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -49,7 +54,9 @@ public class CvServiceImpl implements CvService {
     private final CvTemplateRepository cvTemplateRepository;
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
+    private final CvOnlineTemplateRenderer cvOnlineTemplateRenderer;
     private final FileStorageService fileStorageService;
+    private final PdfGenerationService pdfGenerationService;
     private final FileValidator fileValidator;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -132,7 +139,9 @@ public class CvServiceImpl implements CvService {
                 .updatedBy(userId)
                 .build();
 
-        return mapToOnlineDetail(cvsRepository.save(cv), template);
+        Cvs saved = cvsRepository.save(cv);
+        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
+        return mapToOnlineDetail(saved, template);
     }
 
     @Override
@@ -189,6 +198,31 @@ public class CvServiceImpl implements CvService {
     }
 
     @Override
+    @Transactional
+    public ResCvPdfExportDTO exportOnlineCvPdf(Long userId, Long id) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        Cvs saved = generateAndPersistOnlineCvPdf(cv, template, userId);
+
+        return ResCvPdfExportDTO.builder()
+                .cvId(saved.getId())
+                .pdfUrl(saved.getPdfUrl())
+                .generatedAt(saved.getUpdatedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public Resource downloadOnlineCvPdf(Long userId, Long id) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        String pdfUrl = cv.getPdfUrl();
+        if (pdfUrl == null || pdfUrl.isBlank()) {
+            pdfUrl = exportOnlineCvPdf(userId, id).getPdfUrl();
+        }
+        return fileStorageService.loadFile(pdfUrl);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ResCvOnlineDetailDTO getOnlineCvById(Long userId, Long id) {
         Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
@@ -223,11 +257,11 @@ public class CvServiceImpl implements CvService {
 
         cv.setTitle(title);
         cv.setExtraData(toExtraDataJson(request.getExtraData()));
-        cv.setPdfUrl(null);
         cv.setUpdatedBy(userId);
 
         Cvs saved = cvsRepository.save(cv);
         CvTemplate template = findTemplateByIdOrThrow(saved.getTemplateId());
+        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
         return mapToOnlineDetail(saved, template);
     }
 
@@ -255,10 +289,11 @@ public class CvServiceImpl implements CvService {
         CvTemplate template = findActiveTemplateOrThrow(request.getTemplateId());
 
         cv.setTemplateId(template.getId());
-        cv.setPdfUrl(null);
         cv.setUpdatedBy(userId);
 
-        return mapToOnlineDetail(cvsRepository.save(cv), template);
+        Cvs saved = cvsRepository.save(cv);
+        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
+        return mapToOnlineDetail(saved, template);
     }
 
     @Override
@@ -312,6 +347,9 @@ public class CvServiceImpl implements CvService {
 
         if (cv.getFileUrl() != null && cvsRepository.countActiveByFileUrl(cv.getFileUrl()) == 0) {
             fileStorageService.deleteFile(cv.getFileUrl(), FileUploadType.CV);
+        }
+        if (cv.getPdfUrl() != null && cvsRepository.countActiveByPdfUrl(cv.getPdfUrl()) == 0) {
+            fileStorageService.deleteFile(cv.getPdfUrl(), FileUploadType.CV);
         }
     }
 
@@ -463,6 +501,50 @@ public class CvServiceImpl implements CvService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String buildPdfFileName(Cvs cv) {
+        String baseName = trimToNull(cv.getTitle());
+        if (baseName == null) {
+            return "cv-online-" + cv.getId() + ".pdf";
+        }
+        String normalized = baseName
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
+        if (normalized.isBlank()) {
+            normalized = "cv-online-" + cv.getId();
+        }
+        return normalized + ".pdf";
+    }
+
+    private Cvs generateAndPersistOnlineCvPdf(Cvs cv, CvTemplate template, Long userId) {
+        String oldPdfUrl = cv.getPdfUrl();
+        String xhtmlContent = cvOnlineTemplateRenderer.renderToXhtml(
+                template.getHtmlContent(),
+                template.getCssContent(),
+                parseExtraData(cv.getExtraData()));
+        byte[] pdfBytes = pdfGenerationService.generatePdfFromHtml(xhtmlContent);
+        String pdfUrl = fileStorageService.uploadBytes(pdfBytes, buildPdfFileName(cv), userId, FileUploadType.CV);
+
+        cv.setPdfUrl(pdfUrl);
+        cv.setUpdatedBy(userId);
+        Cvs saved = cvsRepository.save(cv);
+
+        deleteUnusedPdf(oldPdfUrl, pdfUrl);
+        return saved;
+    }
+
+    private void deleteUnusedPdf(String oldPdfUrl, String currentPdfUrl) {
+        if (oldPdfUrl == null || oldPdfUrl.isBlank()) {
+            return;
+        }
+        if (oldPdfUrl.equals(currentPdfUrl)) {
+            return;
+        }
+        if (cvsRepository.countActiveByPdfUrl(oldPdfUrl) == 0) {
+            fileStorageService.deleteFile(oldPdfUrl, FileUploadType.CV);
+        }
     }
 
     private ResCvDTO mapToDTO(Cvs cv) {

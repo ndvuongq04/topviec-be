@@ -31,29 +31,24 @@ public class FileStorageServiceImpl implements FileStorageService {
     @Override
     public String uploadFile(MultipartFile file, Long ownerId, FileUploadType type) {
         try {
-            String extension = extractExtension(file.getOriginalFilename());
-            String fileName = UUID.randomUUID() + "." + extension;
-            Path targetDir = fileStorageConfig.getUploadPath()
-                    .resolve(type.getSubDir())
-                    .resolve(type.resolveOwnerDir(ownerId))
-                    .normalize();
+            String fileUrl = storeBytes(file.getBytes(), file.getOriginalFilename(), ownerId, type);
 
-            if (!targetDir.startsWith(fileStorageConfig.getUploadPath())) {
-                throw AppException.badRequest("Duong dan luu file khong hop le");
-            }
-
-            Files.createDirectories(targetDir);
-
-            Path targetFile = targetDir.resolve(fileName).normalize();
-            Files.copy(file.getInputStream(), targetFile, StandardCopyOption.REPLACE_EXISTING);
-
-            String relativePath = type.getSubDir() + "/" + type.resolveOwnerDir(ownerId) + "/" + fileName;
-            String fileUrl = buildFileUrl(relativePath);
-
-            log.info("Upload {} thanh cong - ownerId: {}, path: {}", type, ownerId, targetFile);
+            log.info("Upload {} thanh cong - ownerId: {}", type, ownerId);
             return fileUrl;
         } catch (IOException e) {
             log.error("Upload {} that bai - ownerId: {}", type, ownerId, e);
+            throw AppException.badRequest("Khong the luu file len he thong");
+        }
+    }
+
+    @Override
+    public String uploadBytes(byte[] content, String originalFilename, Long ownerId, FileUploadType type) {
+        try {
+            String fileUrl = storeBytes(content, originalFilename, ownerId, type);
+            log.info("Upload generated {} thanh cong - ownerId: {}", type, ownerId);
+            return fileUrl;
+        } catch (IOException e) {
+            log.error("Upload generated {} that bai - ownerId: {}", type, ownerId, e);
             throw AppException.badRequest("Khong the luu file len he thong");
         }
     }
@@ -119,6 +114,27 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     private String buildFileUrl(String relativePath) {
         return fileStorageConfig.getBaseUrl().replaceAll("/+$", "") + "/" + relativePath.replace("\\", "/");
+    }
+
+    private String storeBytes(byte[] content, String originalFilename, Long ownerId, FileUploadType type) throws IOException {
+        String extension = extractExtension(originalFilename);
+        String fileName = UUID.randomUUID() + "." + extension;
+        Path targetDir = fileStorageConfig.getUploadPath()
+                .resolve(type.getSubDir())
+                .resolve(type.resolveOwnerDir(ownerId))
+                .normalize();
+
+        if (!targetDir.startsWith(fileStorageConfig.getUploadPath())) {
+            throw AppException.badRequest("Duong dan luu file khong hop le");
+        }
+
+        Files.createDirectories(targetDir);
+
+        Path targetFile = targetDir.resolve(fileName).normalize();
+        Files.write(targetFile, content);
+
+        String relativePath = type.getSubDir() + "/" + type.resolveOwnerDir(ownerId) + "/" + fileName;
+        return buildFileUrl(relativePath);
     }
 
     private String extractExtension(String originalFilename) {

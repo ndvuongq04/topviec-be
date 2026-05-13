@@ -14,10 +14,13 @@ import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvPdfExportDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
 import com.topviec.topviec_be.service.CvService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -131,6 +134,32 @@ public class CvController {
             @Valid @RequestBody ReqChangeOnlineCvTemplateDTO request,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(cvService.changeOnlineCvTemplate(extractUserId(jwt), id, request));
+    }
+
+    /**
+     * POST /api/v1/cvs/{id}/export-pdf
+     * Render CV online sang PDF và cập nhật `pdf_url` mới nhất.
+     */
+    @PostMapping("/{id}/export-pdf")
+    public ResponseEntity<ResCvPdfExportDTO> exportOnlineCvPdf(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.exportOnlineCvPdf(extractUserId(jwt), id));
+    }
+
+    /**
+     * GET /api/v1/cvs/{id}/download-pdf
+     * Tải file PDF của CV online. Nếu chưa có PDF thì BE sẽ render trước khi trả file.
+     */
+    @GetMapping("/{id}/download-pdf")
+    public ResponseEntity<Resource> downloadOnlineCvPdf(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        Resource resource = cvService.downloadOnlineCvPdf(extractUserId(jwt), id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cv-online-" + id + ".pdf\"")
+                .body(resource);
     }
 
     /**
