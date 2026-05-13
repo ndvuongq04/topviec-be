@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.controller;
 
 import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
 import com.topviec.topviec_be.enums.logging.LogActionType;
@@ -86,6 +87,12 @@ public class CvController {
         ResCvDTO data = cvService.getCvById(extractUserId(jwt), id);
 
         return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/online/prefill")
+    public ResponseEntity<CvOnlineExtraDataDTO> getOnlineCvPrefill(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvPrefill(extractUserId(jwt)));
     }
 
     @GetMapping("/online/{id}")

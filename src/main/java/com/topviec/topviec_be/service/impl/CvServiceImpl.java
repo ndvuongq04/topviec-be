@@ -13,15 +13,19 @@ import com.topviec.topviec_be.dto.response.ResCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
+import com.topviec.topviec_be.entity.CandidateProfile;
 import com.topviec.topviec_be.entity.CvTemplate;
 import com.topviec.topviec_be.entity.Cvs;
+import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.cvs.CvParseStatus;
 import com.topviec.topviec_be.enums.cvs.CvType;
 import com.topviec.topviec_be.enums.cvs.CvVisibility;
 import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.repository.CvTemplateRepository;
 import com.topviec.topviec_be.repository.CvsRepository;
+import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.FileValidator;
@@ -42,6 +46,8 @@ public class CvServiceImpl implements CvService {
 
     private final CvsRepository cvsRepository;
     private final CvTemplateRepository cvTemplateRepository;
+    private final CandidateProfileRepository candidateProfileRepository;
+    private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final FileValidator fileValidator;
     private final StringRedisTemplate redisTemplate;
@@ -141,6 +147,15 @@ public class CvServiceImpl implements CvService {
         Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
         return mapToDTO(cv);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CvOnlineExtraDataDTO getOnlineCvPrefill(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("Khong tim thay nguoi dung"));
+        CandidateProfile profile = candidateProfileRepository.findByUserId(userId).orElse(null);
+        return toPrefillExtraData(user, profile);
     }
 
     @Override
@@ -379,6 +394,45 @@ public class CvServiceImpl implements CvService {
         } catch (JsonProcessingException ex) {
             throw AppException.badRequest("Dữ liệu CV online không đúng schema JSON");
         }
+    }
+
+    private CvOnlineExtraDataDTO toPrefillExtraData(User user, CandidateProfile profile) {
+        CvOnlineExtraDataDTO.PersonalInfo personalInfo = CvOnlineExtraDataDTO.PersonalInfo.builder()
+                .fullName(profile != null ? trimToNull(profile.getFullName()) : null)
+                .headline(profile != null ? trimToNull(profile.getPreferredJobTitle()) : null)
+                .email(resolveVisibleEmail(user, profile))
+                .phone(resolveVisiblePhone(profile))
+                .website(profile != null ? trimToNull(profile.getPersonalWebsite()) : null)
+                .linkedin(profile != null ? trimToNull(profile.getLinkedinUrl()) : null)
+                .github(profile != null ? trimToNull(profile.getGithubUrl()) : null)
+                .build();
+
+        return CvOnlineExtraDataDTO.builder()
+                .personalInfo(personalInfo)
+                .careerObjective(profile != null ? trimToNull(profile.getBio()) : null)
+                .build();
+    }
+
+    private String resolveVisibleEmail(User user, CandidateProfile profile) {
+        if (profile != null && Boolean.TRUE.equals(profile.getHideEmail())) {
+            return null;
+        }
+        return trimToNull(user.getEmail());
+    }
+
+    private String resolveVisiblePhone(CandidateProfile profile) {
+        if (profile == null || Boolean.TRUE.equals(profile.getHidePhone())) {
+            return null;
+        }
+        return trimToNull(profile.getPhoneDisplay());
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private ResCvDTO mapToDTO(Cvs cv) {

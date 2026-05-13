@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.service;
 
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
@@ -33,6 +34,8 @@ public interface CvService {
     ResCvDTO getPublicCv(String shareToken);
 
     ResCvDTO getCvById(Long userId, Long id);
+
+    CvOnlineExtraDataDTO getOnlineCvPrefill(Long userId);
 
     ResCvOnlineDetailDTO createOnlineCv(Long userId, ReqCreateOnlineCvDTO request);
 
