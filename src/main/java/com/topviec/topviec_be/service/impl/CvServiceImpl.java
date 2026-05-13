@@ -10,6 +10,7 @@ import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
@@ -156,6 +157,35 @@ public class CvServiceImpl implements CvService {
                 .orElseThrow(() -> AppException.notFound("Khong tim thay nguoi dung"));
         CandidateProfile profile = candidateProfileRepository.findByUserId(userId).orElse(null);
         return toPrefillExtraData(user, profile);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResCvOnlineEditorPayloadDTO getOnlineCvEditorPayloadByTemplate(Long userId, Long templateId) {
+        CvTemplate template = findActiveTemplateOrThrow(templateId);
+        return ResCvOnlineEditorPayloadDTO.builder()
+                .cvId(null)
+                .persisted(false)
+                .title(null)
+                .cvType(CvType.online)
+                .templateId(template.getId())
+                .template(mapTemplateDetail(template))
+                .extraData(getOnlineCvPrefill(userId))
+                .isDefault(false)
+                .visibility(CvVisibility.private_cv)
+                .parseStatus(CvParseStatus.skipped)
+                .viewCount(0)
+                .createdAt(null)
+                .updatedAt(null)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResCvOnlineEditorPayloadDTO getOnlineCvEditorPayloadById(Long userId, Long id) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        return mapToEditorPayload(cv, template);
     }
 
     @Override
@@ -464,6 +494,24 @@ public class CvServiceImpl implements CvService {
                 .template(mapTemplateDetail(template))
                 .extraData(parseExtraData(cv.getExtraData()))
                 .pdfUrl(cv.getPdfUrl())
+                .isDefault(cv.getIsDefault())
+                .visibility(cv.getVisibility())
+                .parseStatus(cv.getParseStatus())
+                .viewCount(cv.getViewCount())
+                .createdAt(cv.getCreatedAt())
+                .updatedAt(cv.getUpdatedAt())
+                .build();
+    }
+
+    private ResCvOnlineEditorPayloadDTO mapToEditorPayload(Cvs cv, CvTemplate template) {
+        return ResCvOnlineEditorPayloadDTO.builder()
+                .cvId(cv.getId())
+                .persisted(true)
+                .title(cv.getTitle())
+                .cvType(cv.getCvType())
+                .templateId(cv.getTemplateId())
+                .template(mapTemplateDetail(template))
+                .extraData(parseExtraData(cv.getExtraData()))
                 .isDefault(cv.getIsDefault())
                 .visibility(cv.getVisibility())
                 .parseStatus(cv.getParseStatus())

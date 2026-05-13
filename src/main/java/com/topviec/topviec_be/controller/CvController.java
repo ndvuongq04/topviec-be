@@ -12,6 +12,7 @@ import com.topviec.topviec_be.dto.request.ReqUpdateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
 import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
 import com.topviec.topviec_be.service.CvService;
@@ -93,6 +94,20 @@ public class CvController {
     public ResponseEntity<CvOnlineExtraDataDTO> getOnlineCvPrefill(
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(cvService.getOnlineCvPrefill(extractUserId(jwt)));
+    }
+
+    @GetMapping("/online/editor/template/{templateId}")
+    public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadByTemplate(
+            @PathVariable Long templateId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvEditorPayloadByTemplate(extractUserId(jwt), templateId));
+    }
+
+    @GetMapping("/online/editor/{id}")
+    public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvEditorPayloadById(extractUserId(jwt), id));
     }
 
     @GetMapping("/online/{id}")
