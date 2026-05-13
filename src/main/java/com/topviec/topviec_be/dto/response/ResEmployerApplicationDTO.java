@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.dto.response;
 
+import com.topviec.topviec_be.enums.cvs.CvType;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -23,8 +24,10 @@ public class ResEmployerApplicationDTO {
 
     // Thông tin CV (lấy từ Cvs)
     private Long cvId;
+    private CvType cvType;
     private String cvFileUrl;
     private String cvPdfUrl;
+    private String cvPreviewUrl;
 
     // Thông tin apply
     private String status;
