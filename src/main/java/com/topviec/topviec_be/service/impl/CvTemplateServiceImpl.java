@@ -1,11 +1,17 @@
 package com.topviec.topviec_be.service.impl;
 
+import com.topviec.topviec_be.cvonline.CvOnlineTemplateRenderer;
+import com.topviec.topviec_be.cvonline.CvTemplateCssAdvisor;
 import com.topviec.topviec_be.cvonline.CvTemplatePlaceholderParser;
+import com.topviec.topviec_be.cvonline.CvTemplateSampleDataFactory;
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateCvTemplateDTO;
+import com.topviec.topviec_be.dto.request.ReqPreviewCvTemplateDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCvTemplateContentDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCvTemplateDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvTemplatePreviewDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.CvTemplate;
 import com.topviec.topviec_be.enums.cvs.FileUploadType;
@@ -16,20 +22,26 @@ import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.ChangeTracker;
 import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CvTemplateServiceImpl implements CvTemplateService {
 
     private final CvTemplateRepository cvTemplateRepository;
+    private final CvTemplateSampleDataFactory sampleDataFactory;
+    private final CvTemplateCssAdvisor cssAdvisor;
+    private final CvOnlineTemplateRenderer templateRenderer;
     private final FileStorageService fileStorageService;
     private final FileValidator fileValidator;
 
@@ -185,6 +197,51 @@ public class CvTemplateServiceImpl implements CvTemplateService {
 
     @Override
     @Transactional(readOnly = true)
+    public CvOnlineExtraDataDTO getSampleData() {
+        return sampleDataFactory.createSampleData();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResCvTemplatePreviewDTO previewTemplate(Long adminUserId, ReqPreviewCvTemplateDTO request) {
+        CvTemplatePlaceholderParser.TemplateValidationResult validation = CvTemplatePlaceholderParser
+                .validate(request.getHtmlContent());
+        List<String> cssWarnings = cssAdvisor.analyze(request.getCssContent());
+        CvOnlineExtraDataDTO sampleData = sampleDataFactory.createSampleData();
+
+        String renderedHtml = null;
+        String renderedXhtml = null;
+        if (validation.isValid()) {
+            try {
+                renderedHtml = templateRenderer.renderHtml(request.getHtmlContent(), sampleData);
+                renderedXhtml = templateRenderer.renderToXhtml(request.getHtmlContent(), request.getCssContent(), sampleData);
+            } catch (Exception ex) {
+                Long templateId = request.getTemplateId();
+                log.error("Preview template that bai - templateId: {}, adminUserId: {}", templateId, adminUserId, ex);
+                throw AppException.badRequest("Khong the preview template voi sample data");
+            }
+        }
+
+        CvTemplate template = request.getTemplateId() != null
+                ? cvTemplateRepository.findActiveOrInactiveById(request.getTemplateId()).orElse(null)
+                : null;
+
+        return ResCvTemplatePreviewDTO.builder()
+                .templateId(request.getTemplateId())
+                .versionTag(template != null ? buildVersionTag(template) : null)
+                .renderedHtml(renderedHtml)
+                .renderedXhtml(renderedXhtml)
+                .sampleData(sampleData)
+                .valid(validation.isValid())
+                .rootPlaceholders(validation.rootPlaceholders())
+                .sections(validation.sections())
+                .placeholderErrors(validation.errors())
+                .cssWarnings(cssWarnings)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ResCvTemplateDTO> getActiveTemplates() {
         return cvTemplateRepository.findAllActive()
                 .stream()
@@ -232,6 +289,19 @@ public class CvTemplateServiceImpl implements CvTemplateService {
         }
     }
 
+    private String buildVersionTag(CvTemplate template) {
+        if (template == null) {
+            return null;
+        }
+        if (template.getUpdatedAt() != null) {
+            return "v" + Timestamp.valueOf(template.getUpdatedAt()).getTime();
+        }
+        if (template.getCreatedAt() != null) {
+            return "v" + Timestamp.valueOf(template.getCreatedAt()).getTime();
+        }
+        return "v0";
+    }
+
     private String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -256,6 +326,7 @@ public class CvTemplateServiceImpl implements CvTemplateService {
                 .slug(template.getSlug())
                 .description(template.getDescription())
                 .thumbnailUrl(template.getThumbnailUrl())
+                .versionTag(buildVersionTag(template))
                 .isActive(template.getIsActive())
                 .isDefault(template.getIsDefault())
                 .createdAt(template.getCreatedAt())
@@ -272,6 +343,7 @@ public class CvTemplateServiceImpl implements CvTemplateService {
                 .thumbnailUrl(template.getThumbnailUrl())
                 .htmlContent(template.getHtmlContent())
                 .cssContent(template.getCssContent())
+                .versionTag(buildVersionTag(template))
                 .isActive(template.getIsActive())
                 .isDefault(template.getIsDefault())
                 .createdAt(template.getCreatedAt())

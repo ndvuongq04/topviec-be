@@ -18,6 +18,7 @@ public class ResCvTemplateDetailDTO {
     private String thumbnailUrl;
     private String htmlContent;
     private String cssContent;
+    private String versionTag;
     private Boolean isActive;
     private Boolean isDefault;
     private LocalDateTime createdAt;

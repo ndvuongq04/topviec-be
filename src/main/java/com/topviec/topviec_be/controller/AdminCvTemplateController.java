@@ -1,9 +1,12 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateCvTemplateDTO;
+import com.topviec.topviec_be.dto.request.ReqPreviewCvTemplateDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCvTemplateContentDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCvTemplateDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvTemplatePreviewDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
 import com.topviec.topviec_be.service.CvTemplateService;
@@ -46,6 +49,34 @@ public class AdminCvTemplateController {
             + AdminRoleConstants.SUPPORT_ADMIN + "')")
     public ResponseEntity<ResCvTemplateDetailDTO> getTemplateDetail(@PathVariable Long id) {
         return ResponseEntity.ok(cvTemplateService.getAdminTemplateDetail(id));
+    }
+
+    /**
+     * GET /api/v1/admin/cv-templates/sample-data
+     * Trả sample data chuẩn để FE preview template nhanh.
+     */
+    @GetMapping("/sample-data")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+            + AdminRoleConstants.SUPPORT_ADMIN + "')")
+    public ResponseEntity<CvOnlineExtraDataDTO> getSampleData() {
+        return ResponseEntity.ok(cvTemplateService.getSampleData());
+    }
+
+    /**
+     * POST /api/v1/admin/cv-templates/preview
+     * Preview template với sample data, đồng thời trả lỗi placeholder và cảnh báo CSS nếu có.
+     */
+    @PostMapping("/preview")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.CONTENT_MODERATOR + "', '"
+            + AdminRoleConstants.SUPPORT_ADMIN + "')")
+    public ResponseEntity<ResCvTemplatePreviewDTO> previewTemplate(
+            @Valid @RequestBody ReqPreviewCvTemplateDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvTemplateService.previewTemplate(extractUserId(jwt), request));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -28,9 +28,13 @@ public class CvOnlineTemplateRenderer {
     }
 
     public String renderToXhtml(String htmlContent, String cssContent, CvOnlineExtraDataDTO extraData) {
-        Map<String, Object> model = renderModelMapper.toRenderModel(extraData);
-        String renderedHtml = renderTemplate(htmlContent, model);
+        String renderedHtml = renderHtml(htmlContent, extraData);
         return normalizeToXhtml(renderedHtml, cssContent);
+    }
+
+    public String renderHtml(String htmlContent, CvOnlineExtraDataDTO extraData) {
+        Map<String, Object> model = renderModelMapper.toRenderModel(extraData);
+        return renderTemplate(htmlContent, model);
     }
 
     private String renderTemplate(String htmlContent, Map<String, Object> model) {
