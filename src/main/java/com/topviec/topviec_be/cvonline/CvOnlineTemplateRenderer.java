@@ -2,12 +2,13 @@ package com.topviec.topviec_be.cvonline;
 
 import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.DataNode;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Entities;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -29,7 +30,12 @@ public class CvOnlineTemplateRenderer {
 
     public String renderToXhtml(String htmlContent, String cssContent, CvOnlineExtraDataDTO extraData) {
         String renderedHtml = renderHtml(htmlContent, extraData);
-        return normalizeToXhtml(renderedHtml, cssContent);
+        return normalizeToDocument(renderedHtml, cssContent, Document.OutputSettings.Syntax.xml);
+    }
+
+    public String renderToHtmlDocument(String htmlContent, String cssContent, CvOnlineExtraDataDTO extraData) {
+        String renderedHtml = renderHtml(htmlContent, extraData);
+        return normalizeToDocument(renderedHtml, cssContent, Document.OutputSettings.Syntax.html);
     }
 
     public String renderHtml(String htmlContent, CvOnlineExtraDataDTO extraData) {
@@ -105,15 +111,30 @@ public class CvOnlineTemplateRenderer {
         return buffer.toString();
     }
 
-    private String normalizeToXhtml(String htmlContent, String cssContent) {
-        Document document = Jsoup.parseBodyFragment(htmlContent == null ? "" : htmlContent);
+    private String normalizeToDocument(
+            String htmlContent,
+            String cssContent,
+            Document.OutputSettings.Syntax syntax) {
+        Document document = Jsoup.parse(htmlContent == null ? "" : htmlContent);
         document.outputSettings()
-                .syntax(Document.OutputSettings.Syntax.xml)
+                .syntax(syntax)
                 .escapeMode(Entities.EscapeMode.xhtml)
-                .charset("UTF-8");
-        document.head().prependElement("meta").attr("charset", "UTF-8");
-        document.head().appendElement("style").attr("type", "text/css").appendText(cssContent == null ? "" : cssContent);
+                .charset("UTF-8")
+                .prettyPrint(false);
+        ensureCharsetMeta(document);
+        appendCss(document, cssContent);
         return document.outerHtml();
+    }
+
+    private void ensureCharsetMeta(Document document) {
+        if (document.head().selectFirst("meta[charset]") == null) {
+            document.head().prependElement("meta").attr("charset", "UTF-8");
+        }
+    }
+
+    private void appendCss(Document document, String cssContent) {
+        Element style = document.head().appendElement("style").attr("type", "text/css");
+        style.appendChild(new DataNode(cssContent == null ? "" : cssContent));
     }
 
     private String formatValue(Object value) {

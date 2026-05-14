@@ -213,7 +213,10 @@ public class CvTemplateServiceImpl implements CvTemplateService {
         String renderedXhtml = null;
         if (validation.isValid()) {
             try {
-                renderedHtml = templateRenderer.renderHtml(request.getHtmlContent(), sampleData);
+                renderedHtml = templateRenderer.renderToHtmlDocument(
+                        request.getHtmlContent(),
+                        request.getCssContent(),
+                        sampleData);
                 renderedXhtml = templateRenderer.renderToXhtml(request.getHtmlContent(), request.getCssContent(), sampleData);
             } catch (Exception ex) {
                 Long templateId = request.getTemplateId();
