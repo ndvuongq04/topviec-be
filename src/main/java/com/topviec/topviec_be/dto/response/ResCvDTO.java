@@ -20,6 +20,7 @@ public class ResCvDTO {
     private Long templateId;
     private String fileUrl;
     private String pdfUrl;
+    private Boolean pdfDirty;
     private Boolean isDefault;
     private CvVisibility visibility;
     private String shareToken;

@@ -6,6 +6,7 @@ import com.topviec.topviec_be.dto.request.ReqInviteFromTalentPoolDTO;
 import com.topviec.topviec_be.event.TalentPoolInviteEvent;
 import com.topviec.topviec_be.dto.response.ResApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResCandidateSearchResultDTO;
+import com.topviec.topviec_be.dto.response.ResCvPdfExportDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolCandidateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResTalentPoolDTO;
@@ -21,6 +22,7 @@ import com.topviec.topviec_be.entity.TalentPool;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.application.ApplicationStatus;
 import com.topviec.topviec_be.enums.application.ApplyMethod;
+import com.topviec.topviec_be.enums.cvs.CvType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.ApplicationRepository;
@@ -31,6 +33,7 @@ import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.LocationRepository;
 import com.topviec.topviec_be.repository.TalentPoolRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.TalentPoolService;
 import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +69,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final TokenService tokenService;
+    private final CvService cvService;
 
     @Value("${app.talent-pool-invite-url}")
     private String talentPoolInviteUrl;
@@ -169,7 +173,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     // -------------------------------------------------------------------------
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ResTalentPoolCandidateDetailDTO getTalentPoolCandidateDetail(Long companyId, Long talentPoolId) {
         TalentPool talentPool = talentPoolRepository.findById(talentPoolId)
                 .filter(tp -> tp.getDeletedAt() == null)
@@ -245,7 +249,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     // -------------------------------------------------------------------------
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ResTalentPoolCandidateDetailDTO getCandidateDetail(Long companyId, Long candidateUserId) {
         CandidateProfile profile = candidateProfileRepository.findByUserId(candidateUserId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy hồ sơ ứng viên"));
@@ -445,12 +449,19 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     // -------------------------------------------------------------------------
 
     private ResTalentPoolCandidateDetailDTO.DefaultCvDTO toDefaultCvDTO(Cvs cv) {
+        if (cv.getCvType() == CvType.online
+                && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank() || Boolean.TRUE.equals(cv.getPdfDirty()))) {
+            ResCvPdfExportDTO export = cvService.exportOnlineCvPdf(cv.getUserId(), cv.getId());
+            cv.setPdfUrl(export.getPdfUrl());
+            cv.setPdfDirty(export.getPdfDirty());
+        }
         return ResTalentPoolCandidateDetailDTO.DefaultCvDTO.builder()
                 .cvId(cv.getId())
                 .title(cv.getTitle())
                 .cvType(cv.getCvType())
                 .fileUrl(cv.getFileUrl())
                 .pdfUrl(cv.getPdfUrl())
+                .pdfDirty(cv.getPdfDirty())
                 .visibility(cv.getVisibility())
                 .viewCount(cv.getViewCount())
                 .createdAt(cv.getCreatedAt())

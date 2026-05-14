@@ -22,6 +22,7 @@ public class ResCvOnlineDetailDTO {
     private ResCvTemplateDetailDTO template;
     private CvOnlineExtraDataDTO extraData;
     private String pdfUrl;
+    private Boolean pdfDirty;
     private Boolean isDefault;
     private CvVisibility visibility;
     private CvParseStatus parseStatus;

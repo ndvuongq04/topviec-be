@@ -29,12 +29,14 @@ import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.repository.CvTemplateRepository;
 import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.repository.UserRepository;
+import com.topviec.topviec_be.service.CvSectionSyncService;
 import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.service.PdfGenerationService;
 import com.topviec.topviec_be.util.FileValidator;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -42,13 +44,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.function.BiConsumer;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CvServiceImpl implements CvService {
+
+    private static final Logger log = LoggerFactory.getLogger(CvServiceImpl.class);
 
     private final CvsRepository cvsRepository;
     private final CvTemplateRepository cvTemplateRepository;
@@ -57,6 +63,7 @@ public class CvServiceImpl implements CvService {
     private final CvOnlineTemplateRenderer cvOnlineTemplateRenderer;
     private final FileStorageService fileStorageService;
     private final PdfGenerationService pdfGenerationService;
+    private final CvSectionSyncService cvSectionSyncService;
     private final FileValidator fileValidator;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -124,13 +131,18 @@ public class CvServiceImpl implements CvService {
             clearCurrentDefaultCv(userId);
         }
 
+        CvOnlineExtraDataDTO extraData = request.getExtraData() == null
+                ? CvOnlineExtraDataDTO.empty()
+                : request.getExtraData();
+
         Cvs cv = Cvs.builder()
                 .userId(userId)
                 .title(title)
                 .cvType(CvType.online)
                 .templateId(template.getId())
-                .extraData(toExtraDataJson(request.getExtraData()))
+                .extraData(toExtraDataJson(extraData))
                 .pdfUrl(null)
+                .pdfDirty(true)
                 .isDefault(shouldBeDefault)
                 .visibility(CvVisibility.private_cv)
                 .parseStatus(CvParseStatus.skipped)
@@ -140,7 +152,8 @@ public class CvServiceImpl implements CvService {
                 .build();
 
         Cvs saved = cvsRepository.save(cv);
-        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
+        cvSectionSyncService.syncSectionsIfChanged(saved, extraData);
+        saved = cvsRepository.save(saved);
         return mapToOnlineDetail(saved, template);
     }
 
@@ -156,6 +169,9 @@ public class CvServiceImpl implements CvService {
     public ResCvDTO getCvById(Long userId, Long id) {
         Cvs cv = cvsRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
+        if (cv.getCvType() == CvType.online) {
+            cv = ensureFreshOnlineCvPdf(cv, findTemplateByIdOrThrow(cv.getTemplateId()), userId);
+        }
         return mapToDTO(cv);
     }
 
@@ -180,6 +196,7 @@ public class CvServiceImpl implements CvService {
                 .templateId(template.getId())
                 .template(mapTemplateDetail(template))
                 .extraData(getOnlineCvPrefill(userId))
+                .pdfDirty(true)
                 .isDefault(false)
                 .visibility(CvVisibility.private_cv)
                 .parseStatus(CvParseStatus.skipped)
@@ -202,11 +219,12 @@ public class CvServiceImpl implements CvService {
     public ResCvPdfExportDTO exportOnlineCvPdf(Long userId, Long id) {
         Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
         CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
-        Cvs saved = generateAndPersistOnlineCvPdf(cv, template, userId);
+        Cvs saved = ensureFreshOnlineCvPdf(cv, template, userId);
 
         return ResCvPdfExportDTO.builder()
                 .cvId(saved.getId())
                 .pdfUrl(saved.getPdfUrl())
+                .pdfDirty(saved.getPdfDirty())
                 .generatedAt(saved.getUpdatedAt())
                 .build();
     }
@@ -215,11 +233,9 @@ public class CvServiceImpl implements CvService {
     @Transactional
     public Resource downloadOnlineCvPdf(Long userId, Long id) {
         Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
-        String pdfUrl = cv.getPdfUrl();
-        if (pdfUrl == null || pdfUrl.isBlank()) {
-            pdfUrl = exportOnlineCvPdf(userId, id).getPdfUrl();
-        }
-        return fileStorageService.loadFile(pdfUrl);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        Cvs saved = ensureFreshOnlineCvPdf(cv, template, userId);
+        return fileStorageService.loadFile(saved.getPdfUrl());
     }
 
     @Override
@@ -227,7 +243,8 @@ public class CvServiceImpl implements CvService {
     public ResCvOnlineDetailDTO getOnlineCvById(Long userId, Long id) {
         Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
         CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
-        return mapToOnlineDetail(cv, template);
+        Cvs saved = ensureFreshOnlineCvPdf(cv, template, userId);
+        return mapToOnlineDetail(saved, template);
     }
 
     @Override
@@ -255,13 +272,24 @@ public class CvServiceImpl implements CvService {
             throw AppException.conflict("Tên CV '" + title + "' đã tồn tại");
         }
 
+        CvOnlineExtraDataDTO extraData = request.getExtraData() == null
+                ? CvOnlineExtraDataDTO.empty()
+                : request.getExtraData();
+        String nextExtraDataJson = toExtraDataJson(extraData);
+        boolean contentChanged = !Objects.equals(cv.getExtraData(), nextExtraDataJson);
+
         cv.setTitle(title);
-        cv.setExtraData(toExtraDataJson(request.getExtraData()));
+        cv.setExtraData(nextExtraDataJson);
         cv.setUpdatedBy(userId);
+        if (contentChanged) {
+            // PDF cũ vẫn giữ lại để user xem tạm; khi xem/tải BE sẽ render lại nếu cờ này đang bật.
+            cv.setPdfDirty(true);
+        }
 
         Cvs saved = cvsRepository.save(cv);
         CvTemplate template = findTemplateByIdOrThrow(saved.getTemplateId());
-        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
+        cvSectionSyncService.syncSectionsIfChanged(saved, extraData);
+        saved = cvsRepository.save(saved);
         return mapToOnlineDetail(saved, template);
     }
 
@@ -290,10 +318,124 @@ public class CvServiceImpl implements CvService {
 
         cv.setTemplateId(template.getId());
         cv.setUpdatedBy(userId);
+        // Đổi template làm HTML/CSS render khác dù dữ liệu CV không đổi.
+        cv.setPdfDirty(true);
 
         Cvs saved = cvsRepository.save(cv);
-        saved = generateAndPersistOnlineCvPdf(saved, template, userId);
         return mapToOnlineDetail(saved, template);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvPersonalInfo(
+            Long userId,
+            Long id,
+            CvOnlineExtraDataDTO.PersonalInfo personalInfo) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        extraData.setPersonalInfo(personalInfo == null ? new CvOnlineExtraDataDTO.PersonalInfo() : personalInfo);
+        return savePartialOnlineCv(userId, cv, template, extraData);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvExperiences(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.ExperienceItem> experiences) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        List<CvOnlineExtraDataDTO.ExperienceItem> safeExperiences = safeList(experiences);
+        extraData.setExperiences(safeExperiences);
+        return saveSearchableOnlineCvSection(
+                userId,
+                cv,
+                template,
+                extraData,
+                safeExperiences,
+                cvSectionSyncService::syncExperiences);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvEducations(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.EducationItem> educations) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        List<CvOnlineExtraDataDTO.EducationItem> safeEducations = safeList(educations);
+        extraData.setEducations(safeEducations);
+        return saveSearchableOnlineCvSection(
+                userId,
+                cv,
+                template,
+                extraData,
+                safeEducations,
+                cvSectionSyncService::syncEducations);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvSkills(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.SkillItem> skills) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        List<CvOnlineExtraDataDTO.SkillItem> safeSkills = safeList(skills);
+        extraData.setSkills(safeSkills);
+        return saveSearchableOnlineCvSection(
+                userId,
+                cv,
+                template,
+                extraData,
+                safeSkills,
+                cvSectionSyncService::syncSkills);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvCertifications(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.CertificationItem> certifications) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        List<CvOnlineExtraDataDTO.CertificationItem> safeCertifications = safeList(certifications);
+        extraData.setCertifications(safeCertifications);
+        return saveSearchableOnlineCvSection(
+                userId,
+                cv,
+                template,
+                extraData,
+                safeCertifications,
+                cvSectionSyncService::syncCertifications);
+    }
+
+    @Override
+    @Transactional
+    public ResCvOnlineDetailDTO updateOnlineCvLanguages(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.LanguageItem> languages) {
+        Cvs cv = findOwnedOnlineCvOrThrow(userId, id);
+        CvTemplate template = findTemplateByIdOrThrow(cv.getTemplateId());
+        CvOnlineExtraDataDTO extraData = parseExtraData(cv.getExtraData());
+        List<CvOnlineExtraDataDTO.LanguageItem> safeLanguages = safeList(languages);
+        extraData.setLanguages(safeLanguages);
+        return saveSearchableOnlineCvSection(
+                userId,
+                cv,
+                template,
+                extraData,
+                safeLanguages,
+                cvSectionSyncService::syncLanguages);
     }
 
     @Override
@@ -320,6 +462,10 @@ public class CvServiceImpl implements CvService {
                 .templateId(original.getTemplateId())
                 .fileUrl(original.getFileUrl())
                 .pdfUrl(original.getPdfUrl())
+                .pdfDirty(original.getCvType() == CvType.online
+                        && (Boolean.TRUE.equals(original.getPdfDirty())
+                                || original.getPdfUrl() == null
+                                || original.getPdfUrl().isBlank()))
                 .extraData(original.getExtraData())
                 .isDefault(false)
                 .visibility(original.getVisibility())
@@ -328,7 +474,12 @@ public class CvServiceImpl implements CvService {
                 .createdBy(userId)
                 .build();
 
-        return mapToDTO(cvsRepository.save(copy));
+        Cvs saved = cvsRepository.save(copy);
+        if (saved.getCvType() == CvType.online) {
+            cvSectionSyncService.syncSectionsIfChanged(saved, parseExtraData(saved.getExtraData()));
+            saved = cvsRepository.save(saved);
+        }
+        return mapToDTO(saved);
     }
 
     @Override
@@ -344,6 +495,9 @@ public class CvServiceImpl implements CvService {
         cv.setDeletedAt(LocalDateTime.now());
         cv.setUpdatedBy(userId);
         cvsRepository.save(cv);
+        if (cv.getCvType() == CvType.online) {
+            cvSectionSyncService.deleteSections(cv.getId());
+        }
 
         if (cv.getFileUrl() != null && cvsRepository.countActiveByFileUrl(cv.getFileUrl()) == 0) {
             fileStorageService.deleteFile(cv.getFileUrl(), FileUploadType.CV);
@@ -413,6 +567,9 @@ public class CvServiceImpl implements CvService {
             throw AppException.notFound("Không tìm thấy CV hoặc link đã hết hạn");
         }
 
+        if (cv.getCvType() == CvType.online) {
+            cv = ensureFreshOnlineCvPdf(cv, findTemplateByIdOrThrow(cv.getTemplateId()), cv.getUserId());
+        }
         return mapToDTO(cv);
     }
 
@@ -421,6 +578,54 @@ public class CvServiceImpl implements CvService {
             oldDefault.setIsDefault(false);
             cvsRepository.save(oldDefault);
         });
+    }
+
+    private ResCvOnlineDetailDTO savePartialOnlineCv(
+            Long userId,
+            Cvs cv,
+            CvTemplate template,
+            CvOnlineExtraDataDTO extraData) {
+        String nextExtraDataJson = toExtraDataJson(extraData);
+        if (!Objects.equals(cv.getExtraData(), nextExtraDataJson)) {
+            cv.setPdfDirty(true);
+        }
+        cv.setExtraData(nextExtraDataJson);
+        cv.setUpdatedBy(userId);
+        return mapToOnlineDetail(cvsRepository.save(cv), template);
+    }
+
+    private <T> ResCvOnlineDetailDTO saveSearchableOnlineCvSection(
+            Long userId,
+            Cvs cv,
+            CvTemplate template,
+            CvOnlineExtraDataDTO extraData,
+            List<T> sectionItems,
+            BiConsumer<Long, List<T>> sectionSyncAction) {
+        String nextExtraDataJson = toExtraDataJson(extraData);
+        String nextSectionHash = cvSectionSyncService.calculateSectionHash(extraData);
+        boolean contentChanged = !Objects.equals(cv.getExtraData(), nextExtraDataJson);
+        boolean sectionChanged = !Objects.equals(cv.getCvSectionHash(), nextSectionHash);
+
+        if (contentChanged) {
+            // Chỉ đánh dấu PDF cũ, không render lại ngay để thao tác lưu section vẫn nhanh.
+            cv.setPdfDirty(true);
+        }
+        cv.setExtraData(nextExtraDataJson);
+        cv.setUpdatedBy(userId);
+        if (sectionChanged) {
+            cv.setCvSectionHash(nextSectionHash);
+        }
+
+        Cvs saved = cvsRepository.save(cv);
+        if (sectionChanged) {
+            // Endpoint section chỉ rebuild đúng bảng liên quan, không đụng các cv_section khác.
+            sectionSyncAction.accept(saved.getId(), sectionItems);
+        }
+        return mapToOnlineDetail(saved, template);
+    }
+
+    private <T> List<T> safeList(List<T> items) {
+        return items == null ? new ArrayList<>() : new ArrayList<>(items);
     }
 
     private Cvs findOwnedOnlineCvOrThrow(Long userId, Long id) {
@@ -518,6 +723,16 @@ public class CvServiceImpl implements CvService {
         return normalized + ".pdf";
     }
 
+    private Cvs ensureFreshOnlineCvPdf(Cvs cv, CvTemplate template, Long userId) {
+        if (cv.getCvType() != CvType.online) {
+            return cv;
+        }
+        if (cv.getPdfUrl() != null && !cv.getPdfUrl().isBlank() && !Boolean.TRUE.equals(cv.getPdfDirty())) {
+            return cv;
+        }
+        return generateAndPersistOnlineCvPdf(cv, template, userId);
+    }
+
     private Cvs generateAndPersistOnlineCvPdf(Cvs cv, CvTemplate template, Long userId) {
         String oldPdfUrl = cv.getPdfUrl();
         String xhtmlContent = cvOnlineTemplateRenderer.renderToXhtml(
@@ -527,7 +742,9 @@ public class CvServiceImpl implements CvService {
         byte[] pdfBytes = pdfGenerationService.generatePdfFromHtml(xhtmlContent);
         String pdfUrl = fileStorageService.uploadBytes(pdfBytes, buildPdfFileName(cv), userId, FileUploadType.CV);
 
+        // Chỉ xóa PDF cũ sau khi upload PDF mới thành công để tránh mất file nếu render lỗi giữa chừng.
         cv.setPdfUrl(pdfUrl);
+        cv.setPdfDirty(false);
         cv.setUpdatedBy(userId);
         Cvs saved = cvsRepository.save(cv);
 
@@ -555,6 +772,7 @@ public class CvServiceImpl implements CvService {
                 .templateId(cv.getTemplateId())
                 .fileUrl(cv.getFileUrl())
                 .pdfUrl(cv.getPdfUrl())
+                .pdfDirty(cv.getPdfDirty())
                 .isDefault(cv.getIsDefault())
                 .visibility(cv.getVisibility())
                 .shareToken(cv.getShareToken())
@@ -576,6 +794,7 @@ public class CvServiceImpl implements CvService {
                 .template(mapTemplateDetail(template))
                 .extraData(parseExtraData(cv.getExtraData()))
                 .pdfUrl(cv.getPdfUrl())
+                .pdfDirty(cv.getPdfDirty())
                 .isDefault(cv.getIsDefault())
                 .visibility(cv.getVisibility())
                 .parseStatus(cv.getParseStatus())
@@ -594,6 +813,7 @@ public class CvServiceImpl implements CvService {
                 .templateId(cv.getTemplateId())
                 .template(mapTemplateDetail(template))
                 .extraData(parseExtraData(cv.getExtraData()))
+                .pdfDirty(cv.getPdfDirty())
                 .isDefault(cv.getIsDefault())
                 .visibility(cv.getVisibility())
                 .parseStatus(cv.getParseStatus())

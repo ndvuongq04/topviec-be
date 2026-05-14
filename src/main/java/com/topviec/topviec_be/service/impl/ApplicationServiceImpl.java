@@ -291,7 +291,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         if (cv.getCvType() == com.topviec.topviec_be.enums.cvs.CvType.online
-                && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank())) {
+                && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank() || Boolean.TRUE.equals(cv.getPdfDirty()))) {
             cvService.exportOnlineCvPdf(candidateUserId, cv.getId());
             cv = cvsRepository.findById(cvId)
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
@@ -419,7 +419,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         ResultPaginationDTO result = new ResultPaginationDTO();
         result.setMeta(meta);
         result.setResult(applicationPage.getContent().stream()
-                .map(this::toEmployerResponse)
+                .map(application -> toEmployerResponse(application, false))
                 .toList());
 
         return result;
@@ -541,6 +541,10 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     private ResEmployerApplicationDTO toEmployerResponse(Application a) {
+        return toEmployerResponse(a, true);
+    }
+
+    private ResEmployerApplicationDTO toEmployerResponse(Application a, boolean ensureFreshPdf) {
         User user = null;
         CandidateProfile profile = null;
         Cvs cv = null;
@@ -552,9 +556,10 @@ public class ApplicationServiceImpl implements ApplicationService {
 
         if (a.getCvId() != null) {
             cv = cvsRepository.findById(a.getCvId()).orElse(null);
-            if (cv != null
+            if (ensureFreshPdf
+                    && cv != null
                     && cv.getCvType() == CvType.online
-                    && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank())) {
+                    && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank() || Boolean.TRUE.equals(cv.getPdfDirty()))) {
                 cvService.exportOnlineCvPdf(cv.getUserId(), cv.getId());
                 cv = cvsRepository.findById(a.getCvId()).orElse(cv);
             }
@@ -576,6 +581,7 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .cvType(cv != null ? cv.getCvType() : null)
                 .cvFileUrl(cv != null ? cv.getFileUrl() : null)
                 .cvPdfUrl(cv != null ? cv.getPdfUrl() : null)
+                .cvPdfDirty(cv != null ? cv.getPdfDirty() : null)
                 .cvPreviewUrl(resolveCvPreviewUrl(cv))
                 .status(a.getStatus())
                 .applyMethod(a.getApplyMethod())

@@ -27,6 +27,7 @@ public class ResEmployerApplicationDTO {
     private CvType cvType;
     private String cvFileUrl;
     private String cvPdfUrl;
+    private Boolean cvPdfDirty;
     private String cvPreviewUrl;
 
     // Thông tin apply

@@ -22,6 +22,7 @@ public class ResCvOnlineEditorPayloadDTO {
     private Long templateId;
     private ResCvTemplateDetailDTO template;
     private CvOnlineExtraDataDTO extraData;
+    private Boolean pdfDirty;
     private Boolean isDefault;
     private CvVisibility visibility;
     private CvParseStatus parseStatus;

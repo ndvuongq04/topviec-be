@@ -146,6 +146,54 @@ public class CvController {
         return ResponseEntity.ok(cvService.changeOnlineCvTemplate(extractUserId(jwt), id, request));
     }
 
+    @PatchMapping("/online/{id}/sections/personal-info")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvPersonalInfo(
+            @PathVariable Long id,
+            @Valid @RequestBody CvOnlineExtraDataDTO.PersonalInfo request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvPersonalInfo(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/experiences")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvExperiences(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.ExperienceItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvExperiences(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/educations")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvEducations(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.EducationItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvEducations(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/skills")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvSkills(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.SkillItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvSkills(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/certifications")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvCertifications(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.CertificationItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvCertifications(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/languages")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvLanguages(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.LanguageItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvLanguages(extractUserId(jwt), id, request));
+    }
+
     /**
      * POST /api/v1/cvs/{id}/export-pdf
      * Render CV online sang PDF và cập nhật `pdf_url` mới nhất.

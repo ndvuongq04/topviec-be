@@ -55,4 +55,34 @@ public interface CvService {
     ResCvOnlineDetailDTO updateOnlineCv(Long userId, Long id, ReqUpdateOnlineCvDTO request);
 
     ResCvOnlineDetailDTO changeOnlineCvTemplate(Long userId, Long id, ReqChangeOnlineCvTemplateDTO request);
+
+    ResCvOnlineDetailDTO updateOnlineCvPersonalInfo(
+            Long userId,
+            Long id,
+            CvOnlineExtraDataDTO.PersonalInfo personalInfo);
+
+    ResCvOnlineDetailDTO updateOnlineCvExperiences(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.ExperienceItem> experiences);
+
+    ResCvOnlineDetailDTO updateOnlineCvEducations(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.EducationItem> educations);
+
+    ResCvOnlineDetailDTO updateOnlineCvSkills(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.SkillItem> skills);
+
+    ResCvOnlineDetailDTO updateOnlineCvCertifications(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.CertificationItem> certifications);
+
+    ResCvOnlineDetailDTO updateOnlineCvLanguages(
+            Long userId,
+            Long id,
+            List<CvOnlineExtraDataDTO.LanguageItem> languages);
 }

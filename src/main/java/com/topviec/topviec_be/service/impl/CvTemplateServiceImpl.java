@@ -14,9 +14,11 @@ import com.topviec.topviec_be.dto.response.ResCvTemplateDetailDTO;
 import com.topviec.topviec_be.dto.response.ResCvTemplatePreviewDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.entity.CvTemplate;
+import com.topviec.topviec_be.enums.cvs.CvType;
 import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CvTemplateRepository;
+import com.topviec.topviec_be.repository.CvsRepository;
 import com.topviec.topviec_be.service.CvTemplateService;
 import com.topviec.topviec_be.service.FileStorageService;
 import com.topviec.topviec_be.util.ChangeTracker;
@@ -39,6 +41,7 @@ import java.util.stream.Collectors;
 public class CvTemplateServiceImpl implements CvTemplateService {
 
     private final CvTemplateRepository cvTemplateRepository;
+    private final CvsRepository cvsRepository;
     private final CvTemplateSampleDataFactory sampleDataFactory;
     private final CvTemplateCssAdvisor cssAdvisor;
     private final CvOnlineTemplateRenderer templateRenderer;
@@ -123,6 +126,8 @@ public class CvTemplateServiceImpl implements CvTemplateService {
         template.setUpdatedBy(adminUserId);
 
         CvTemplate saved = cvTemplateRepository.save(template);
+        // HTML/CSS template đổi thì toàn bộ PDF đã render từ template này đều trở thành bản cũ.
+        cvsRepository.markPdfDirtyByTemplateId(saved.getId(), CvType.online);
         tracker.compare(saved).apply();
         return toDetailDTO(saved);
     }

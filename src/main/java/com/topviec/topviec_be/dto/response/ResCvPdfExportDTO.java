@@ -13,5 +13,6 @@ public class ResCvPdfExportDTO {
 
     private Long cvId;
     private String pdfUrl;
+    private Boolean pdfDirty;
     private LocalDateTime generatedAt;
 }
