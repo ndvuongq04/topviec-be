@@ -70,14 +70,15 @@ app:
   slot-selection-url: ${APP_SLOT_SELECTION_URL:http://localhost:5173/interview-select-slot}
   talent-pool-invite-url: ${APP_TALENT_POOL_INVITE_URL:http://localhost:5173/talent-pool-invite}
 
-  # config cho Cloudinary
-  cloudinary:
-    cloud-name: ${CLOUDINARY_CLOUD_NAME}
-    api-key: ${CLOUDINARY_API_KEY}
-    api-secret: ${CLOUDINARY_API_SECRET}
-    folder:
-      root: ${CLOUDINARY_FOLDER_ROOT:topviec}
-      cv: ${CLOUDINARY_FOLDER_CV:cvs}
-      avatar: ${CLOUDINARY_FOLDER_AVATAR:avatars}
-      company-cover: ${CLOUDINARY_FOLDER_COMPANY_COVER:company-covers}
+  storage:
+    upload-dir: ${UPLOAD_DIR:uploads}
+    base-url: ${STORAGE_BASE_URL:http://localhost:8080/api/v1/files}
+
+vnpay:
+  tmn-code: ${VNPAY_TMN_CODE}
+  hash-secret: ${VNPAY_HASH_SECRET}
+  pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  api-url: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment/vnpay/return}
+  frontend-return-url: ${VNPAY_FRONTEND_RETURN_URL:http://localhost:5173/payment/result}
 

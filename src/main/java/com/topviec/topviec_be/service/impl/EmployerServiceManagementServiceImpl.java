@@ -52,7 +52,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -129,20 +131,53 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                 Long companyId = getCompanyId(userId);
 
                 List<CompanyAddon> addons = companyAddonRepository
-                                .findByCompanyIdOrderByCreatedAtDesc(companyId);
+                                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
 
-                return addons.stream().map(addon -> {
-                        AddonService addonSvc = addonServiceRepository.findById(addon.getAddonServiceId()).orElse(null);
-                        Services svc = addonSvc != null
-                                        ? serviceRepository.findById(addonSvc.getServiceId()).orElse(null)
-                                        : null;
+                // Gộp theo addon code: cùng code thì cộng dồn số lượng, khác code thì giữ riêng
+                Map<String, List<CompanyAddon>> grouped = new LinkedHashMap<>();
+                Map<String, AddonService> addonSvcMap = new LinkedHashMap<>();
+
+                for (CompanyAddon addon : addons) {
+                        AddonService addonSvc = addonServiceRepository.findById(addon.getAddonServiceId())
+                                        .orElse(null);
+                        if (addonSvc == null) continue;
+
+                        String addonCode = addonSvc.getCode();
+                        grouped.computeIfAbsent(addonCode, k -> new ArrayList<>()).add(addon);
+                        addonSvcMap.putIfAbsent(addonCode, addonSvc);
+                }
+
+                return grouped.entrySet().stream().map(entry -> {
+                        String addonCode = entry.getKey();
+                        List<CompanyAddon> group = entry.getValue();
+                        AddonService addonSvc = addonSvcMap.get(addonCode);
+                        Services svc = serviceRepository.findById(addonSvc.getServiceId()).orElse(null);
+
+                        int totalQty = group.stream().mapToInt(CompanyAddon::getQuantityTotal).sum();
+                        int remainingQty = group.stream().mapToInt(CompanyAddon::getQuantityRemaining).sum();
+                        List<Long> ids = group.stream().map(CompanyAddon::getId).collect(Collectors.toList());
+
+                        CompanyAddon representative = group.get(0);
+
+                        LocalDateTime latestExpiry = group.stream()
+                                        .map(CompanyAddon::getExpiredAt)
+                                        .filter(e -> e != null)
+                                        .max(LocalDateTime::compareTo)
+                                        .orElse(null);
+
+                        LocalDateTime earliestStart = group.stream()
+                                        .map(CompanyAddon::getStartedAt)
+                                        .filter(s -> s != null)
+                                        .min(LocalDateTime::compareTo)
+                                        .orElse(null);
 
                         return ResCompanyAddonDTO.builder()
-                                        .id(addon.getId())
-                                        .addonServiceId(addon.getAddonServiceId())
-                                        .addonName(addonSvc != null ? addonSvc.getName() : null)
-                                        .addonCode(addonSvc != null ? addonSvc.getCode() : null)
-                                        .addonQuantity(addonSvc != null ? addonSvc.getQuantity() : null)
+                                        .id(representative.getId())
+                                        .addonServiceId(representative.getAddonServiceId())
+                                        .companyAddonIds(ids)
+                                        .addonName(addonSvc.getName())
+                                        .addonCode(addonCode)
+                                        .addonQuantity(addonSvc.getQuantity())
                                         .serviceId(svc != null ? svc.getId() : null)
                                         .serviceCode(svc != null ? svc.getCode() : null)
                                         .serviceName(svc != null ? svc.getName() : null)
@@ -150,12 +185,12 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                         .serviceCategoryName(svc != null && svc.getCategory() != null
                                                         ? svc.getCategory().getValue()
                                                         : null)
-                                        .status(addon.getStatus())
-                                        .quantityTotal(addon.getQuantityTotal())
-                                        .quantityRemaining(addon.getQuantityRemaining())
-                                        .startedAt(addon.getStartedAt())
-                                        .expiredAt(addon.getExpiredAt())
-                                        .createdAt(addon.getCreatedAt())
+                                        .status(SubscriptionStatus.ACTIVE)
+                                        .quantityTotal(totalQty)
+                                        .quantityRemaining(remainingQty)
+                                        .startedAt(earliestStart)
+                                        .expiredAt(latestExpiry)
+                                        .createdAt(representative.getCreatedAt())
                                         .build();
                 }).collect(Collectors.toList());
         }

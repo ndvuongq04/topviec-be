@@ -25,6 +25,8 @@ public interface CompanySubscriptionRepository extends JpaRepository<CompanySubs
 
         Optional<CompanySubscription> findFirstByCompanyIdOrderByCreatedAtDesc(Long companyId);
 
+        Optional<CompanySubscription> findByOrderId(Long orderId);
+
         Page<CompanySubscription> findByCompanyIdOrderByCreatedAtDesc(Long companyId, Pageable pageable);
 
         /**

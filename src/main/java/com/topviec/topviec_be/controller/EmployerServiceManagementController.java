@@ -34,6 +34,7 @@ public class EmployerServiceManagementController {
      * Lấy thông tin gói dịch vụ hiện tại NTD đang dùng và hạn mức còn lại
      */
     @GetMapping("/subscription")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:view_history')")
     public ResponseEntity<ResCompanySubscriptionDTO> getMySubscription(
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(employerServiceManagementService.getMySubscription(extractUserId(jwt)));
@@ -44,6 +45,7 @@ public class EmployerServiceManagementController {
      */
     @PostMapping("/subscription/renew")
     @LogAction(LogActionType.RENEW_SUBSCRIPTION)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:purchase')")
     public ResponseEntity<ResSubscriptionRenewalDTO> renewSubscription(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqRenewSubscriptionDTO request) {
@@ -55,6 +57,7 @@ public class EmployerServiceManagementController {
      * Lấy danh sách các dịch vụ lẻ mà NTD đã mua và số lượng còn lại
      */
     @GetMapping("/addons")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:view_history')")
     public ResponseEntity<List<ResCompanyAddonDTO>> getMyAddons(
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(employerServiceManagementService.getMyAddons(extractUserId(jwt)));
@@ -65,6 +68,7 @@ public class EmployerServiceManagementController {
      */
     @PostMapping("/job-posts/{jobPostingId}/apply-addon")
     @LogAction(LogActionType.APPLY_JOB_POST_ADDON)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:purchase')")
     public ResponseEntity<ResJobPostAddonDTO> applyAddonToJobPost(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long jobPostingId,
@@ -80,6 +84,7 @@ public class EmployerServiceManagementController {
      */
     @PostMapping("/company/apply-branding")
     @LogAction(LogActionType.APPLY_COMPANY_BRANDING)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'service:purchase')")
     public ResponseEntity<ResCompanyBrandingDTO> applyBrandingToCompany(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReqApplyAddonDTO request) {

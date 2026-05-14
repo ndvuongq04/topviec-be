@@ -89,7 +89,7 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
         }).collect(Collectors.toList());
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1); // Follow convention in CompanyService
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(pageResult.getTotalPages());
         meta.setTotals(pageResult.getTotalElements());
@@ -152,7 +152,7 @@ public class AdminCandidateServiceImpl implements AdminCandidateService {
         }
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1); // 1-based index convention
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages((int) Math.ceil((double) allCvs.size() / pageable.getPageSize()));
         meta.setTotals(allCvs.size());

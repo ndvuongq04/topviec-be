@@ -36,6 +36,7 @@ public class PublicApplicationController {
     /**
      * POST /applications/{jobPostId}
      * CN-UV-010: Nộp đơn đầy đủ
+     * `cvId` hỗ trợ cả CV online lẫn CV tải lên.
      */
     @PostMapping("/{jobPostId}")
     @LogAction(LogActionType.APPLY_JOB)
@@ -52,6 +53,7 @@ public class PublicApplicationController {
     /**
      * POST /applications/{jobPostId}/quick
      * CN-UV-011: Ứng tuyển nhanh (CV mặc định)
+     * CV mặc định có thể là CV online hoặc CV tải lên.
      */
     @PostMapping("/{jobPostId}/quick")
     @LogAction(LogActionType.QUICK_APPLY_JOB)
@@ -127,6 +129,7 @@ public class PublicApplicationController {
     /**
      * PATCH /applications/{applicationId}/cv
      * Cập nhật CV cho đơn ứng tuyển (chỉ khi đang pending)
+     * `cvId` hỗ trợ cả CV online lẫn CV tải lên.
      */
     @PatchMapping("/{applicationId}/cv")
     @LogAction(LogActionType.UPDATE_APPLICATION_CV)

@@ -24,7 +24,14 @@ public class ResOrderDTO {
     private OrderStatus status;
     private PaymentMethod paymentMethod;
     private String paymentTransactionId;
+    private String vnpayTransactionNo;
+    private String vnpayResponseCode;
     private LocalDateTime paidAt;
+    private String paymentUrl;
+    private Boolean refundEligible;
+    private String refundReason;
+    private LocalDateTime refundRequestedAt;
+    private LocalDateTime refundApprovedAt;
     private String note;
     private LocalDateTime createdAt;
     private List<ResOrderItemDTO> items;

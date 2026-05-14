@@ -40,6 +40,7 @@ public class EmployerJobPostingController {
      */
     @PostMapping
     @LogAction(LogActionType.CREATE_JOB_POSTING)
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job:create')")
     public ResponseEntity<ResJobPostingDetail> create(
             @Valid @RequestBody ReqCreateJobPostingDTO request) {
 
@@ -57,6 +58,7 @@ public class EmployerJobPostingController {
      * companyId tự động lấy từ JWT → chỉ trả về tin của công ty đang đăng nhập.
      */
     @GetMapping
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job:view_all')")
     public ResponseEntity<ResultPaginationDTO> getList(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long industryId,
@@ -87,6 +89,7 @@ public class EmployerJobPostingController {
      */
     @PutMapping("/{id}")
     @LogAction(LogActionType.UPDATE_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:edit_own', 'job:edit_other')")
     public ResponseEntity<ResJobPostingDetail> update(
             @PathVariable Long id,
             @Valid @RequestBody ReqUpdateJobPostingDTO request) {
@@ -103,6 +106,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/pause")
     @LogAction(LogActionType.PAUSE_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:toggle_own', 'job:toggle_other')")
     public ResponseEntity<ResJobPostingDetail> pause(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -115,6 +119,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/resume")
     @LogAction(LogActionType.RESUME_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:toggle_own', 'job:toggle_other')")
     public ResponseEntity<ResJobPostingDetail> resume(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -127,6 +132,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/close")
     @LogAction(LogActionType.CLOSE_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:toggle_own', 'job:toggle_other')")
     public ResponseEntity<ResJobPostingDetail> close(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -139,6 +145,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/extend")
     @LogAction(LogActionType.EXTEND_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:edit_own', 'job:edit_other')")
     public ResponseEntity<ResJobPostingDetail> extend(
             @PathVariable Long id,
             @Valid @RequestBody ReqExtendJobPostDTO request) {
@@ -152,6 +159,7 @@ public class EmployerJobPostingController {
      * Làm mới tin tuyển dụng (đẩy lên đầu).
      */
     @PatchMapping("/{id}/refresh")
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:edit_own', 'job:edit_other')")
     public ResponseEntity<ResJobPostingDetail> refresh(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -164,6 +172,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/pending-approval")
     @LogAction(LogActionType.SUBMIT_JOB_POSTING_APPROVAL)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:edit_own', 'job:edit_other')")
     public ResponseEntity<ResJobPostingDetail> pendingApproval(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -176,6 +185,7 @@ public class EmployerJobPostingController {
      */
     @DeleteMapping("/{id}")
     @LogAction(LogActionType.DELETE_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:delete_own', 'job:delete_other')")
     public ResponseEntity<Void> softDelete(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -189,6 +199,7 @@ public class EmployerJobPostingController {
      */
     @PatchMapping("/{id}/restore")
     @LogAction(LogActionType.RESTORE_JOB_POSTING)
+    @PreAuthorize("@employerPerm.canManageJob(authentication, #id, 'job:edit_own', 'job:edit_other')")
     public ResponseEntity<ResJobPostingDetail> restore(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -200,6 +211,7 @@ public class EmployerJobPostingController {
      * Lấy thống kê của một tin tuyển dụng.
      */
     @GetMapping("/{id}/statistics")
+    @PreAuthorize("@companyPerm.hasPermission(authentication, 'job:view_all')")
     public ResponseEntity<ResJobPostingStatisticsDTO> getJobPostingStatistics(@PathVariable Long id) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);

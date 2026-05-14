@@ -62,10 +62,8 @@ public class AdminUserController {
          * | "support_admin" | "finance_admin"
          */
         @GetMapping
-        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-                        + AdminRoleConstants.SUPER_ADMIN + "', '"
-                        + AdminRoleConstants.CONTENT_MODERATOR + "', '"
-                        + AdminRoleConstants.SUPPORT_ADMIN + "')")
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
+                        + "')")
         public ResponseEntity<ResultPaginationDTO> getAllAdmins(
                         @RequestParam(required = false) String keyword,
                         @RequestParam(required = false) String adminRole,
@@ -79,9 +77,7 @@ public class AdminUserController {
          * super_admin + content_moderator + support_admin xem được chi tiết
          */
         @GetMapping("/{id}")
-        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
-                        + AdminRoleConstants.SUPER_ADMIN
-                        + "', '" + AdminRoleConstants.CONTENT_MODERATOR + "', '" + AdminRoleConstants.SUPPORT_ADMIN
+        @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasRole(authentication, '" + AdminRoleConstants.SUPER_ADMIN
                         + "')")
         public ResponseEntity<ResAdminUser> getAdminById(@PathVariable Long id) {
                 return ResponseEntity.ok(adminUserService.getAdminById(id));

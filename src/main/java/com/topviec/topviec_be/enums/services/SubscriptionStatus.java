@@ -6,7 +6,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum SubscriptionStatus {
     ACTIVE("active"),
     EXPIRED("expired"),
-    CANCELLED("cancelled");
+    CANCELLED("cancelled"),
+    REVOKED("revoked");
 
     private final String value;
 
