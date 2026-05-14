@@ -60,6 +60,10 @@ public class CvOnlineRenderModelMapper {
         model.put("skills", mapSkills(safeData.getSkills()));
         model.put("certifications", mapCertifications(safeData.getCertifications()));
         model.put("languages", mapLanguages(safeData.getLanguages()));
+        model.put("projects", mapProjects(safeData.getProjects()));
+        model.put("hobbies", mapHobbies(safeData.getHobbies()));
+        model.put("awards", mapAwards(safeData.getAwards()));
+        model.put("customSections", mapCustomSections(safeData.getCustomSections()));
         return model;
     }
 
@@ -149,6 +153,76 @@ public class CvOnlineRenderModelMapper {
             mapped.put("name", safe(item.getName()));
             mapped.put("level", safe(item.getLevel()));
             mapped.put("certificate", safe(item.getCertificate()));
+            result.add(mapped);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> mapProjects(List<CvOnlineExtraDataDTO.ProjectItem> items) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (items == null) {
+            return result;
+        }
+
+        for (CvOnlineExtraDataDTO.ProjectItem item : items) {
+            Map<String, Object> mapped = new LinkedHashMap<>();
+            mapped.put("name", safe(item.getName()));
+            mapped.put("role", safe(item.getRole()));
+            mapped.put("organization", safe(item.getOrganization()));
+            mapped.put("startDate", safe(item.getStartDate()));
+            mapped.put("endDate", safe(item.getEndDate()));
+            mapped.put("projectUrl", safe(item.getProjectUrl()));
+            mapped.put("description", safe(item.getDescription()));
+            result.add(mapped);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> mapHobbies(List<CvOnlineExtraDataDTO.HobbyItem> items) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (items == null) {
+            return result;
+        }
+
+        for (CvOnlineExtraDataDTO.HobbyItem item : items) {
+            Map<String, Object> mapped = new LinkedHashMap<>();
+            mapped.put("name", safe(item.getName()));
+            mapped.put("description", safe(item.getDescription()));
+            result.add(mapped);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> mapAwards(List<CvOnlineExtraDataDTO.AwardItem> items) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (items == null) {
+            return result;
+        }
+
+        for (CvOnlineExtraDataDTO.AwardItem item : items) {
+            Map<String, Object> mapped = new LinkedHashMap<>();
+            mapped.put("title", safe(item.getTitle()));
+            mapped.put("issuer", safe(item.getIssuer()));
+            mapped.put("awardedAt", safe(item.getAwardedAt()));
+            mapped.put("description", safe(item.getDescription()));
+            result.add(mapped);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> mapCustomSections(List<CvOnlineExtraDataDTO.CustomSectionItem> items) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (items == null) {
+            return result;
+        }
+
+        for (CvOnlineExtraDataDTO.CustomSectionItem item : items) {
+            Map<String, Object> mapped = new LinkedHashMap<>();
+            mapped.put("sectionTitle", safe(item.getSectionTitle()));
+            mapped.put("itemTitle", safe(item.getItemTitle()));
+            mapped.put("itemSubtitle", safe(item.getItemSubtitle()));
+            mapped.put("itemMeta", safe(item.getItemMeta()));
+            mapped.put("description", safe(item.getDescription()));
             result.add(mapped);
         }
         return result;

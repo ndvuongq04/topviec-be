@@ -99,6 +99,11 @@ public class CvController {
         return ResponseEntity.ok(cvService.getOnlineCvPrefill(extractUserId(jwt)));
     }
 
+    /**
+     * GET /api/v1/cvs/online/editor/template/{templateId}
+     * Lấy payload editor cho CV online mới từ template.
+     * `extraData` hỗ trợ cả các section mở rộng như projects, hobbies, awards, customSections.
+     */
     @GetMapping("/online/editor/template/{templateId}")
     public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadByTemplate(
             @PathVariable Long templateId,
@@ -106,6 +111,11 @@ public class CvController {
         return ResponseEntity.ok(cvService.getOnlineCvEditorPayloadByTemplate(extractUserId(jwt), templateId));
     }
 
+    /**
+     * GET /api/v1/cvs/online/editor/{id}
+     * Lấy payload editor cho CV online đã lưu.
+     * `extraData` hỗ trợ cả các section mở rộng như projects, hobbies, awards, customSections.
+     */
     @GetMapping("/online/editor/{id}")
     public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadById(
             @PathVariable Long id,

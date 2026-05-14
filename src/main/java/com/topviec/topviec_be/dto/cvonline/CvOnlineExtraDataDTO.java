@@ -45,6 +45,22 @@ public class CvOnlineExtraDataDTO {
     @Builder.Default
     private List<LanguageItem> languages = new ArrayList<>();
 
+    @Valid
+    @Builder.Default
+    private List<ProjectItem> projects = new ArrayList<>();
+
+    @Valid
+    @Builder.Default
+    private List<HobbyItem> hobbies = new ArrayList<>();
+
+    @Valid
+    @Builder.Default
+    private List<AwardItem> awards = new ArrayList<>();
+
+    @Valid
+    @Builder.Default
+    private List<CustomSectionItem> customSections = new ArrayList<>();
+
     public static CvOnlineExtraDataDTO empty() {
         return CvOnlineExtraDataDTO.builder().build();
     }
@@ -196,5 +212,87 @@ public class CvOnlineExtraDataDTO {
 
         @Size(max = 255)
         private String certificate;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ProjectItem {
+        @Size(max = 255)
+        private String name;
+
+        @Size(max = 255)
+        private String role;
+
+        @Size(max = 255)
+        private String organization;
+
+        @Size(max = 50)
+        private String startDate;
+
+        @Size(max = 50)
+        private String endDate;
+
+        @Size(max = 255)
+        private String projectUrl;
+
+        @Size(max = 4000)
+        private String description;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class HobbyItem {
+        @Size(max = 255)
+        private String name;
+
+        @Size(max = 1000)
+        private String description;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class AwardItem {
+        @Size(max = 255)
+        private String title;
+
+        @Size(max = 255)
+        private String issuer;
+
+        @Size(max = 50)
+        private String awardedAt;
+
+        @Size(max = 2000)
+        private String description;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CustomSectionItem {
+        @Size(max = 255)
+        private String sectionTitle;
+
+        @Size(max = 255)
+        private String itemTitle;
+
+        @Size(max = 255)
+        private String itemSubtitle;
+
+        @Size(max = 255)
+        private String itemMeta;
+
+        @Size(max = 4000)
+        private String description;
     }
 }

@@ -66,6 +66,36 @@ public class CvTemplateSampleDataFactory {
                                 .level("Professional Working Proficiency")
                                 .certificate("IELTS 7.0")
                                 .build()))
+                .projects(List.of(
+                        CvOnlineExtraDataDTO.ProjectItem.builder()
+                                .name("CV Online Platform")
+                                .role("Technical Lead")
+                                .organization("TopViec")
+                                .startDate("02/2025")
+                                .endDate("05/2026")
+                                .projectUrl("https://topviec.example.com")
+                                .description("Thiết kế và triển khai hệ thống CV online từ editor đến PDF export.")
+                                .build()))
+                .hobbies(List.of(
+                        CvOnlineExtraDataDTO.HobbyItem.builder()
+                                .name("Writing Technical Blogs")
+                                .description("Chia sẻ kinh nghiệm xây dựng hệ thống web và tối ưu frontend.")
+                                .build()))
+                .awards(List.of(
+                        CvOnlineExtraDataDTO.AwardItem.builder()
+                                .title("Top Performer")
+                                .issuer("TopViec Engineering")
+                                .awardedAt("2025")
+                                .description("Được ghi nhận vì dẫn dắt thành công dự án CV online.")
+                                .build()))
+                .customSections(List.of(
+                        CvOnlineExtraDataDTO.CustomSectionItem.builder()
+                                .sectionTitle("Community")
+                                .itemTitle("Frontend Mentor")
+                                .itemSubtitle("Internal Guild")
+                                .itemMeta("2024 - 2026")
+                                .description("Hướng dẫn thành viên mới về Vue 3, TypeScript và code review.")
+                                .build()))
                 .build();
     }
 }

@@ -63,6 +63,28 @@ public final class CvOnlineTemplateContract {
                 "name",
                 "level",
                 "certificate"));
+        sections.put("projects", Set.of(
+                "name",
+                "role",
+                "organization",
+                "startDate",
+                "endDate",
+                "projectUrl",
+                "description"));
+        sections.put("hobbies", Set.of(
+                "name",
+                "description"));
+        sections.put("awards", Set.of(
+                "title",
+                "issuer",
+                "awardedAt",
+                "description"));
+        sections.put("customSections", Set.of(
+                "sectionTitle",
+                "itemTitle",
+                "itemSubtitle",
+                "itemMeta",
+                "description"));
         SECTION_ITEM_PLACEHOLDERS = Collections.unmodifiableMap(sections);
     }
 

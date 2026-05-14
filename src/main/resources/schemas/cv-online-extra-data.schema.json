@@ -95,6 +95,60 @@
           "certificate": { "type": "string", "maxLength": 255 }
         }
       }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "maxLength": 255 },
+          "role": { "type": "string", "maxLength": 255 },
+          "organization": { "type": "string", "maxLength": 255 },
+          "startDate": { "type": "string", "maxLength": 50 },
+          "endDate": { "type": "string", "maxLength": 50 },
+          "projectUrl": { "type": "string", "maxLength": 255 },
+          "description": { "type": "string", "maxLength": 4000 }
+        }
+      }
+    },
+    "hobbies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "maxLength": 255 },
+          "description": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
+    "awards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "maxLength": 255 },
+          "issuer": { "type": "string", "maxLength": 255 },
+          "awardedAt": { "type": "string", "maxLength": 50 },
+          "description": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    },
+    "customSections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sectionTitle": { "type": "string", "maxLength": 255 },
+          "itemTitle": { "type": "string", "maxLength": 255 },
+          "itemSubtitle": { "type": "string", "maxLength": 255 },
+          "itemMeta": { "type": "string", "maxLength": 255 },
+          "description": { "type": "string", "maxLength": 4000 }
+        }
+      }
     }
   }
 }
