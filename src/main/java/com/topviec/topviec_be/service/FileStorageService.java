@@ -8,6 +8,8 @@ public interface FileStorageService {
 
     String uploadFile(MultipartFile file, Long ownerId, FileUploadType type);
 
+    String uploadBytes(byte[] content, String originalFilename, Long ownerId, FileUploadType type);
+
     void deleteFile(String fileUrl, FileUploadType type);
 
     Resource loadFile(String fileUrl);

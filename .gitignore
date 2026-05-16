@@ -37,6 +37,8 @@ out/
 .vscode/
 
 .env
+.env.docker
 .env.production
 !.env.example
 uploads/
+docs/

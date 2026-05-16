@@ -1,7 +1,9 @@
 package com.topviec.topviec_be.repository;
 
 import com.topviec.topviec_be.entity.Cvs;
+import com.topviec.topviec_be.enums.cvs.CvType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,4 +43,19 @@ public interface CvsRepository extends JpaRepository<Cvs, Long> {
 
     @Query("SELECT COUNT(c) FROM Cvs c WHERE c.fileUrl = :fileUrl AND c.deletedAt IS NULL")
     long countActiveByFileUrl(@Param("fileUrl") String fileUrl);
+
+    @Query("SELECT COUNT(c) FROM Cvs c WHERE c.pdfUrl = :pdfUrl AND c.deletedAt IS NULL")
+    long countActiveByPdfUrl(@Param("pdfUrl") String pdfUrl);
+
+    @Modifying
+    @Query("""
+            UPDATE Cvs c
+            SET c.pdfDirty = true
+            WHERE c.templateId = :templateId
+            AND c.cvType = :cvType
+            AND c.deletedAt IS NULL
+            """)
+    int markPdfDirtyByTemplateId(
+            @Param("templateId") Long templateId,
+            @Param("cvType") CvType cvType);
 }

@@ -67,6 +67,7 @@ public class ResTalentPoolCandidateDetailDTO {
         private CvType cvType;
         private String fileUrl;
         private String pdfUrl;
+        private Boolean pdfDirty;
         private CvVisibility visibility;
         private Integer viewCount;
         private LocalDateTime createdAt;
