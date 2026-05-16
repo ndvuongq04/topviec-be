@@ -25,6 +25,10 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
     boolean existsByCreatedBy(Long userId);
 
+    long countByStatusAndDeletedAtIsNull(String status);
+
+    long countByVerificationStatusAndDeletedAtIsNull(String verificationStatus);
+
     // ── Admin — getAllCompanies ─────────────────────
     @Query("""
             SELECT c FROM Company c

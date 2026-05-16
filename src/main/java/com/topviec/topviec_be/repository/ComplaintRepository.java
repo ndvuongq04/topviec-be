@@ -186,4 +186,35 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             @Param("now") LocalDateTime now,
             @Param("deadlineA") LocalDateTime deadlineA,
             @Param("deadlineB") LocalDateTime deadlineB);
+
+    @Query("""
+            SELECT COUNT(c) FROM Complaint c
+            WHERE c.status IN :statuses
+            AND c.deletedAt IS NULL
+            """)
+    long countByStatusIn(@Param("statuses") List<String> statuses);
+
+    @Query("""
+            SELECT c.status, COUNT(c)
+            FROM Complaint c
+            WHERE c.deletedAt IS NULL
+            GROUP BY c.status
+            """)
+    List<Object[]> countGroupByStatus();
+
+    @Query("""
+            SELECT c, j.title, co.name FROM Complaint c
+            JOIN JobPosting j ON c.jobPostId = j.id
+            JOIN Company co ON j.companyId = co.id
+            WHERE c.status IN ('pending', 'processing')
+            AND c.deletedAt IS NULL
+            ORDER BY
+                CASE c.priority
+                    WHEN 'urgent' THEN 1
+                    WHEN 'important' THEN 2
+                    ELSE 3
+                END,
+                c.createdAt ASC
+            """)
+    List<Object[]> findUrgentComplaints(Pageable pageable);
 }

@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -34,4 +36,39 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     /** Tổng giá trị đơn hàng theo trạng thái */
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = :status")
     BigDecimal sumTotalAmountByStatus(@Param("status") OrderStatus status);
+
+    @Query("""
+            SELECT COALESCE(SUM(o.totalAmount), 0)
+            FROM Order o
+            WHERE o.status = :status
+            AND o.paidAt >= :startDate
+            AND o.paidAt < :endDate
+            """)
+    BigDecimal sumPaidRevenueInDateRange(
+            @Param("status") OrderStatus status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT FUNCTION('DATE_FORMAT', o.paidAt, '%Y-%m'), SUM(o.totalAmount)
+            FROM Order o
+            WHERE o.status = :status
+            AND o.paidAt >= :startDate
+            AND o.paidAt < :endDate
+            GROUP BY FUNCTION('DATE_FORMAT', o.paidAt, '%Y-%m')
+            ORDER BY FUNCTION('DATE_FORMAT', o.paidAt, '%Y-%m')
+            """)
+    List<Object[]> sumRevenueGroupByMonth(
+            @Param("status") OrderStatus status,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.status IN :statuses
+            ORDER BY o.createdAt DESC
+            """)
+    List<Order> findActionableOrders(
+            @Param("statuses") List<OrderStatus> statuses,
+            Pageable pageable);
 }

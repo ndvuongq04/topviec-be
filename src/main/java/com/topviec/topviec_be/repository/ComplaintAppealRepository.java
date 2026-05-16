@@ -17,4 +17,6 @@ public interface ComplaintAppealRepository extends JpaRepository<ComplaintAppeal
     Optional<ComplaintAppeal> findByComplaintIdAndEmployerId(Long complaintId, Long employerId);
 
     boolean existsByComplaintIdAndEmployerIdAndStatusIn(Long complaintId, Long employerId, List<String> statuses);
+
+    long countByStatus(String status);
 }

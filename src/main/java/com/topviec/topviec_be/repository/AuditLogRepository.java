@@ -123,4 +123,13 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     long countByUserIdsAndCategories(
             @Param("userIds") List<Long> userIds,
             @Param("categories") List<String> categories);
+
+    @Query("""
+            SELECT a FROM AuditLog a
+            WHERE a.userId IN :adminUserIds
+            ORDER BY a.createdAt DESC
+            """)
+    List<AuditLog> findRecentByAdminUserIds(
+            @Param("adminUserIds") List<Long> adminUserIds,
+            Pageable pageable);
 }
