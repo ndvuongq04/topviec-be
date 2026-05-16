@@ -13,4 +13,6 @@ public interface EmployerViolationScoreRepository extends JpaRepository<Employer
     Optional<EmployerViolationScore> findByEmployerId(Long employerId);
 
     List<EmployerViolationScore> findByTotalScoreGreaterThan(Integer totalScore);
+
+    long countByTotalScoreGreaterThanEqual(Integer totalScore);
 }
