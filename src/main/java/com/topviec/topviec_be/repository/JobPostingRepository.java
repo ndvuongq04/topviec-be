@@ -98,4 +98,21 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long>,
             ORDER BY j.createdAt ASC
             """)
     List<JobPosting> findOldestPendingJobs(Pageable pageable);
+
+    @Query("""
+            SELECT j FROM JobPosting j
+            WHERE j.companyId = :companyId
+            AND j.deletedAt IS NULL
+            ORDER BY j.createdAt DESC
+            """)
+    List<JobPosting> findRecentByCompany(@Param("companyId") Long companyId, Pageable pageable);
+
+    @Query("""
+            SELECT j.id FROM JobPosting j
+            WHERE j.companyId = :companyId
+            AND j.status IN ('published', 'interviewing')
+            AND j.deletedAt IS NULL
+            ORDER BY j.createdAt DESC
+            """)
+    List<Long> findActiveIdsByCompanyId(@Param("companyId") Long companyId);
 }

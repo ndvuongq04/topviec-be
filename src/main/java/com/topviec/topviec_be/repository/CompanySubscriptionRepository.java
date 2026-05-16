@@ -29,6 +29,8 @@ public interface CompanySubscriptionRepository extends JpaRepository<CompanySubs
 
         Page<CompanySubscription> findByCompanyIdOrderByCreatedAtDesc(Long companyId, Pageable pageable);
 
+        long countByCompanyIdAndStatus(Long companyId, SubscriptionStatus status);
+
         /**
          * Tìm subscription ACTIVE sắp hết hạn + chưa gửi nhắc nhở — dùng cho scheduler
          */

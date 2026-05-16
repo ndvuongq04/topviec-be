@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -113,4 +114,36 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
                         AND jp.deletedAt IS NULL
                         """)
         long countOverdueSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt >= :from
+                        AND i.scheduledAt < :to
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countUpcomingByCompany(
+                        @Param("companyId") Long companyId,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt >= :from
+                        AND i.scheduledAt < :to
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        """)
+        long countUpcomingByJobPostIds(
+                        @Param("jobPostIds") List<Long> jobPostIds,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
 }

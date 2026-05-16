@@ -202,4 +202,123 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
                         AND j.deletedAt IS NULL
                         """)
         long countByCompanyId(@Param("companyId") Long companyId);
-}
+
+        @Query("""
+                        SELECT COUNT(a) FROM Application a
+                        JOIN a.jobPosting j
+                        WHERE j.companyId = :companyId
+                        AND a.status IN :statuses
+                        AND a.createdAt >= :startDate
+                        AND a.createdAt < :endDate
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        """)
+        long countByCompanyAndStatusesAndDateRange(
+                        @Param("companyId") Long companyId,
+                        @Param("statuses") List<String> statuses,
+                        @Param("startDate") LocalDateTime startDate,
+                        @Param("endDate") LocalDateTime endDate);
+
+        @Query("""
+                        SELECT COUNT(a) FROM Application a
+                        JOIN a.jobPosting j
+                        WHERE j.companyId = :companyId
+                        AND a.status IN :statuses
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        """)
+        long countByCompanyAndStatuses(
+                        @Param("companyId") Long companyId,
+                        @Param("statuses") List<String> statuses);
+
+        @Query("""
+                        SELECT a.status, COUNT(a)
+                        FROM Application a
+                        JOIN a.jobPosting j
+                        WHERE j.companyId = :companyId
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        GROUP BY a.status
+                        """)
+        List<Object[]> countByCompanyGroupByStatus(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT a FROM Application a
+                        JOIN FETCH a.jobPosting j
+                        LEFT JOIN FETCH a.candidate
+                        WHERE j.companyId = :companyId
+                        AND a.status IN :statuses
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        ORDER BY a.createdAt ASC
+                        """)
+        List<Application> findPendingByCompany(
+                        @Param("companyId") Long companyId,
+                        @Param("statuses") List<String> statuses,
+                        Pageable pageable);
+
+        @Query(value = """
+                        SELECT FLOOR(TIMESTAMPDIFF(DAY, :startDate, a.created_at) / 7) AS week_index, COUNT(*)
+                        FROM applications a
+                        JOIN job_postings j ON a.job_post_id = j.id
+                        WHERE j.company_id = :companyId
+                        AND a.created_at >= :startDate
+                        AND a.created_at < :endDate
+                        AND a.deleted_at IS NULL
+                        AND j.deleted_at IS NULL
+                        GROUP BY week_index
+                        ORDER BY week_index
+                        """, nativeQuery = true)
+        List<Object[]> countWeeklyByCompany(
+                        @Param("companyId") Long companyId,
+                        @Param("startDate") LocalDateTime startDate,
+                        @Param("endDate") LocalDateTime endDate);
+
+        @Query("""
+                        SELECT COUNT(a) FROM Application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND a.status IN :statuses
+                        AND a.deletedAt IS NULL
+                        """)
+        long countByJobPostIdsAndStatuses(
+                        @Param("jobPostIds") List<Long> jobPostIds,
+                        @Param("statuses") List<String> statuses);
+
+        @Query("""
+                        SELECT a.jobPostId, COUNT(a)
+                        FROM Application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND a.deletedAt IS NULL
+                        GROUP BY a.jobPostId
+                        """)
+        List<Object[]> countByJobPostIdsGroupByJob(@Param("jobPostIds") List<Long> jobPostIds);
+
+        @Query("""
+                        SELECT a FROM Application a
+                        JOIN FETCH a.jobPosting j
+                        LEFT JOIN FETCH a.candidate
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND a.status IN :statuses
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        ORDER BY a.createdAt ASC
+                        """)
+        List<Application> findPendingByJobPostIds(
+                        @Param("jobPostIds") List<Long> jobPostIds,
+                        @Param("statuses") List<String> statuses,
+                        Pageable pageable);
+
+        @Query("""
+                        SELECT COUNT(a) FROM Application a
+                        JOIN a.jobPosting j
+                        WHERE j.companyId = :companyId
+                        AND a.createdAt >= :startDate
+                        AND a.createdAt < :endDate
+                        AND a.deletedAt IS NULL
+                        AND j.deletedAt IS NULL
+                        """)
+        long countByCompanyAndDateRange(
+                        @Param("companyId") Long companyId,
+                        @Param("startDate") LocalDateTime startDate,
+                        @Param("endDate") LocalDateTime endDate);
+}

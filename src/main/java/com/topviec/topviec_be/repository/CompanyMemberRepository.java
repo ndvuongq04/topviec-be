@@ -52,6 +52,7 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Lo
 
     @Query("""
             SELECT cm FROM CompanyMember cm
+            JOIN FETCH cm.roleDefault
             WHERE cm.companyId = :companyId AND cm.userId = :userId AND cm.deletedAt IS NULL
             """)
     Optional<CompanyMember> findByCompanyIdAndUserId(

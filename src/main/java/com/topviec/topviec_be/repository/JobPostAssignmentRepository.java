@@ -86,4 +86,18 @@ public interface JobPostAssignmentRepository extends JpaRepository<JobPostAssign
             AND jp.deletedAt IS NULL
             """)
     List<Long> findAssignedJobPostIdsByCompanyId(@Param("companyId") Long companyId);
+
+    @Query("""
+            SELECT a.jobPostId FROM JobPostAssignment a
+            JOIN JobPosting jp ON a.jobPostId = jp.id
+            WHERE a.userId = :userId
+            AND jp.companyId = :companyId
+            AND a.revokedAt IS NULL
+            AND jp.status IN ('published', 'interviewing')
+            AND jp.deletedAt IS NULL
+            ORDER BY jp.createdAt DESC
+            """)
+    List<Long> findActiveAssignedJobPostIds(
+            @Param("userId") Long userId,
+            @Param("companyId") Long companyId);
 }
