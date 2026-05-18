@@ -12,6 +12,7 @@ import com.topviec.topviec_be.repository.ServicePackageDetailRepository;
 import com.topviec.topviec_be.repository.ServicePackageRepository;
 import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.service.ServicePackageService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -41,7 +42,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
         Page<ServicePackage> page = servicePackageRepository.searchAll(keyword, pageable);
 
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
-        meta.setPage(pageable.getPageNumber() + 1);
+        meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
         meta.setPages(page.getTotalPages());
         meta.setTotals(page.getTotalElements());
@@ -100,6 +101,9 @@ public class ServicePackageServiceImpl implements ServicePackageService {
             throw AppException.badRequest("Mã gói dịch vụ đã tồn tại, vui lòng chọn mã khác.");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(servicePackage);
+
         servicePackage.setName(reqDTO.getName());
         servicePackage.setCode(reqDTO.getCode());
         servicePackage.setBillingCycle(reqDTO.getBillingCycle());
@@ -125,6 +129,9 @@ public class ServicePackageServiceImpl implements ServicePackageService {
                 saveDetails(saved, reqDTO.getDetails());
             }
         }
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
 
         return mapToDTO(servicePackageRepository.findById(saved.getId()).orElse(saved));
     }

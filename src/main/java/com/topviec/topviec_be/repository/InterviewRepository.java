@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,4 +68,82 @@ public interface InterviewRepository extends JpaRepository<Interview, Long> {
                         ORDER BY i.createdAt ASC
                         """)
         List<Interview> findPendingCandidatesByRoundId(@Param("roundId") Long roundId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.isDefault = true
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countPendingNewSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.isDefault = false
+                        AND i.confirmedByCandidate = false
+                        AND i.status = 'scheduled'
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countUnconfirmedSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt < CURRENT_TIMESTAMP
+                        AND i.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countOverdueSchedulesByCompanyId(@Param("companyId") Long companyId);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        JOIN a.jobPosting jp
+                        WHERE jp.companyId = :companyId
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt >= :from
+                        AND i.scheduledAt < :to
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        AND jp.deletedAt IS NULL
+                        """)
+        long countUpcomingByCompany(
+                        @Param("companyId") Long companyId,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
+
+        @Query("""
+                        SELECT COUNT(i) FROM Interview i
+                        JOIN i.application a
+                        WHERE a.jobPostId IN :jobPostIds
+                        AND i.status = 'scheduled'
+                        AND i.scheduledAt >= :from
+                        AND i.scheduledAt < :to
+                        AND i.deletedAt IS NULL
+                        AND a.deletedAt IS NULL
+                        """)
+        long countUpcomingByJobPostIds(
+                        @Param("jobPostIds") List<Long> jobPostIds,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
 }

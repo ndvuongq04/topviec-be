@@ -1,7 +1,11 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.*;
 import com.topviec.topviec_be.dto.response.*;
+import com.topviec.topviec_be.dto.response.ResEmployerInterviewStatisticsDTO;
 import com.topviec.topviec_be.service.CompanyService;
 import com.topviec.topviec_be.service.InterviewService;
 import com.topviec.topviec_be.util.SecurityUtil;
@@ -30,6 +34,8 @@ public class EmployerInterviewController {
     // ── Vòng phỏng vấn ────────────────────────────────────────────────────────
 
     @PostMapping("/job-postings/{jobPostId}/interview-rounds")
+    @LogAction(LogActionType.CREATE_INTERVIEW_ROUND)
+    @PreAuthorize("@employerPerm.canInviteInterviewForJob(authentication, #jobPostId)")
     public ResponseEntity<ResInterviewRoundDTO> createRound(
             @PathVariable Long jobPostId,
             @Valid @RequestBody ReqCreateInterviewRoundDTO request) {
@@ -43,6 +49,7 @@ public class EmployerInterviewController {
     }
 
     @GetMapping("/job-postings/{jobPostId}/interview-rounds")
+    @PreAuthorize("@employerPerm.canViewApplications(authentication, #jobPostId)")
     public ResponseEntity<List<ResInterviewRoundDTO>> getRounds(
             @PathVariable Long jobPostId) {
 
@@ -53,6 +60,8 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/interview-rounds/{roundId}")
+    @LogAction(LogActionType.UPDATE_INTERVIEW_ROUND)
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<ResInterviewRoundDTO> updateRound(
             @PathVariable Long roundId,
             @Valid @RequestBody ReqUpdateInterviewRoundDTO request) {
@@ -64,6 +73,8 @@ public class EmployerInterviewController {
     }
 
     @DeleteMapping("/interview-rounds/{roundId}")
+    @LogAction(LogActionType.DELETE_INTERVIEW_ROUND)
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<Void> deleteRound(@PathVariable Long roundId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -75,6 +86,8 @@ public class EmployerInterviewController {
     // ── Lịch phỏng vấn ───────────────────────────────────────────────────────
 
     @PostMapping("/interview-rounds/{roundId}/schedules")
+    @LogAction(LogActionType.CREATE_INTERVIEW_SCHEDULE)
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<ResInterviewScheduleDTO> createSchedule(
             @PathVariable Long roundId,
             @Valid @RequestBody ReqCreateInterviewScheduleDTO request) {
@@ -88,6 +101,7 @@ public class EmployerInterviewController {
     }
 
     @GetMapping("/interview-rounds/{roundId}/schedule-slots")
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<List<ResInterviewSlotDTO>> getSlots(
             @PathVariable Long roundId) {
 
@@ -98,6 +112,7 @@ public class EmployerInterviewController {
     }
 
     @PostMapping("/interview-rounds/{roundId}/schedule-slots")
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<Void> createSlots(
             @PathVariable Long roundId,
             @Valid @RequestBody ReqCreateInterviewSlotsDTO request) {
@@ -110,6 +125,7 @@ public class EmployerInterviewController {
     }
 
     @GetMapping("/job-postings/{jobPostId}/interview-schedules")
+    @PreAuthorize("@employerPerm.canViewApplications(authentication, #jobPostId)")
     public ResponseEntity<List<ResInterviewScheduleDTO>> getSchedules(
             @PathVariable Long jobPostId,
             @RequestParam(required = false) Long roundId,
@@ -123,6 +139,8 @@ public class EmployerInterviewController {
     }
 
     @PutMapping("/interview-schedules/{scheduleId}")
+    @LogAction(LogActionType.UPDATE_INTERVIEW_SCHEDULE)
+    @PreAuthorize("@employerPerm.canInviteInterviewForSchedule(authentication, #scheduleId)")
     public ResponseEntity<ResInterviewScheduleDTO> updateSchedule(
             @PathVariable Long scheduleId,
             @Valid @RequestBody ReqUpdateInterviewScheduleDTO request) {
@@ -134,6 +152,8 @@ public class EmployerInterviewController {
     }
 
     @DeleteMapping("/interview-schedules/{scheduleId}")
+    @LogAction(LogActionType.DELETE_INTERVIEW_SCHEDULE)
+    @PreAuthorize("@employerPerm.canInviteInterviewForSchedule(authentication, #scheduleId)")
     public ResponseEntity<Void> deleteSchedule(@PathVariable Long scheduleId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -143,6 +163,7 @@ public class EmployerInterviewController {
     }
 
     @PostMapping("/interview-schedules/{scheduleId}/remind")
+    @PreAuthorize("@employerPerm.canInviteInterviewForSchedule(authentication, #scheduleId)")
     public ResponseEntity<Void> remindConfirmSchedule(@PathVariable Long scheduleId) {
         Long userId = SecurityUtil.getCurrentUserId();
         Long companyId = companyService.getCompanyIdByUserId(userId);
@@ -154,6 +175,8 @@ public class EmployerInterviewController {
     // ── Kết quả phỏng vấn ────────────────────────────────────────────────────
 
     @PostMapping("/interview-schedules/{scheduleId}/results")
+    @LogAction(LogActionType.CREATE_INTERVIEW_RESULT)
+    @PreAuthorize("@employerPerm.canRecordInterviewForSchedule(authentication, #scheduleId)")
     public ResponseEntity<ResInterviewResultDTO> createResult(
             @PathVariable Long scheduleId,
             @Valid @RequestBody ReqInterviewResultDTO request) {
@@ -167,6 +190,7 @@ public class EmployerInterviewController {
     }
 
     @GetMapping("/interview-schedules/{scheduleId}/results")
+    @PreAuthorize("@employerPerm.canInviteInterviewForSchedule(authentication, #scheduleId)")
     public ResponseEntity<ResInterviewResultDTO> getResult(
             @PathVariable Long scheduleId) {
 
@@ -179,6 +203,7 @@ public class EmployerInterviewController {
     // ── Lịch sử PV ──────────────────────────────────────────────────────────
 
     @GetMapping("/applications/{applicationId}/interview-history")
+    @PreAuthorize("@employerPerm.canViewApplication(authentication, #applicationId)")
     public ResponseEntity<ResInterviewHistoryDTO> getInterviewHistory(
             @PathVariable Long applicationId) {
 
@@ -191,6 +216,7 @@ public class EmployerInterviewController {
     // ── Lọc UV theo trạng thái lịch ─────────────────────────────────────────
 
     @GetMapping("/interview-rounds/{roundId}/pending-candidates")
+    @PreAuthorize("@employerPerm.canInviteInterviewForRound(authentication, #roundId)")
     public ResponseEntity<List<ResInterviewScheduleDTO>> getPendingCandidates(
             @PathVariable Long roundId) {
 
@@ -203,6 +229,7 @@ public class EmployerInterviewController {
     // ── Overdue ──────────────────────────────────────────────────────────────
 
     @GetMapping("/job-postings/{jobPostId}/overdue-applications")
+    @PreAuthorize("@employerPerm.canViewApplications(authentication, #jobPostId)")
     public ResponseEntity<List<ResOverdueApplicationDTO>> getOverdueApplications(
             @PathVariable Long jobPostId) {
 
@@ -213,6 +240,7 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/applications/{applicationId}/extend-deadline")
+    @PreAuthorize("@employerPerm.canRecordInterviewForApplication(authentication, #applicationId)")
     public ResponseEntity<Void> extendDeadline(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqExtendDeadlineDTO request) {
@@ -225,6 +253,7 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/applications/{applicationId}/force-schedule")
+    @PreAuthorize("@employerPerm.canRecordInterviewForApplication(authentication, #applicationId)")
     public ResponseEntity<ResInterviewScheduleDTO> forceSchedule(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqForceScheduleDTO request) {
@@ -238,6 +267,8 @@ public class EmployerInterviewController {
     // ── Offer ────────────────────────────────────────────────────────────────
 
     @PatchMapping("/applications/{applicationId}/offer")
+    @LogAction(LogActionType.SEND_OFFER)
+    @PreAuthorize("@employerPerm.canRecordInterviewForApplication(authentication, #applicationId)")
     public ResponseEntity<ResEmployerApplicationDTO> updateOffer(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqOfferResultDTO request) {
@@ -251,6 +282,7 @@ public class EmployerInterviewController {
     // ── Job interview phase ──────────────────────────────────────────────────
 
     @GetMapping("/job-postings/{jobPostId}/interview-readiness")
+    @PreAuthorize("@employerPerm.canViewApplications(authentication, #jobPostId)")
     public ResponseEntity<ResInterviewReadinessDTO> checkReadiness(
             @PathVariable Long jobPostId) {
 
@@ -261,6 +293,8 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/job-postings/{jobPostId}/start-interviewing")
+    @LogAction(LogActionType.START_INTERVIEW_PHASE)
+    @PreAuthorize("@employerPerm.canRecordInterviewForJob(authentication, #jobPostId)")
     public ResponseEntity<Void> startInterviewing(
             @PathVariable Long jobPostId) {
 
@@ -272,6 +306,8 @@ public class EmployerInterviewController {
     }
 
     @PatchMapping("/job-postings/{jobPostId}/complete")
+    @LogAction(LogActionType.COMPLETE_RECRUITMENT)
+    @PreAuthorize("@employerPerm.canRecordInterviewForJob(authentication, #jobPostId)")
     public ResponseEntity<Void> completeRecruitment(
             @PathVariable Long jobPostId,
             @Valid @RequestBody ReqCompleteRecruitmentDTO request) {
@@ -281,5 +317,14 @@ public class EmployerInterviewController {
 
         interviewService.completeRecruitment(jobPostId, userId, companyId, request);
         return ResponseEntity.ok().build();
+    }
+
+    // ── Thống kê phỏng vấn ───────────────────────────────────────────────────
+
+    @GetMapping("/interview-statistics")
+    public ResponseEntity<ResEmployerInterviewStatisticsDTO> getInterviewStatistics() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long companyId = companyService.getCompanyIdByUserId(userId);
+        return ResponseEntity.ok(interviewService.getEmployerInterviewStatistics(companyId));
     }
 }

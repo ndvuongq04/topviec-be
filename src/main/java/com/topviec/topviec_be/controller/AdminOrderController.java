@@ -1,6 +1,10 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqUpdateOrderStatusDTO;
+import com.topviec.topviec_be.dto.response.ResAdminOrderStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResOrderDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.enums.adminUsers.AdminRoleConstants;
@@ -49,6 +53,7 @@ public class AdminOrderController {
     }
 
     @PatchMapping("/{id}/status")
+    @LogAction(LogActionType.ADMIN_UPDATE_ORDER_STATUS)
     @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
             + AdminRoleConstants.SUPER_ADMIN + "', '"
             + AdminRoleConstants.FINANCE_ADMIN + "')")
@@ -57,6 +62,24 @@ public class AdminOrderController {
             @PathVariable Long id,
             @Valid @RequestBody ReqUpdateOrderStatusDTO request) {
         return ResponseEntity.ok(orderService.updateOrderStatus(extractUserId(jwt), id, request));
+    }
+
+    @GetMapping("/statistics")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
+    public ResponseEntity<ResAdminOrderStatisticsDTO> getOrderStatistics() {
+        return ResponseEntity.ok(orderService.getOrderStatistics());
+    }
+
+    @GetMapping("/company/{companyId}")
+    @PreAuthorize("hasRole('ADMIN') and @adminSecurity.hasAnyRole(authentication, '"
+            + AdminRoleConstants.SUPER_ADMIN + "', '"
+            + AdminRoleConstants.FINANCE_ADMIN + "')")
+    public ResponseEntity<ResultPaginationDTO> getOrdersByCompany(
+            @PathVariable Long companyId,
+            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(orderService.getOrdersByCompanyId(companyId, pageable));
     }
 
     private Long extractUserId(Jwt jwt) {

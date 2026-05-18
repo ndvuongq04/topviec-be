@@ -32,6 +32,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+    // AOP (Logging Aspect) — Spring Boot 4.0 đổi tên từ starter-aop
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+
     // Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
@@ -66,9 +69,6 @@ dependencies {
     // Dev tools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    // Cloudinary 
-    implementation 'com.cloudinary:cloudinary-http44:1.38.0'
-
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
@@ -76,6 +76,8 @@ dependencies {
 
     // JSon
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    implementation 'org.jsoup:jsoup:1.18.1'
+    implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
 }
 
 tasks.named('test') {

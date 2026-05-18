@@ -4,9 +4,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum ApplyMethod {
-    NORMAL("normal"), // Nộp thông thường
-    QUICK("quick"), // Nộp nhanh
-    BULK("bulk"); // Nộp hàng loạt
+    NORMAL("normal"),
+    QUICK("quick"),
+    BULK("bulk"),
+    INVITED("invited"); // Được mời từ talent pool
 
     private final String value;
 

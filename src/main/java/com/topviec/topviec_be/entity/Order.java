@@ -54,8 +54,35 @@ public class Order {
     @Column(name = "payment_transaction_id", length = 255)
     private String paymentTransactionId;
 
+    @Column(name = "vnpay_transaction_no", length = 100)
+    private String vnpayTransactionNo;
+
+    @Column(name = "vnpay_response_code", length = 10)
+    private String vnpayResponseCode;
+
+    @Column(name = "vnpay_pay_date", length = 20)
+    private String vnpayPayDate;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    @Column(name = "refund_amount", precision = 15, scale = 2)
+    private BigDecimal refundAmount;
+
+    @Column(name = "refund_reason", columnDefinition = "TEXT")
+    private String refundReason;
+
+    @Column(name = "refund_requested_at")
+    private LocalDateTime refundRequestedAt;
+
+    @Column(name = "refund_approved_at")
+    private LocalDateTime refundApprovedAt;
+
+    @Column(name = "refund_vnpay_response_code", length = 10)
+    private String refundVnpayResponseCode;
+
+    @Column(name = "refund_vnpay_transaction_no", length = 100)
+    private String refundVnpayTransactionNo;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;

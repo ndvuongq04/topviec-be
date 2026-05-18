@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.topviec.topviec_be.dto.response.ReminderInfo;
@@ -30,7 +30,7 @@ public class TokenServiceImpl implements TokenService {
     @Value("${app.token.interview-reminder-prefix:interview:reminder:}")
     private String INTERVIEW_REMINDER_PREFIX;
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public String generateVerifyEmailToken(String email) {
@@ -149,6 +149,30 @@ public class TokenServiceImpl implements TokenService {
     public void invalidateInterviewUpdateToken(String token) {
         String key = "interview-update:" + token;
         redisTemplate.delete(key);
+    }
+
+    @Override
+    public String generateTalentPoolInviteToken(Long applicationId, Long jobPostId, Duration ttl) {
+        String token = UUID.randomUUID().toString();
+        String key = "talent-pool-invite:" + token;
+        String payload = applicationId + ":" + jobPostId;
+        redisTemplate.opsForValue().set(key, payload, ttl);
+        return token;
+    }
+
+    @Override
+    public String verifyTalentPoolInviteToken(String token) {
+        String key = "talent-pool-invite:" + token;
+        String payload = redisTemplate.opsForValue().get(key);
+        if (payload == null) {
+            throw AppException.badRequest("Link mời ứng tuyển đã hết hạn hoặc không hợp lệ");
+        }
+        return payload;
+    }
+
+    @Override
+    public void invalidateTalentPoolInviteToken(String token) {
+        redisTemplate.delete("talent-pool-invite:" + token);
     }
 
     @Override

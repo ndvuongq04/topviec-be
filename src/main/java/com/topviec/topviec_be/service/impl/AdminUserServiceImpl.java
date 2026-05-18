@@ -11,6 +11,8 @@ import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.repository.AdminUserRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.AdminUserService;
+import com.topviec.topviec_be.service.AdminUserService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -105,12 +107,20 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .filter(a -> a.getDeletedAt() == null)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy admin với id: " + adminUsersId));
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(admin);
+
         admin.setAdminRole(request.getAdminRole().getValue());
         admin.setFullName(request.getFullName());
         admin.setDepartment(request.getDepartment());
         admin.setUpdatedBy(updatedByUserId);
 
-        return toResponse(adminUserRepository.save(admin));
+        AdminUser saved = adminUserRepository.save(admin);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------
@@ -124,10 +134,18 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .filter(a -> a.getDeletedAt() == null)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy admin với id: " + adminUsersId));
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(admin);
+
         admin.setIsActive(!admin.getIsActive());
         admin.setUpdatedBy(updatedByUserId);
 
-        return toResponse(adminUserRepository.save(admin));
+        AdminUser saved = adminUserRepository.save(admin);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------

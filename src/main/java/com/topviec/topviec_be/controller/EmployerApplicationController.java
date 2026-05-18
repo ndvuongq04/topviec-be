@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqUpdateApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResEmployerApplicationDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -31,6 +34,7 @@ public class EmployerApplicationController {
      * Lấy danh sách hồ sơ ứng tuyển của 1 tin tuyển dụng.
      */
     @GetMapping("/job/{jobPostId}")
+    @PreAuthorize("@employerPerm.canViewApplications(authentication, #jobPostId)")
     public ResponseEntity<ResultPaginationDTO> getApplicationsByJobPost(
             @PathVariable Long jobPostId,
             @RequestParam(required = false) String status,
@@ -48,6 +52,7 @@ public class EmployerApplicationController {
      * Xem chi tiết 1 hồ sơ ứng tuyển. Tự động chuyển status PENDING -> SEEN.
      */
     @GetMapping("/{applicationId}")
+    @PreAuthorize("@employerPerm.canViewApplication(authentication, #applicationId)")
     public ResponseEntity<ResEmployerApplicationDTO> getApplicationDetail(
             @PathVariable Long applicationId) {
 
@@ -62,6 +67,8 @@ public class EmployerApplicationController {
      * NTD cập nhật trạng thái và/hoặc đánh giá (cho điểm, ghi chú, gán tag) CV ứng tuyển.
      */
     @PatchMapping("/{applicationId}")
+    @LogAction(LogActionType.UPDATE_APPLICATION)
+    @PreAuthorize("@employerPerm.canUpdateApplication(authentication, #applicationId)")
     public ResponseEntity<ResEmployerApplicationDTO> updateApplication(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqUpdateApplicationDTO request) {

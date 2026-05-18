@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -26,15 +27,19 @@ public class InterviewRound {
     @Column(name = "round_number", nullable = false)
     private Integer roundNumber;
 
+    @Trackable(label = "Tên vòng")
     @Column(name = "round_name", nullable = false)
     private String roundName;
 
+    @Trackable(label = "Mô tả")
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Trackable(label = "Thời lượng dự kiến (phút)")
     @Column(name = "expected_duration_minutes")
     private Integer expectedDuration;
 
+    @Trackable(label = "Vòng cuối cùng")
     @Column(name = "is_final", nullable = false)
     private Boolean isFinal;
 

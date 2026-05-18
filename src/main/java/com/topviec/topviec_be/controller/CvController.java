@@ -1,14 +1,26 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.dto.cvonline.CvOnlineExtraDataDTO;
+import com.topviec.topviec_be.dto.request.ReqChangeOnlineCvTemplateDTO;
+import com.topviec.topviec_be.dto.request.ReqCreateOnlineCvDTO;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqRenameCvDTO;
 import com.topviec.topviec_be.dto.request.ReqShareCvDTO;
+import com.topviec.topviec_be.dto.request.ReqUpdateOnlineCvDTO;
 import com.topviec.topviec_be.dto.request.ReqUploadCvDTO;
 import com.topviec.topviec_be.dto.request.ReqCreateShareTokenDTO;
 import com.topviec.topviec_be.dto.response.ResCvDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineEditorPayloadDTO;
+import com.topviec.topviec_be.dto.response.ResCvOnlineDetailDTO;
+import com.topviec.topviec_be.dto.response.ResCvPdfExportDTO;
 import com.topviec.topviec_be.dto.response.ResShareTokenDTO;
 import com.topviec.topviec_be.service.CvService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +44,7 @@ public class CvController {
      * Upload CV từ máy tính (PDF/DOCX)
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @LogAction(LogActionType.UPLOAD_CV)
     public ResponseEntity<ResCvDTO> uploadCv(
             @RequestPart("file") MultipartFile file,
             @RequestParam("title") String title,
@@ -44,6 +57,14 @@ public class CvController {
 
         ResCvDTO data = cvService.uploadCv(extractUserId(jwt), file, request);
 
+        return ResponseEntity.status(HttpStatus.CREATED).body(data);
+    }
+
+    @PostMapping("/online")
+    public ResponseEntity<ResCvOnlineDetailDTO> createOnlineCv(
+            @Valid @RequestBody ReqCreateOnlineCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        ResCvOnlineDetailDTO data = cvService.createOnlineCv(extractUserId(jwt), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(data);
     }
 
@@ -70,6 +91,133 @@ public class CvController {
         ResCvDTO data = cvService.getCvById(extractUserId(jwt), id);
 
         return ResponseEntity.ok(data);
+    }
+
+    @GetMapping("/online/prefill")
+    public ResponseEntity<CvOnlineExtraDataDTO> getOnlineCvPrefill(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvPrefill(extractUserId(jwt)));
+    }
+
+    /**
+     * GET /api/v1/cvs/online/editor/template/{templateId}
+     * Lấy payload editor cho CV online mới từ template.
+     * `extraData` hỗ trợ cả các section mở rộng như projects, hobbies, awards, customSections.
+     */
+    @GetMapping("/online/editor/template/{templateId}")
+    public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadByTemplate(
+            @PathVariable Long templateId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvEditorPayloadByTemplate(extractUserId(jwt), templateId));
+    }
+
+    /**
+     * GET /api/v1/cvs/online/editor/{id}
+     * Lấy payload editor cho CV online đã lưu.
+     * `extraData` hỗ trợ cả các section mở rộng như projects, hobbies, awards, customSections.
+     */
+    @GetMapping("/online/editor/{id}")
+    public ResponseEntity<ResCvOnlineEditorPayloadDTO> getOnlineCvEditorPayloadById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvEditorPayloadById(extractUserId(jwt), id));
+    }
+
+    @GetMapping("/online/{id}")
+    public ResponseEntity<ResCvOnlineDetailDTO> getOnlineCvById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.getOnlineCvById(extractUserId(jwt), id));
+    }
+
+    @PutMapping("/online/{id}")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCv(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqUpdateOnlineCvDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCv(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/template")
+    public ResponseEntity<ResCvOnlineDetailDTO> changeOnlineCvTemplate(
+            @PathVariable Long id,
+            @Valid @RequestBody ReqChangeOnlineCvTemplateDTO request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.changeOnlineCvTemplate(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/personal-info")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvPersonalInfo(
+            @PathVariable Long id,
+            @Valid @RequestBody CvOnlineExtraDataDTO.PersonalInfo request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvPersonalInfo(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/experiences")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvExperiences(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.ExperienceItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvExperiences(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/educations")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvEducations(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.EducationItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvEducations(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/skills")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvSkills(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.SkillItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvSkills(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/certifications")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvCertifications(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.CertificationItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvCertifications(extractUserId(jwt), id, request));
+    }
+
+    @PatchMapping("/online/{id}/sections/languages")
+    public ResponseEntity<ResCvOnlineDetailDTO> updateOnlineCvLanguages(
+            @PathVariable Long id,
+            @Valid @RequestBody List<CvOnlineExtraDataDTO.LanguageItem> request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.updateOnlineCvLanguages(extractUserId(jwt), id, request));
+    }
+
+    /**
+     * POST /api/v1/cvs/{id}/export-pdf
+     * Render CV online sang PDF và cập nhật `pdf_url` mới nhất.
+     */
+    @PostMapping("/{id}/export-pdf")
+    public ResponseEntity<ResCvPdfExportDTO> exportOnlineCvPdf(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(cvService.exportOnlineCvPdf(extractUserId(jwt), id));
+    }
+
+    /**
+     * GET /api/v1/cvs/{id}/download-pdf
+     * Tải file PDF của CV online. Nếu chưa có PDF thì BE sẽ render trước khi trả file.
+     */
+    @GetMapping("/{id}/download-pdf")
+    public ResponseEntity<Resource> downloadOnlineCvPdf(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        Resource resource = cvService.downloadOnlineCvPdf(extractUserId(jwt), id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cv-online-" + id + ".pdf\"")
+                .body(resource);
     }
 
     /**
@@ -114,6 +262,7 @@ public class CvController {
      * Xóa CV (Soft delete)
      */
     @DeleteMapping("/{id}")
+    @LogAction(LogActionType.DELETE_CV)
     public ResponseEntity<Void> deleteCv(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -131,6 +280,7 @@ public class CvController {
      * update visibility
      */
     @PatchMapping("/{id}/share")
+    @LogAction(LogActionType.SHARE_CV)
     public ResponseEntity<ResCvDTO> shareCv(
             @PathVariable Long id,
             @Valid @RequestBody ReqShareCvDTO request,
@@ -157,6 +307,7 @@ public class CvController {
      * Xem CV công khai qua token
      */
     @GetMapping("/public/{shareToken}")
+    @LogAction(LogActionType.VIEW_PUBLIC_CV)
     public ResponseEntity<ResCvDTO> getPublicCv(@PathVariable String shareToken) {
         ResCvDTO data = cvService.getPublicCv(shareToken);
         return ResponseEntity.ok(data);

@@ -15,6 +15,8 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
 
     Optional<Company> findBySlug(String slug);
 
+    Optional<Company> findByUserId(Long userId);
+
     Optional<Company> findByCreatedBy(Long userId);
 
     boolean existsBySlug(String slug);
@@ -22,6 +24,10 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     boolean existsByTaxCode(String taxCode);
 
     boolean existsByCreatedBy(Long userId);
+
+    long countByStatusAndDeletedAtIsNull(String status);
+
+    long countByVerificationStatusAndDeletedAtIsNull(String verificationStatus);
 
     // ── Admin — getAllCompanies ─────────────────────
     @Query("""

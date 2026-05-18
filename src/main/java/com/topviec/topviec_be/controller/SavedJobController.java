@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.response.ResSavedJobDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
 import com.topviec.topviec_be.service.SavedJobService;
@@ -19,6 +22,7 @@ public class SavedJobController {
     private final SavedJobService savedJobService;
 
     @PostMapping("/{jobPostId}/toggle")
+    @LogAction(LogActionType.SAVE_JOB)
     public ResponseEntity<ResSavedJobDTO> toggle(
             @PathVariable Long jobPostId,
             @AuthenticationPrincipal Jwt jwt) {

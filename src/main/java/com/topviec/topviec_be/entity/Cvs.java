@@ -43,6 +43,13 @@ public class Cvs {
     @Column(name = "pdf_url")
     private String pdfUrl;
 
+    @Column(name = "pdf_dirty", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean pdfDirty = false;
+
+    @Column(name = "cv_section_hash", length = 64)
+    private String cvSectionHash;
+
     @Column(name = "is_default", nullable = false)
     @Builder.Default
     private Boolean isDefault = false;

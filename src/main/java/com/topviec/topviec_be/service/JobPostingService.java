@@ -85,6 +85,9 @@ public interface JobPostingService {
         /** Employer gửi tin đang DRAFT/REJECTED lên chờ admin duyệt. */
         ResJobPostingDetail pendingApproval(Long id, Long companyId, Long updatedByUserId);
 
+        /** Admin khôi phục tin đang HIDDEN về PUBLISHED. */
+        ResJobPostingDetail restore(Long id, Long adminId);
+
         // -------------------------------------------------------------------------
         // Employer — Soft Delete / Restore
         // -------------------------------------------------------------------------
@@ -97,4 +100,7 @@ public interface JobPostingService {
 
         /** Employer khôi phục tin đã xóa mềm về trạng thái DRAFT. */
         ResJobPostingDetail restore(Long id, Long companyId, Long restoredByUserId);
+
+        /** Lấy thống kê của một tin tuyển dụng (view, applications, edit count, remaining days). */
+        com.topviec.topviec_be.dto.response.ResJobPostingStatisticsDTO getJobPostingStatistics(Long id, Long companyId);
 }

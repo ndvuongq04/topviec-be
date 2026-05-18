@@ -1,5 +1,8 @@
 package com.topviec.topviec_be.controller;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqApplyJobDTO;
 import com.topviec.topviec_be.dto.request.ReqBulkApplyDTO;
 import com.topviec.topviec_be.dto.request.ReqWithdrawApplicationDTO;
@@ -33,8 +36,10 @@ public class PublicApplicationController {
     /**
      * POST /applications/{jobPostId}
      * CN-UV-010: Nộp đơn đầy đủ
+     * `cvId` hỗ trợ cả CV online lẫn CV tải lên.
      */
     @PostMapping("/{jobPostId}")
+    @LogAction(LogActionType.APPLY_JOB)
     public ResponseEntity<ResApplicationDTO> apply(
             @PathVariable Long jobPostId,
             @RequestBody ReqApplyJobDTO request,
@@ -48,8 +53,10 @@ public class PublicApplicationController {
     /**
      * POST /applications/{jobPostId}/quick
      * CN-UV-011: Ứng tuyển nhanh (CV mặc định)
+     * CV mặc định có thể là CV online hoặc CV tải lên.
      */
     @PostMapping("/{jobPostId}/quick")
+    @LogAction(LogActionType.QUICK_APPLY_JOB)
     public ResponseEntity<ResApplicationDTO> quickApply(
             @PathVariable Long jobPostId,
             @AuthenticationPrincipal Jwt jwt) {
@@ -64,6 +71,7 @@ public class PublicApplicationController {
      * CN-UV-012: Ứng tuyển hàng loạt (tối đa 10 tin)
      */
     @PostMapping("/bulk")
+    @LogAction(LogActionType.BULK_APPLY_JOB)
     public ResponseEntity<List<ResApplicationDTO>> bulkApply(
             @RequestBody ReqBulkApplyDTO request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -105,6 +113,7 @@ public class PublicApplicationController {
      * CN-UV-015: Rút đơn ứng tuyển
      */
     @PatchMapping("/{applicationId}/withdraw")
+    @LogAction(LogActionType.WITHDRAW_APPLICATION)
     public ResponseEntity<ResApplicationDTO> withdraw(
             @PathVariable Long applicationId,
             @RequestBody(required = false) ReqWithdrawApplicationDTO request,
@@ -120,14 +129,42 @@ public class PublicApplicationController {
     /**
      * PATCH /applications/{applicationId}/cv
      * Cập nhật CV cho đơn ứng tuyển (chỉ khi đang pending)
+     * `cvId` hỗ trợ cả CV online lẫn CV tải lên.
      */
     @PatchMapping("/{applicationId}/cv")
+    @LogAction(LogActionType.UPDATE_APPLICATION_CV)
     public ResponseEntity<ResApplicationDTO> updateApplicationCv(
             @PathVariable Long applicationId,
             @Valid @RequestBody ReqUpdateApplicationCvDTO request,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(
                 applicationService.updateApplicationCv(extractUserId(jwt), applicationId, request));
+    }
+
+    /**
+     * PATCH /applications/{applicationId}/accept-invite
+     * UV chấp nhận lời mời từ talent pool (INVITED → PENDING)
+     */
+    @PatchMapping("/{applicationId}/accept-invite")
+    @LogAction(LogActionType.ACCEPT_TALENT_POOL_INVITE)
+    public ResponseEntity<ResApplicationDTO> acceptInvite(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                applicationService.acceptInvite(extractUserId(jwt), applicationId));
+    }
+
+    /**
+     * PATCH /applications/{applicationId}/decline-invite
+     * UV từ chối lời mời từ talent pool (INVITED → WITHDRAWN)
+     */
+    @PatchMapping("/{applicationId}/decline-invite")
+    @LogAction(LogActionType.DECLINE_TALENT_POOL_INVITE)
+    public ResponseEntity<ResApplicationDTO> declineInvite(
+            @PathVariable Long applicationId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                applicationService.declineInvite(extractUserId(jwt), applicationId));
     }
 
     // -------------------------------------------------------------------------

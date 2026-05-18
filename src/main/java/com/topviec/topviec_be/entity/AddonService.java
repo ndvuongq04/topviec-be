@@ -1,5 +1,7 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,24 +30,30 @@ public class AddonService {
     @JoinColumn(name = "service_id", insertable = false, updatable = false)
     private Services service;
 
+    @Trackable(label = "Tên addon")
     @Column(name = "name", length = 255, nullable = false)
     private String name;
 
     @Column(name = "code", length = 100, unique = true, nullable = false)
     private String code;
 
+    @Trackable(label = "Số lượng")
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
+    @Trackable(label = "Thời hạn (ngày)")
     @Column(name = "duration_days")
     private Integer durationDays;
 
+    @Trackable(label = "Giá")
     @Column(name = "price", precision = 15, scale = 2)
     private BigDecimal price;
 
+    @Trackable(label = "Mô tả")
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Trackable(label = "Trạng thái kích hoạt")
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;

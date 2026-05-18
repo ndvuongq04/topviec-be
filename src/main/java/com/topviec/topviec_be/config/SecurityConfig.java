@@ -3,6 +3,7 @@ package com.topviec.topviec_be.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -34,6 +35,7 @@ public class SecurityConfig {
                         "/companies/**",
                         "/job-postings/**",
                         "/interview-schedules/confirm", // UV xác nhận slot PV (không cần auth)
+                        "/talent-pool-invite/**",       // UV xem thông tin lời mời từ email (không cần auth)
                         "/actuator/health",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
@@ -42,6 +44,8 @@ public class SecurityConfig {
                         "/skills/**",
                         "/locations/**",
                         "/levels/**",
+                        "/payment/vnpay/ipn",
+                        "/payment/vnpay/return",
         };
 
         @Bean
@@ -51,6 +55,7 @@ public class SecurityConfig {
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                                                 .requestMatchers(PUBLIC_URLS).permitAll()
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/employer/**").hasRole("EMPLOYER")

@@ -4,6 +4,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.topviec.topviec_be.annotation.LogAction;
+import com.topviec.topviec_be.enums.logging.LogActionType;
+
 import com.topviec.topviec_be.dto.request.ReqRejectJobPostDTO;
 import com.topviec.topviec_be.dto.response.ResJobPostingDetail;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
@@ -61,6 +64,7 @@ public class AdminJobPostingController {
      * Admin duyệt tin tuyển dụng.
      */
     @PatchMapping("/{id}/approve")
+    @LogAction(LogActionType.APPROVE_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> approve(@PathVariable Long id) {
         Long adminId = SecurityUtil.getCurrentUserId();
         return ResponseEntity.ok(jobPostingService.approve(id, adminId));
@@ -71,6 +75,7 @@ public class AdminJobPostingController {
      * Admin từ chối tin tuyển dụng.
      */
     @PatchMapping("/{id}/reject")
+    @LogAction(LogActionType.REJECT_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> reject(
             @PathVariable Long id,
             @Valid @RequestBody ReqRejectJobPostDTO request) {
@@ -83,11 +88,23 @@ public class AdminJobPostingController {
      * Admin gỡ tin tuyển dụng vi phạm.
      */
     @PatchMapping("/{id}/takedown")
+    @LogAction(LogActionType.TAKEDOWN_JOB_POSTING)
     public ResponseEntity<ResJobPostingDetail> takedown(
             @PathVariable Long id,
             @Valid @RequestBody ReqRejectJobPostDTO request) {
         Long adminId = SecurityUtil.getCurrentUserId();
         return ResponseEntity.ok(jobPostingService.takedown(id, adminId, request));
+    }
+
+    /**
+     * PATCH /admin/job-postings/{id}/restore
+     * Admin khôi phục tin đang bị ẩn (HIDDEN) do khiếu nại về PUBLISHED.
+     */
+    @PatchMapping("/{id}/restore")
+    @LogAction(LogActionType.ADMIN_RESTORE_JOB_POSTING)
+    public ResponseEntity<ResJobPostingDetail> restore(@PathVariable Long id) {
+        Long adminId = SecurityUtil.getCurrentUserId();
+        return ResponseEntity.ok(jobPostingService.restore(id, adminId));
     }
 
 }

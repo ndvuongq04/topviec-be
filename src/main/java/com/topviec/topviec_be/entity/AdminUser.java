@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.entity;
 
+import com.topviec.topviec_be.annotation.Trackable;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -22,16 +23,20 @@ public class AdminUser {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
+    @Trackable(label = "Vai trò admin")
     @Column(name = "admin_role", nullable = false, length = 30)
     @Builder.Default
     private String adminRole = "support_admin";
 
+    @Trackable(label = "Họ tên")
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Trackable(label = "Phòng ban")
     @Column(name = "department")
     private String department;
 
+    @Trackable(label = "Trạng thái kích hoạt")
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

@@ -6,12 +6,16 @@ import com.topviec.topviec_be.dto.request.ReqUpdateCandidateProfileVisibilityDTO
 import com.topviec.topviec_be.dto.response.ResCandidateProfileDTO;
 import com.topviec.topviec_be.entity.CandidateProfile;
 import com.topviec.topviec_be.enums.candidateProfile.PreferredWorkType;
+import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.service.CandidateProfileService;
+import com.topviec.topviec_be.service.FileStorageService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 
 @Service
@@ -19,32 +23,25 @@ import java.time.LocalDateTime;
 public class CandidateProfileServiceImpl implements CandidateProfileService {
 
     private final CandidateProfileRepository candidateProfileRepository;
-
-    // -------------------------------------------------------------------------
-    // Default profile
-    // -------------------------------------------------------------------------
+    private final FileStorageService fileStorageService;
 
     @Override
     @Transactional
     public void createDefaultProfile(Long userId, String email) {
         CandidateProfile profile = CandidateProfile.builder()
                 .userId(userId)
-                .fullName(email) // tạm dùng email, ứng viên cập nhật sau
+                .fullName(email)
                 .createdBy(userId)
                 .build();
 
         candidateProfileRepository.save(profile);
     }
 
-    // -------------------------------------------------------------------------
-    // Create
-    // -------------------------------------------------------------------------
-
     @Override
     @Transactional
     public ResCandidateProfileDTO createProfile(Long userId, ReqCreateCandidateProfileDTO request) {
         if (candidateProfileRepository.existsByUserId(userId)) {
-            throw AppException.conflict("Hồ sơ cá nhân đã tồn tại");
+            throw AppException.conflict("Ho so ca nhan da ton tai");
         }
 
         validateSalaryRange(request.getExpectedSalaryMin(), request.getExpectedSalaryMax(),
@@ -83,17 +80,12 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
 
         profile = candidateProfileRepository.save(profile);
 
-        // Tính % hoàn thiện sau khi lưu
         int pct = calculateCompletionPct(profile);
         candidateProfileRepository.updateProfileCompletionPct(userId, pct);
         profile.setProfileCompletionPct(pct);
 
         return toResponse(profile);
     }
-
-    // -------------------------------------------------------------------------
-    // Read
-    // -------------------------------------------------------------------------
 
     @Override
     @Transactional(readOnly = true)
@@ -102,38 +94,26 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         return toResponse(profile);
     }
 
-    // -------------------------------------------------------------------------
-    // Update
-    // -------------------------------------------------------------------------
-
     @Override
     @Transactional
     public ResCandidateProfileDTO updateProfile(Long userId, ReqUpdateCandidateProfileDTO request) {
         CandidateProfile profile = findByUserIdOrThrow(userId);
+        String oldAvatarUrl = profile.getAvatarUrl();
 
-        // Dùng giá trị từ request nếu có, fallback về giá trị hiện tại trong DB
-        // Double salaryMin = request.getExpectedSalaryMin() != null ?
-        // request.getExpectedSalaryMin()
-        // : profile.getExpectedSalaryMin();
-        // Double salaryMax = request.getExpectedSalaryMax() != null ?
-        // request.getExpectedSalaryMax()
-        // : profile.getExpectedSalaryMax();
-        // Boolean salaryNegotiable = request.getSalaryNegotiable() != null ?
-        // request.getSalaryNegotiable()
-        // : profile.getSalaryNegotiable();
-        // validateSalaryRange(salaryMin, salaryMax, salaryNegotiable);
-
-        Double salaryMin = request.getExpectedSalaryMin() != null ? request.getExpectedSalaryMin()
+        Double salaryMin = request.getExpectedSalaryMin() != null
+                ? request.getExpectedSalaryMin()
                 : profile.getExpectedSalaryMin();
-        Double salaryMax = request.getExpectedSalaryMax() != null ? request.getExpectedSalaryMax()
+        Double salaryMax = request.getExpectedSalaryMax() != null
+                ? request.getExpectedSalaryMax()
                 : profile.getExpectedSalaryMax();
-        Boolean salaryNegotiable = request.getSalaryNegotiable() != null ? request.getSalaryNegotiable()
+        Boolean salaryNegotiable = request.getSalaryNegotiable() != null
+                ? request.getSalaryNegotiable()
                 : profile.getSalaryNegotiable();
 
-        System.out.println("min=" + salaryMin + ", max=" + salaryMax + ", negotiable=" + salaryNegotiable);
         validateSalaryRange(salaryMin, salaryMax, salaryNegotiable);
 
-        // Chỉ update field nào có giá trị trong request (null = giữ nguyên)
+        ChangeTracker tracker = ChangeTracker.of(profile);
+
         if (request.getFullName() != null)
             profile.setFullName(request.getFullName());
         if (request.getAvatarUrl() != null)
@@ -178,13 +158,15 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
             profile.setHideExpectedSalary(request.getHideExpectedSalary());
 
         profile.setUpdatedBy(userId);
-
         profile = candidateProfileRepository.save(profile);
 
-        // Tính lại % hoàn thiện
+        tracker.compare(profile).apply();
+
         int pct = calculateCompletionPct(profile);
         candidateProfileRepository.updateProfileCompletionPct(userId, pct);
         profile.setProfileCompletionPct(pct);
+
+        deleteReplacedFile(oldAvatarUrl, profile.getAvatarUrl(), FileUploadType.AVATAR);
 
         return toResponse(profile);
     }
@@ -194,6 +176,8 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
     public ResCandidateProfileDTO updateVisibility(Long userId, ReqUpdateCandidateProfileVisibilityDTO request) {
         CandidateProfile profile = findByUserIdOrThrow(userId);
 
+        ChangeTracker tracker = ChangeTracker.of(profile);
+
         profile.setHidePhone(request.getHidePhone());
         profile.setHideEmail(request.getHideEmail());
         profile.setHideDateOfBirth(request.getHideDateOfBirth());
@@ -201,12 +185,10 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         profile.setUpdatedBy(userId);
 
         profile = candidateProfileRepository.save(profile);
+        tracker.compare(profile).apply();
+
         return toResponse(profile);
     }
-
-    // -------------------------------------------------------------------------
-    // Delete (soft)
-    // -------------------------------------------------------------------------
 
     @Override
     @Transactional
@@ -217,100 +199,94 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
         candidateProfileRepository.save(profile);
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
     private CandidateProfile findByUserIdOrThrow(Long userId) {
         return candidateProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> AppException.notFound("Hồ sơ cá nhân không tồn tại"));
+                .orElseThrow(() -> AppException.notFound("Ho so ca nhan khong ton tai"));
     }
 
-    /**
-     * Validate salary range theo rule nghiệp vụ:
-     * - salaryNegotiable = true → min/max không bắt buộc, bỏ trống được
-     * - salaryNegotiable = false → bắt buộc điền cả 2, và min phải <= max
-     */
+    private void deleteReplacedFile(String oldFileUrl, String newFileUrl, FileUploadType type) {
+        if (oldFileUrl == null || oldFileUrl.isBlank()) {
+            return;
+        }
+        if (oldFileUrl.equals(newFileUrl)) {
+            return;
+        }
+        fileStorageService.deleteFile(oldFileUrl, type);
+    }
+
     private void validateSalaryRange(Double min, Double max, Boolean salaryNegotiable) {
         boolean isNegotiable = Boolean.TRUE.equals(salaryNegotiable);
 
         if (!isNegotiable) {
             if (min == null || max == null) {
                 throw AppException.badRequest(
-                        "Vui lòng điền đầy đủ mức lương tối thiểu và tối đa, hoặc chọn 'Thỏa thuận'");
+                        "Vui long dien day du muc luong toi thieu va toi da, hoac chon 'Thoa thuan'");
             }
             if (min > max) {
-                throw AppException.badRequest("Mức lương tối thiểu không được lớn hơn mức lương tối đa");
+                throw AppException.badRequest("Muc luong toi thieu khong duoc lon hon muc luong toi da");
             }
         }
     }
 
-    /**
-     * Tính tỷ lệ hoàn thiện hồ sơ (0–100).
-     * Mỗi field được coi là 1 điểm, tổng cộng 10 điểm → quy đổi ra %.
-     */
-    private int calculateCompletionPct(CandidateProfile p) {
+    private int calculateCompletionPct(CandidateProfile profile) {
         int score = 0;
-        if (p.getFullName() != null && !p.getFullName().isBlank())
+        if (profile.getFullName() != null && !profile.getFullName().isBlank())
             score++;
-        if (p.getAvatarUrl() != null && !p.getAvatarUrl().isBlank())
+        if (profile.getAvatarUrl() != null && !profile.getAvatarUrl().isBlank())
             score++;
-        if (p.getDateOfBirth() != null)
+        if (profile.getDateOfBirth() != null)
             score++;
-        if (p.getGender() != null && !p.getGender().isBlank())
+        if (profile.getGender() != null && !profile.getGender().isBlank())
             score++;
-        if (p.getPhoneDisplay() != null && !p.getPhoneDisplay().isBlank())
+        if (profile.getPhoneDisplay() != null && !profile.getPhoneDisplay().isBlank())
             score++;
-        if (p.getBio() != null && !p.getBio().isBlank())
+        if (profile.getBio() != null && !profile.getBio().isBlank())
             score++;
-        if (p.getLinkedinUrl() != null && !p.getLinkedinUrl().isBlank())
+        if (profile.getLinkedinUrl() != null && !profile.getLinkedinUrl().isBlank())
             score++;
-        if (p.getExpectedSalaryMin() != null || Boolean.TRUE.equals(p.getSalaryNegotiable()))
+        if (profile.getExpectedSalaryMin() != null || Boolean.TRUE.equals(profile.getSalaryNegotiable()))
             score++;
-        if (p.getPreferredWorkType() != null && !p.getPreferredWorkType().isBlank())
+        if (profile.getPreferredWorkType() != null && !profile.getPreferredWorkType().isBlank())
             score++;
-        if (p.getPreferredLocationId() != null)
+        if (profile.getPreferredLocationId() != null)
             score++;
 
         return (score * 100) / 10;
     }
 
-    /**
-     * Map entity → response DTO (thủ công, không dùng MapStruct).
-     */
-    private ResCandidateProfileDTO toResponse(CandidateProfile p) {
-
+    private ResCandidateProfileDTO toResponse(CandidateProfile profile) {
         return ResCandidateProfileDTO.builder()
-                .id(p.getId())
-                .userId(p.getUserId())
-                .fullName(p.getFullName())
-                .avatarUrl(p.getAvatarUrl())
-                .dateOfBirth(p.getDateOfBirth())
-                .gender(p.getGender())
-                .phoneDisplay(p.getPhoneDisplay())
-                .bio(p.getBio())
-                .linkedinUrl(p.getLinkedinUrl())
-                .githubUrl(p.getGithubUrl())
-                .personalWebsite(p.getPersonalWebsite())
-                .expectedSalaryMin(p.getExpectedSalaryMin())
-                .expectedSalaryMax(p.getExpectedSalaryMax())
-                .salaryNegotiable(p.getSalaryNegotiable())
-                .jobSeekingStatus(p.getJobSeekingStatus() != null
+                .id(profile.getId())
+                .userId(profile.getUserId())
+                .fullName(profile.getFullName())
+                .avatarUrl(profile.getAvatarUrl())
+                .dateOfBirth(profile.getDateOfBirth())
+                .gender(profile.getGender())
+                .phoneDisplay(profile.getPhoneDisplay())
+                .bio(profile.getBio())
+                .linkedinUrl(profile.getLinkedinUrl())
+                .githubUrl(profile.getGithubUrl())
+                .personalWebsite(profile.getPersonalWebsite())
+                .expectedSalaryMin(profile.getExpectedSalaryMin())
+                .expectedSalaryMax(profile.getExpectedSalaryMax())
+                .salaryNegotiable(profile.getSalaryNegotiable())
+                .jobSeekingStatus(profile.getJobSeekingStatus() != null
                         ? com.topviec.topviec_be.enums.candidateProfile.JobSeekingStatus
-                                .fromValue(p.getJobSeekingStatus())
+                                .fromValue(profile.getJobSeekingStatus())
                         : null)
-                .preferredWorkType(
-                        p.getPreferredWorkType() != null ? PreferredWorkType.fromValue(p.getPreferredWorkType()) : null)
-                .preferredJobTitle(p.getPreferredJobTitle())
-                .preferredLocationId(p.getPreferredLocationId())
-                .profileCompletionPct(p.getProfileCompletionPct())
-                .isCvPublic(p.getCvPublic())
-                .hidePhone(p.getHidePhone())
-                .hideEmail(p.getHideEmail())
-                .hideDateOfBirth(p.getHideDateOfBirth())
-                .hideExpectedSalary(p.getHideExpectedSalary())
-                .createdAt(p.getCreatedAt())
-                .updatedAt(p.getUpdatedAt())
+                .preferredWorkType(profile.getPreferredWorkType() != null
+                        ? PreferredWorkType.fromValue(profile.getPreferredWorkType())
+                        : null)
+                .preferredJobTitle(profile.getPreferredJobTitle())
+                .preferredLocationId(profile.getPreferredLocationId())
+                .profileCompletionPct(profile.getProfileCompletionPct())
+                .isCvPublic(profile.getCvPublic())
+                .hidePhone(profile.getHidePhone())
+                .hideEmail(profile.getHideEmail())
+                .hideDateOfBirth(profile.getHideDateOfBirth())
+                .hideExpectedSalary(profile.getHideExpectedSalary())
+                .createdAt(profile.getCreatedAt())
+                .updatedAt(profile.getUpdatedAt())
                 .build();
     }
 }

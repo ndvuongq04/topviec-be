@@ -17,6 +17,7 @@ import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.User;
 import com.topviec.topviec_be.enums.application.ApplicationStatus;
 import com.topviec.topviec_be.enums.application.ApplyMethod;
+import com.topviec.topviec_be.enums.cvs.CvType;
 import com.topviec.topviec_be.enums.jobs.JobPostStatus;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.ApplicationRepository;
@@ -26,6 +27,8 @@ import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.CandidateProfileRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.ApplicationService;
+import com.topviec.topviec_be.service.CvService;
+import com.topviec.topviec_be.util.ChangeTracker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,6 +52,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     private final CvsRepository cvsRepository;
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
+    private final CvService cvService;
 
     // -------------------------------------------------------------------------
     // CN-UV-010: Nộp đơn đầy đủ
@@ -58,9 +62,10 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Transactional
     public ResApplicationDTO apply(Long candidateUserId, Long jobPostId, ReqApplyJobDTO request) {
         JobPosting job = findAcceptingJobOrThrow(jobPostId);
+        Cvs cv = findOwnedCvForApplication(candidateUserId, request.getCvId());
 
         Application application = getOrInitializeApplication(
-                candidateUserId, jobPostId, request.getCvId(),
+                candidateUserId, jobPostId, cv.getId(),
                 ApplyMethod.NORMAL.getValue(), job);
 
         return toResponse(applicationRepository.save(application), job,
@@ -99,9 +104,10 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (request.getJobPostIds() == null || request.getJobPostIds().isEmpty()) {
             throw AppException.badRequest("Danh sách tin tuyển dụng không được trống");
         }
-        
+        Cvs cv = findOwnedCvForApplication(candidateUserId, request.getCvId());
+
         List<Long> distinctJobIds = request.getJobPostIds().stream().distinct().toList();
-        
+
         if (distinctJobIds.size() > 10) {
             throw AppException.badRequest("Chỉ được ứng tuyển tối đa 10 tin cùng lúc");
         }
@@ -112,7 +118,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             JobPosting job = findAcceptingJobOrThrow(jobPostId);
 
             Application application = getOrInitializeApplication(
-                    candidateUserId, jobPostId, request.getCvId(),
+                    candidateUserId, jobPostId, cv.getId(),
                     ApplyMethod.BULK.getValue(), job);
 
             Company company = companyRepository.findById(job.getCompanyId()).orElse(null);
@@ -225,17 +231,20 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
 
         if (!ApplicationStatus.PENDING.getValue().equals(application.getStatus())) {
-            throw AppException.badRequest("Chỉ được phép thay đổi CV khi đơn ứng tuyển ở trạng thái chờ xử lý (PENDING)");
+            throw AppException
+                    .badRequest("Chỉ được phép thay đổi CV khi đơn ứng tuyển ở trạng thái chờ xử lý (PENDING)");
         }
 
-        Cvs cv = cvsRepository.findById(request.getCvId())
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
-        if (!cv.getUserId().equals(candidateUserId)) {
-            throw AppException.forbidden("CV này không thuộc về bạn");
-        }
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(application);
 
-        application.setCvId(request.getCvId());
+        Cvs cv = findOwnedCvForApplication(candidateUserId, request.getCvId());
+
+        application.setCvId(cv.getId());
         Application saved = applicationRepository.save(application);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
 
         Company company = saved.getJobPosting() != null
                 ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
@@ -265,10 +274,37 @@ public class ApplicationServiceImpl implements ApplicationService {
         return job;
     }
 
+    private Cvs findOwnedCvForApplication(Long candidateUserId, Long cvId) {
+        if (cvId == null) {
+            throw AppException.badRequest("Vui lòng chọn CV để ứng tuyển");
+        }
+
+        Cvs cv = cvsRepository.findById(cvId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
+
+        if (!cv.getUserId().equals(candidateUserId)) {
+            throw AppException.forbidden("CV này không thuộc về bạn");
+        }
+
+        if (cv.getDeletedAt() != null) {
+            throw AppException.badRequest("CV này đã bị xóa");
+        }
+
+        if (cv.getCvType() == com.topviec.topviec_be.enums.cvs.CvType.online
+                && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank() || Boolean.TRUE.equals(cv.getPdfDirty()))) {
+            cvService.exportOnlineCvPdf(candidateUserId, cv.getId());
+            cv = cvsRepository.findById(cvId)
+                    .orElseThrow(() -> AppException.notFound("Không tìm thấy CV"));
+        }
+
+        return cv;
+    }
+
     private Application getOrInitializeApplication(Long candidateUserId, Long jobPostId,
             Long cvId, String applyMethod, JobPosting job) {
-        
-        java.util.Optional<Application> existingOpt = applicationRepository.findByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(jobPostId, candidateUserId);
+
+        java.util.Optional<Application> existingOpt = applicationRepository
+                .findByJobPostIdAndCandidateUserIdAndDeletedAtIsNull(jobPostId, candidateUserId);
 
         if (existingOpt.isPresent()) {
             Application existing = existingOpt.get();
@@ -287,7 +323,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             }
             existing.setWithdrawnAt(null);
             existing.setWithdrawalReason(null);
-            
+
             return existing;
         }
 
@@ -361,7 +397,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status, String search, Pageable pageable) {
+    public ResultPaginationDTO getApplicationsByJobPost(Long userId, Long companyId, Long jobPostId, String status,
+            String search, Pageable pageable) {
         JobPosting job = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng"));
 
@@ -370,8 +407,9 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         String searchTrim = (search != null && !search.isBlank()) ? search.trim() : null;
-        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, searchTrim, pageable);
-        
+        Page<Application> applicationPage = applicationRepository.findByJobPost(jobPostId, status, searchTrim,
+                pageable);
+
         ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
         meta.setPage(pageable.getPageNumber());
         meta.setPageSize(pageable.getPageSize());
@@ -381,7 +419,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         ResultPaginationDTO result = new ResultPaginationDTO();
         result.setMeta(meta);
         result.setResult(applicationPage.getContent().stream()
-                .map(this::toEmployerResponse)
+                .map(application -> toEmployerResponse(application, false))
                 .toList());
 
         return result;
@@ -392,7 +430,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     public ResEmployerApplicationDTO getApplicationDetailByEmployer(Long userId, Long companyId, Long applicationId) {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
-        
+
         JobPosting job = application.getJobPosting();
         if (job == null || !job.getCompanyId().equals(companyId)) {
             throw AppException.forbidden("Bạn không có quyền xem đơn ứng tuyển này");
@@ -410,7 +448,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     @Transactional
-    public ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId, ReqUpdateApplicationDTO request) {
+    public ResEmployerApplicationDTO updateApplication(Long userId, Long companyId, Long applicationId,
+            ReqUpdateApplicationDTO request) {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
 
@@ -419,12 +458,16 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw AppException.forbidden("Bạn không có quyền sửa đơn ứng tuyển này");
         }
 
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(application);
+
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             ApplicationStatus currentStatus = ApplicationStatus.fromValue(application.getStatus());
             ApplicationStatus nextStatus = ApplicationStatus.fromValue(request.getStatus());
 
             if (!currentStatus.canTransitionTo(nextStatus)) {
-                throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang " + nextStatus.getValue());
+                throw AppException.badRequest("Không thể chuyển trạng thái từ " + currentStatus.getValue() + " sang "
+                        + nextStatus.getValue());
             }
 
             application.setStatus(nextStatus.getValue());
@@ -447,10 +490,61 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         Application saved = applicationRepository.save(application);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
         return toEmployerResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public ResApplicationDTO acceptInvite(Long candidateUserId, Long applicationId) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        if (!ApplicationStatus.INVITED.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể chấp nhận lời mời ở trạng thái invited");
+        }
+
+        application.setStatus(ApplicationStatus.PENDING.getValue());
+        Application saved = applicationRepository.save(application);
+
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
+    @Override
+    @Transactional
+    public ResApplicationDTO declineInvite(Long candidateUserId, Long applicationId) {
+        Application application = applicationRepository
+                .findByIdAndCandidateUserId(applicationId, candidateUserId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển"));
+
+        if (!ApplicationStatus.INVITED.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Chỉ có thể từ chối lời mời ở trạng thái invited");
+        }
+
+        application.setStatus(ApplicationStatus.WITHDRAWN.getValue());
+        application.setWithdrawnAt(LocalDateTime.now());
+        Application saved = applicationRepository.save(application);
+
+        Company company = saved.getJobPosting() != null
+                ? companyRepository.findById(saved.getJobPosting().getCompanyId()).orElse(null)
+                : null;
+
+        return toResponse(saved, company);
+    }
+
     private ResEmployerApplicationDTO toEmployerResponse(Application a) {
+        return toEmployerResponse(a, true);
+    }
+
+    private ResEmployerApplicationDTO toEmployerResponse(Application a, boolean ensureFreshPdf) {
         User user = null;
         CandidateProfile profile = null;
         Cvs cv = null;
@@ -459,9 +553,16 @@ public class ApplicationServiceImpl implements ApplicationService {
             user = userRepository.findById(a.getCandidateUserId()).orElse(null);
             profile = candidateProfileRepository.findByUserId(a.getCandidateUserId()).orElse(null);
         }
-        
+
         if (a.getCvId() != null) {
             cv = cvsRepository.findById(a.getCvId()).orElse(null);
+            if (ensureFreshPdf
+                    && cv != null
+                    && cv.getCvType() == CvType.online
+                    && (cv.getPdfUrl() == null || cv.getPdfUrl().isBlank() || Boolean.TRUE.equals(cv.getPdfDirty()))) {
+                cvService.exportOnlineCvPdf(cv.getUserId(), cv.getId());
+                cv = cvsRepository.findById(a.getCvId()).orElse(cv);
+            }
         }
 
         JobPosting job = a.getJobPosting();
@@ -471,13 +572,17 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .jobPostId(a.getJobPostId())
                 .jobTitle(job != null ? job.getTitle() : null)
                 .candidateUserId(a.getCandidateUserId())
-                .candidateName(profile != null ? profile.getFullName() : (user != null ? "User " + user.getId() : "Unknown"))
+                .candidateName(
+                        profile != null ? profile.getFullName() : (user != null ? "User " + user.getId() : "Unknown"))
                 .candidateEmail(user != null ? user.getEmail() : null)
                 .candidatePhone(profile != null ? profile.getPhoneDisplay() : null)
                 .candidateAvatar(profile != null ? profile.getAvatarUrl() : null)
                 .cvId(a.getCvId())
+                .cvType(cv != null ? cv.getCvType() : null)
                 .cvFileUrl(cv != null ? cv.getFileUrl() : null)
                 .cvPdfUrl(cv != null ? cv.getPdfUrl() : null)
+                .cvPdfDirty(cv != null ? cv.getPdfDirty() : null)
+                .cvPreviewUrl(resolveCvPreviewUrl(cv))
                 .status(a.getStatus())
                 .applyMethod(a.getApplyMethod())
                 .recruiterRating(a.getRecruiterRating())
@@ -487,5 +592,15 @@ public class ApplicationServiceImpl implements ApplicationService {
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();
+    }
+
+    private String resolveCvPreviewUrl(Cvs cv) {
+        if (cv == null) {
+            return null;
+        }
+        if (cv.getCvType() == CvType.online) {
+            return cv.getPdfUrl();
+        }
+        return cv.getFileUrl() != null ? cv.getFileUrl() : cv.getPdfUrl();
     }
 }

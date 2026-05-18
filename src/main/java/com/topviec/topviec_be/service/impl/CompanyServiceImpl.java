@@ -2,20 +2,40 @@ package com.topviec.topviec_be.service.impl;
 
 import com.topviec.topviec_be.dto.request.ReqAdminUpdateCompanyDTO;
 import com.topviec.topviec_be.dto.request.ReqUpdateCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResAdminCompanyStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyDTO;
+import com.topviec.topviec_be.dto.response.ResEmployerJobStatisticsDTO;
 import com.topviec.topviec_be.dto.response.ResultPaginationDTO;
+import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.Company;
 import com.topviec.topviec_be.enums.company.CompanySize;
 import com.topviec.topviec_be.enums.company.CompanyStatus;
 import com.topviec.topviec_be.enums.company.VerificationStatus;
+import com.topviec.topviec_be.enums.cvs.FileUploadType;
 import com.topviec.topviec_be.exception.AppException;
+import com.topviec.topviec_be.repository.ApplicationRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
 import com.topviec.topviec_be.repository.CompanyMemberRepository;
+import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
 import com.topviec.topviec_be.repository.IndustryRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.entity.CompanyMember;
+import com.topviec.topviec_be.entity.CompanySubscription;
 import com.topviec.topviec_be.entity.Industry;
+import com.topviec.topviec_be.entity.Order;
+import com.topviec.topviec_be.entity.ServicePackage;
+import com.topviec.topviec_be.entity.Services;
+import com.topviec.topviec_be.enums.services.SubscriptionStatus;
 import com.topviec.topviec_be.service.CompanyService;
+import com.topviec.topviec_be.service.FileStorageService;
+import com.topviec.topviec_be.util.ChangeTracker;
+import com.topviec.topviec_be.repository.CompanyAddonRepository;
+import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
+import com.topviec.topviec_be.entity.CompanyAddon;
+import com.topviec.topviec_be.entity.SubscriptionUsage;
+import com.topviec.topviec_be.repository.ServiceRepository;
+import com.topviec.topviec_be.dto.response.ResCompanyPlanDTO;
+import com.topviec.topviec_be.dto.response.ResSubscriptionHistoryDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +55,12 @@ public class CompanyServiceImpl implements CompanyService {
     private final CompanyMemberRepository companyMemberRepository;
     private final IndustryRepository industryRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final ApplicationRepository applicationRepository;
+    private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final CompanyAddonRepository companyAddonRepository;
+    private final SubscriptionUsageRepository subscriptionUsageRepository;
+    private final ServiceRepository serviceRepository;
+    private final FileStorageService fileStorageService;
 
     // -------------------------------------------------------------------------
     // Employer — Read
@@ -53,6 +80,9 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional
     public ResCompanyDTO updateMyCompany(Long userId, ReqUpdateCompanyDTO request) {
         Company company = findByCreatedByOrThrow(userId);
+        String oldLogoUrl = company.getLogoUrl();
+        String oldCoverUrl = company.getCoverUrl();
+        String oldBusinessLicenseUrl = company.getBusinessLicenseUrl();
 
         if (CompanyStatus.SUSPENDED.getValue().equals(company.getStatus())) {
             throw AppException.badRequest("Công ty đang bị tạm khóa, không thể cập nhật hồ sơ");
@@ -60,6 +90,9 @@ public class CompanyServiceImpl implements CompanyService {
         if (CompanyStatus.DELETED.getValue().equals(company.getStatus())) {
             throw AppException.badRequest("Công ty đã bị xóa");
         }
+
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(company);
 
         applyUpdate(company, request, userId);
 
@@ -69,7 +102,16 @@ public class CompanyServiceImpl implements CompanyService {
             company.setRejectionReason(null);
         }
 
-        return toResponse(companyRepository.save(company));
+        Company saved = companyRepository.save(company);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        deleteReplacedFile(oldLogoUrl, saved.getLogoUrl(), FileUploadType.COMPANY_LOGO);
+        deleteReplacedFile(oldCoverUrl, saved.getCoverUrl(), FileUploadType.COMPANY_COVER);
+        deleteReplacedFile(oldBusinessLicenseUrl, saved.getBusinessLicenseUrl(), FileUploadType.BUSINESS_LICENSE);
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------
@@ -152,6 +194,12 @@ public class CompanyServiceImpl implements CompanyService {
             ReqAdminUpdateCompanyDTO request) {
 
         Company company = findByIdOrThrow(companyId);
+        String oldLogoUrl = company.getLogoUrl();
+        String oldCoverUrl = company.getCoverUrl();
+        String oldBusinessLicenseUrl = company.getBusinessLicenseUrl();
+
+        // CDC: Snapshot trước khi sửa
+        ChangeTracker tracker = ChangeTracker.of(company);
 
         // Bước 1: Xử lý action status nếu có
         if (request.getAction() != null && !request.getAction().isBlank()) {
@@ -257,7 +305,16 @@ public class CompanyServiceImpl implements CompanyService {
             company.setSocialLinks(request.getSocialLinks());
 
         company.setUpdatedBy(adminId);
-        return toResponse(companyRepository.save(company));
+        Company saved = companyRepository.save(company);
+
+        // CDC: So sánh + ghi vào log context
+        tracker.compare(saved).apply();
+
+        deleteReplacedFile(oldLogoUrl, saved.getLogoUrl(), FileUploadType.COMPANY_LOGO);
+        deleteReplacedFile(oldCoverUrl, saved.getCoverUrl(), FileUploadType.COMPANY_COVER);
+        deleteReplacedFile(oldBusinessLicenseUrl, saved.getBusinessLicenseUrl(), FileUploadType.BUSINESS_LICENSE);
+
+        return toResponse(saved);
     }
 
     // -------------------------------------------------------------------------
@@ -285,13 +342,15 @@ public class CompanyServiceImpl implements CompanyService {
 
     private Company findByCreatedByOrThrow(Long userId) {
         // 1. Kiểm tra xem user có phải người tạo công ty không
-        java.util.Optional<Company> companyOpt = companyRepository.findByCreatedBy(userId);
+        Optional<Company> companyOpt = companyRepository.findByCreatedBy(userId);
         if (companyOpt.isPresent()) {
             return companyOpt.get();
         }
 
-        // 2. Nếu không, kiểm tra xem user có phải là thành viên active của công ty nào không
-        java.util.Optional<CompanyMember> memberOpt = companyMemberRepository.findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active");
+        // 2. Nếu không, kiểm tra xem user có phải là thành viên active của công ty nào
+        // không
+        Optional<CompanyMember> memberOpt = companyMemberRepository
+                .findFirstByUserIdAndStatusAndDeletedAtIsNull(userId, "active");
         if (memberOpt.isPresent()) {
             return companyRepository.findById(memberOpt.get().getCompanyId())
                     .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty của bạn"));
@@ -443,8 +502,212 @@ public class CompanyServiceImpl implements CompanyService {
     @Override
     @Transactional(readOnly = true)
     public Long getCompanyIdByUserId(Long userId) {
-        return companyRepository.findByCreatedBy(userId)
-                .orElseThrow(() -> AppException.notFound("Bạn chưa có hồ sơ công ty"))
-                .getId();
+        // Dùng chung findByCreatedByOrThrow để hỗ trợ cả OWNER lẫn Member
+        return findByCreatedByOrThrow(userId).getId();
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin — Company Statistics
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResAdminCompanyStatisticsDTO getCompanyStatistics(Long companyId) {
+        // Validate company exists
+        findByIdOrThrow(companyId);
+
+        // 1. Tổng tin đã đăng (chưa bị xóa mềm)
+        long totalJobPostings = jobPostingRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
+
+        // 2. Tổng CV/đơn ứng tuyển đã nhận
+        long totalApplicationsReceived = applicationRepository.countByCompanyId(companyId);
+
+        // 3. Gói dịch vụ đang sử dụng (status = ACTIVE)
+        List<CompanySubscription> activeSubscriptions = companySubscriptionRepository
+                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
+
+        List<ResAdminCompanyStatisticsDTO.ActiveSubscriptionDTO> subscriptionDTOs = activeSubscriptions.stream()
+                .map(sub -> {
+                    ServicePackage pkg = sub.getServicePackage();
+                    return ResAdminCompanyStatisticsDTO.ActiveSubscriptionDTO.builder()
+                            .subscriptionId(sub.getId())
+                            .servicePackageId(sub.getServicePackageId())
+                            .packageName(pkg != null ? pkg.getName() : null)
+                            .packageCode(pkg != null ? pkg.getCode() : null)
+                            .billingCycle(sub.getBillingCycle())
+                            .status(sub.getStatus())
+                            .startedAt(sub.getStartedAt())
+                            .expiredAt(sub.getExpiredAt())
+                            .build();
+                })
+                .toList();
+
+        return ResAdminCompanyStatisticsDTO.builder()
+                .totalJobPostings(totalJobPostings)
+                .totalApplicationsReceived(totalApplicationsReceived)
+                .activeSubscriptions(subscriptionDTOs)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResCompanyPlanDTO getCompanyPlan(Long companyId) {
+        // Validate company exists
+        findByIdOrThrow(companyId);
+
+        Map<String, String> serviceCodeToNameMap = new java.util.HashMap<>();
+        serviceRepository.findAll().forEach(s -> serviceCodeToNameMap.put(s.getCode(), s.getName()));
+
+        // 1. Lấy gói dịch vụ hiện hành (ưu tiên ACTIVE, nếu không có thì lấy gói mới
+        // nhất)
+        ResCompanyPlanDTO.CurrentPackageDTO currentPackageDTO = null;
+        Optional<CompanySubscription> optSubscription = companySubscriptionRepository
+                .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
+
+        if (optSubscription.isEmpty()) {
+            optSubscription = companySubscriptionRepository.findFirstByCompanyIdOrderByCreatedAtDesc(companyId);
+        }
+
+        if (optSubscription.isPresent()) {
+            CompanySubscription sub = optSubscription.get();
+            ServicePackage pkg = sub.getServicePackage();
+
+            // Lấy danh sách usage của subscription này
+            List<SubscriptionUsage> usages = subscriptionUsageRepository.findByCompanySubscriptionId(sub.getId());
+            List<ResCompanyPlanDTO.UsageDTO> usageDTOs = usages.stream()
+                    .map(u -> ResCompanyPlanDTO.UsageDTO.builder()
+                            .featureCode(u.getFeatureCode())
+                            .featureName(serviceCodeToNameMap.get(u.getFeatureCode()))
+                            .total(u.getQuantityTotal())
+                            .used(u.getQuantityTotal() - u.getQuantityRemaining())
+                            .build())
+                    .toList();
+
+            Order packageOrder = sub.getOrder();
+
+            currentPackageDTO = ResCompanyPlanDTO.CurrentPackageDTO.builder()
+                    .subscriptionId(sub.getId())
+                    .servicePackageId(sub.getServicePackageId())
+                    .packageName(pkg != null ? pkg.getName() : null)
+                    .packageCode(pkg != null ? pkg.getCode() : null)
+                    .billingCycle(sub.getBillingCycle() != null ? sub.getBillingCycle().name() : null)
+                    .status(sub.getStatus() != null ? sub.getStatus().name() : null)
+                    .startedAt(sub.getStartedAt())
+                    .expiredAt(sub.getExpiredAt())
+                    .orderId(sub.getOrderId())
+                    .orderCode(packageOrder != null ? packageOrder.getOrderCode() : null)
+                    .usages(usageDTOs)
+                    .build();
+        }
+
+        // 2. Lấy danh sách dịch vụ lẻ
+        List<CompanyAddon> addons = companyAddonRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        List<ResCompanyPlanDTO.CurrentAddonDTO> addonDTOs = addons.stream()
+                .map(a -> {
+                    AddonService addonService = a.getAddonService();
+                    Services svc = addonService != null ? addonService.getService() : null;
+                    Order order = a.getOrder();
+                    return ResCompanyPlanDTO.CurrentAddonDTO.builder()
+                            .addonId(a.getId())
+                            .addonServiceId(a.getAddonServiceId())
+                            .addonName(addonService != null ? addonService.getName() : null)
+                            .addonCode(addonService != null ? addonService.getCode() : null)
+                            .serviceCategory(svc != null && svc.getCategory() != null ? svc.getCategory().name() : null)
+                            .serviceCategoryName(
+                                    svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
+                            .status(a.getStatus() != null ? a.getStatus().name() : null)
+                            .total(a.getQuantityTotal())
+                            .used(a.getQuantityTotal() - a.getQuantityRemaining())
+                            .startedAt(a.getStartedAt())
+                            .expiredAt(a.getExpiredAt())
+                            .orderId(a.getOrderId())
+                            .orderCode(order != null ? order.getOrderCode() : null)
+                            .build();
+                })
+                .toList();
+
+        return ResCompanyPlanDTO.builder()
+                .currentPackage(currentPackageDTO)
+                .currentAddons(addonDTOs)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getSubscriptionHistory(Long companyId, Pageable pageable) {
+        findByIdOrThrow(companyId);
+
+        Page<CompanySubscription> page = companySubscriptionRepository.findByCompanyIdOrderByCreatedAtDesc(companyId,
+                pageable);
+
+        List<ResSubscriptionHistoryDTO> results = page.getContent().stream().map(sub -> {
+            ServicePackage pkg = sub.getServicePackage();
+            if (pkg == null && sub.getServicePackageId() != null) {
+                // If lazy loading issue or need explicit fetch
+            }
+            return ResSubscriptionHistoryDTO.builder()
+                    .subscriptionId(sub.getId())
+                    .companyId(sub.getCompanyId())
+                    .orderId(sub.getOrderId())
+                    .servicePackageId(sub.getServicePackageId())
+                    .packageName(pkg != null ? pkg.getName() : null)
+                    .packageCode(pkg != null ? pkg.getCode() : null)
+                    .status(sub.getStatus() != null ? sub.getStatus().name() : null)
+                    .billingCycle(sub.getBillingCycle() != null ? sub.getBillingCycle().name() : null)
+                    .startedAt(sub.getStartedAt())
+                    .expiredAt(sub.getExpiredAt())
+                    .purchasedAt(sub.getCreatedAt())
+                    .packagePrice(pkg != null ? pkg.getPrice() : null)
+                    .build();
+        }).toList();
+
+        ResultPaginationDTO.Meta meta = new ResultPaginationDTO.Meta();
+        meta.setPage(pageable.getPageNumber());
+        meta.setPageSize(pageable.getPageSize());
+        meta.setPages(page.getTotalPages());
+        meta.setTotals(page.getTotalElements());
+
+        ResultPaginationDTO result = new ResultPaginationDTO();
+        result.setMeta(meta);
+        result.setResult(results);
+
+        return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Employer — Job Statistics
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResEmployerJobStatisticsDTO getEmployerJobStatistics(Long userId) {
+        Company company = findByCreatedByOrThrow(userId);
+        Long companyId = company.getId();
+
+        long totalJobPosts = jobPostingRepository.countByCompanyIdAndDeletedAtIsNull(companyId);
+        long activeJobPosts = jobPostingRepository.countActiveByCompanyId(companyId);
+        long pendingJobPosts = jobPostingRepository.countByCompanyIdAndStatusAndDeletedAtIsNull(companyId,
+                "pending_approval");
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sevenDaysLater = now.plusDays(7);
+        long expiringJobPosts = jobPostingRepository.countExpiringByCompanyId(companyId, now, sevenDaysLater);
+
+        return ResEmployerJobStatisticsDTO.builder()
+                .totalJobPosts(totalJobPosts)
+                .activeJobPosts(activeJobPosts)
+                .pendingJobPosts(pendingJobPosts)
+                .expiringJobPosts(expiringJobPosts)
+                .build();
+    }
+
+    private void deleteReplacedFile(String oldFileUrl, String newFileUrl, FileUploadType type) {
+        if (oldFileUrl == null || oldFileUrl.isBlank()) {
+            return;
+        }
+        if (oldFileUrl.equals(newFileUrl)) {
+            return;
+        }
+        fileStorageService.deleteFile(oldFileUrl, type);
     }
 }

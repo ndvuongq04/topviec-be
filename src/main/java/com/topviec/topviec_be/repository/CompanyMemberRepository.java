@@ -52,6 +52,7 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Lo
 
     @Query("""
             SELECT cm FROM CompanyMember cm
+            JOIN FETCH cm.roleDefault
             WHERE cm.companyId = :companyId AND cm.userId = :userId AND cm.deletedAt IS NULL
             """)
     Optional<CompanyMember> findByCompanyIdAndUserId(
@@ -65,4 +66,21 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Lo
     List<CompanyMember> findByCompanyIdAndUserIds(
             @Param("companyId") Long companyId,
             @Param("userIds") List<Long> userIds);
+
+    /** Tìm thành viên OWNER của công ty */
+    @Query("""
+            SELECT cm FROM CompanyMember cm
+            JOIN cm.roleDefault rd
+            WHERE cm.companyId = :companyId
+            AND rd.roleName = com.topviec.topviec_be.enums.companyMember.MemberRole.OWNER
+            AND cm.status = 'active'
+            AND cm.deletedAt IS NULL
+            """)
+    Optional<CompanyMember> findOwnerByCompanyId(@Param("companyId") Long companyId);
+
+    // ── Thống kê thành viên ─────────────────────────────────────────
+
+    long countByCompanyIdAndDeletedAtIsNull(Long companyId);
+
+    long countByCompanyIdAndStatusAndDeletedAtIsNull(Long companyId, String status);
 }
