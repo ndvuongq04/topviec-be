@@ -2,7 +2,8 @@ name: Deploy Backend
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, feature/remaining-features]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
