@@ -15,4 +15,5 @@ public class ResServicePackageDetailDTO {
     private String serviceCategoryName;
     private String serviceUnit;
     private Integer quantity;
+    private Integer durationDays;
 }

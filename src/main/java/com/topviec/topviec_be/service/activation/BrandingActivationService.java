@@ -1,16 +1,15 @@
 package com.topviec.topviec_be.service.activation;
 
+import com.topviec.topviec_be.dto.internal.ServiceQuotaAllocation;
 import com.topviec.topviec_be.dto.response.ResCompanyBrandingDTO;
-import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.Company;
-import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.CompanyBranding;
 import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
 import com.topviec.topviec_be.enums.services.ServiceCategory;
 import com.topviec.topviec_be.exception.AppException;
-import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.CompanyBrandingRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
+import com.topviec.topviec_be.service.CompanyServiceQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,32 +24,31 @@ import java.util.function.Consumer;
 public class BrandingActivationService {
 
     public static final ServiceCategory CATEGORY = ServiceCategory.BRANDING;
-    public static final String CODE_BANNER_HOME    = "BRANDING_BANNER_HOME";
-    public static final String CODE_TOP_EMPLOYER   = "BRANDING_TOP_EMPLOYER";
-    public static final String CODE_VERIFIED       = "BRANDING_VERIFIED";
+    public static final String CODE_BANNER_HOME = "BRANDING_BANNER_HOME";
+    public static final String CODE_TOP_EMPLOYER = "BRANDING_TOP_EMPLOYER";
+    public static final String CODE_VERIFIED = "BRANDING_VERIFIED";
 
     private final CompanyRepository companyRepository;
     private final CompanyBrandingRepository companyBrandingRepository;
-    private final CompanyAddonRepository companyAddonRepository;
+    private final CompanyServiceQuotaService quotaService;
 
     @Transactional
-    public ResCompanyBrandingDTO activate(String serviceCode, Long companyId,
-            CompanyAddon companyAddon, AddonService addonService) {
+    public ResCompanyBrandingDTO activate(String serviceCode, Long companyId, ServiceQuotaAllocation quota) {
         return switch (serviceCode) {
             case CODE_BANNER_HOME -> applyBrandingService(
-                    companyId, companyAddon, addonService, CODE_BANNER_HOME,
-                    "Công ty đang có Banner trang chủ đang hoạt động. Không cần áp dụng thêm.",
+                    companyId, quota, CODE_BANNER_HOME,
+                    "Cong ty dang co Banner trang chu dang hoat dong. Khong can ap dung them.",
                     30, company -> company.setIsBanner(true));
             case CODE_TOP_EMPLOYER -> applyBrandingService(
-                    companyId, companyAddon, addonService, CODE_TOP_EMPLOYER,
-                    "Công ty đang có nhãn Top Employer đang hoạt động. Không cần áp dụng thêm.",
+                    companyId, quota, CODE_TOP_EMPLOYER,
+                    "Cong ty dang co nhan Top Employer dang hoat dong. Khong can ap dung them.",
                     30, company -> company.setIsTopEmployer(true));
             case CODE_VERIFIED -> applyBrandingService(
-                    companyId, companyAddon, addonService, CODE_VERIFIED,
-                    "Công ty đang có nhãn Doanh Nghiệp Xác Thực đang hoạt động. Không cần áp dụng thêm.",
+                    companyId, quota, CODE_VERIFIED,
+                    "Cong ty dang co nhan Doanh Nghiep Xac Thuc dang hoat dong. Khong can ap dung them.",
                     365, company -> company.setIsBrandVerified(true));
             default -> throw AppException.badRequest(
-                    "Mã dịch vụ BRANDING không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
+                    "Ma dich vu BRANDING khong hop le hoac chua duoc ho tro: " + serviceCode);
         };
     }
 
@@ -60,52 +58,49 @@ public class BrandingActivationService {
                 || CODE_VERIFIED.equals(serviceCode);
     }
 
-    private ResCompanyBrandingDTO applyBrandingService(Long companyId, CompanyAddon companyAddon,
-            AddonService addonService, String serviceCode, String duplicateMessage,
-            int defaultDurationDays, Consumer<Company> flagSetter) {
+    private ResCompanyBrandingDTO applyBrandingService(Long companyId, ServiceQuotaAllocation quota,
+            String serviceCode, String duplicateMessage, int defaultDurationDays, Consumer<Company> flagSetter) {
 
         LocalDateTime now = LocalDateTime.now();
-        log.info("[BrandingActivationService] Kích hoạt {} cho công ty #{}", serviceCode, companyId);
+        log.info("[BrandingActivationService] Activate {} for company #{}", serviceCode, companyId);
 
-        // 1. Kiểm tra đang active chưa
         long active = companyBrandingRepository.countActiveForCompany(companyId, serviceCode, now);
         if (active > 0) {
             throw AppException.badRequest(duplicateMessage);
         }
 
-        // 2. Tính thời hạn
-        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : defaultDurationDays;
+        int durationDays = quota.getDurationDays() != null ? quota.getDurationDays() : defaultDurationDays;
         LocalDateTime expiredAt = now.plusDays(durationDays);
 
-        // 3. Bật cờ trên Company
         Company company = companyRepository.findById(companyId)
-                .orElseThrow(() -> AppException.notFound("Không tìm thấy công ty."));
+                .orElseThrow(() -> AppException.notFound("Khong tim thay cong ty."));
         flagSetter.accept(company);
         companyRepository.save(company);
 
-        // 4. Tạo record CompanyBranding để track expiry
         CompanyBranding branding = CompanyBranding.builder()
                 .companyId(companyId)
-                .companyAddonId(companyAddon.getId())
-                .addonServiceId(addonService.getId())
+                .companyAddonId(quota.getCompanyAddonId())
+                .addonServiceId(quota.getAddonServiceId())
+                .subscriptionUsageId(quota.getSubscriptionUsageId())
                 .serviceCode(serviceCode)
+                .usageSourceType(quota.getSourceType())
                 .status(BrandingAddonStatus.ACTIVE)
                 .startedAt(now)
                 .expiredAt(expiredAt)
                 .build();
         CompanyBranding saved = companyBrandingRepository.save(branding);
 
-        // 5. Trừ quota CompanyAddon
-        companyAddon.setQuantityRemaining(companyAddon.getQuantityRemaining() - 1);
-        companyAddonRepository.save(companyAddon);
+        quotaService.consume(quota);
 
         return ResCompanyBrandingDTO.builder()
                 .id(saved.getId())
                 .companyId(saved.getCompanyId())
                 .companyAddonId(saved.getCompanyAddonId())
                 .addonServiceId(saved.getAddonServiceId())
-                .addonName(addonService.getName())
+                .subscriptionUsageId(saved.getSubscriptionUsageId())
+                .addonName(quota.getDisplayName())
                 .serviceCode(serviceCode)
+                .usageSourceType(saved.getUsageSourceType())
                 .status(saved.getStatus())
                 .startedAt(saved.getStartedAt())
                 .expiredAt(saved.getExpiredAt())

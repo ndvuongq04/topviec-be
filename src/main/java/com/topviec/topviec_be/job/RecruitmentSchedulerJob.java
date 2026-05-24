@@ -40,6 +40,7 @@ public class RecruitmentSchedulerJob {
     private final CompanyRepository companyRepository;
     private final CompanyBrandingRepository companyBrandingRepository;
     private final CompanySubscriptionRepository companySubscriptionRepository;
+    private final CompanyAddonRepository companyAddonRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final CompanyMemberRepository companyMemberRepository;
     private final TokenService tokenService;
@@ -287,8 +288,26 @@ public class RecruitmentSchedulerJob {
     }
 
     /**
-     * Tự động gửi email nhắc nhở NTD khi gói subscription sắp hết hạn (trong 7 ngày).
-     * Chạy mỗi ngày lúc 9h sáng. Mỗi subscription chỉ gửi 1 lần duy nhất.
+     * Tu dong chuyen addon qua han sang EXPIRED.
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    @Transactional
+    public void expireCompanyAddons() {
+        LocalDateTime now = LocalDateTime.now();
+        List<CompanyAddon> expired = companyAddonRepository
+                .findExpiredActiveAddons(SubscriptionStatus.ACTIVE, now);
+
+        if (expired.isEmpty()) return;
+
+        log.info("[Scheduler] expireCompanyAddons: {} addon da het han", expired.size());
+        for (CompanyAddon addon : expired) {
+            addon.setStatus(SubscriptionStatus.EXPIRED);
+            companyAddonRepository.save(addon);
+        }
+    }
+
+    /**
+     * Tu dong gui email nhac nho NTD khi goi subscription sap het han.
      */
     @Scheduled(cron = "0 0 9 * * *")
     @Transactional

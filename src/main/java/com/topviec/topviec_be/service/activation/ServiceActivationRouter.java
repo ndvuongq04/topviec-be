@@ -1,8 +1,7 @@
 package com.topviec.topviec_be.service.activation;
 
+import com.topviec.topviec_be.dto.internal.ServiceQuotaAllocation;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
-import com.topviec.topviec_be.entity.AddonService;
-import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.enums.services.ServiceCategory;
 import com.topviec.topviec_be.exception.AppException;
@@ -38,7 +37,7 @@ public class ServiceActivationRouter {
      * @return DTO kết quả
      */
     public ResJobPostAddonDTO activate(ServiceCategory category, String serviceCode, JobPosting jobPosting,
-            CompanyAddon companyAddon, AddonService addonService) {
+            ServiceQuotaAllocation quota) {
 
         log.info("[ServiceActivationRouter] Định tuyến áp dụng dịch vụ {} - Category: {}", serviceCode, category);
 
@@ -48,7 +47,7 @@ public class ServiceActivationRouter {
 
         switch (category) {
             case JOB_POSTING:
-                return jobPostingActivationService.activate(serviceCode, jobPosting, companyAddon, addonService);
+                return jobPostingActivationService.activate(serviceCode, jobPosting, quota);
             case CANDIDATE:
                 throw AppException.badRequest("Nhóm dịch vụ CANDIDATE chưa được hỗ trợ.");
             case BRANDING:

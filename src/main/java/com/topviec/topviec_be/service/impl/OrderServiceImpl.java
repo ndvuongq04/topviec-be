@@ -687,6 +687,7 @@ public class OrderServiceImpl implements OrderService {
                                             : null)
                                     .serviceUnit(service != null ? service.getUnit() : null)
                                     .quantity(detail.getQuantity())
+                                    .durationDays(detail.getDurationDays())
                                     .build();
                         }).collect(Collectors.toList());
                     }

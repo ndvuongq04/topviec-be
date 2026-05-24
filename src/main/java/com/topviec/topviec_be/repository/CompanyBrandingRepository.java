@@ -13,19 +13,15 @@ import java.util.List;
 @Repository
 public interface CompanyBrandingRepository extends JpaRepository<CompanyBranding, Long> {
 
-    /** Kiểm tra công ty đang có dịch vụ branding theo service code active không */
     @Query("SELECT COUNT(cb) FROM CompanyBranding cb " +
-           "JOIN cb.addonService asv " +
-           "JOIN asv.service s " +
            "WHERE cb.companyId = :companyId " +
-           "AND s.code = :serviceCode " +
+           "AND cb.serviceCode = :serviceCode " +
            "AND cb.status = 'ACTIVE' " +
-           "AND cb.expiredAt > :now")
+           "AND (cb.expiredAt IS NULL OR cb.expiredAt > :now)")
     long countActiveForCompany(@Param("companyId") Long companyId,
                                @Param("serviceCode") String serviceCode,
                                @Param("now") LocalDateTime now);
 
-    /** Tìm các record của 1 service đã hết hạn để scheduler xử lý */
     List<CompanyBranding> findByServiceCodeAndStatusAndExpiredAtBefore(
             String serviceCode, BrandingAddonStatus status, LocalDateTime now);
 }

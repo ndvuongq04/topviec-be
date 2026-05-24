@@ -1,6 +1,7 @@
 package com.topviec.topviec_be.dto.response;
 
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
+import com.topviec.topviec_be.enums.services.ServiceUsageSourceType;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,6 +14,9 @@ public class ResJobPostAddonDTO {
     private Long jobPostingId;
     private Long companyAddonId;
     private Long addonServiceId;
+    private Long subscriptionUsageId;
+    private String serviceCode;
+    private ServiceUsageSourceType usageSourceType;
     private String addonName;
     private JobPostAddonStatus status;
     private LocalDateTime startedAt;

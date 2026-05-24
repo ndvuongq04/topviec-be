@@ -1,32 +1,22 @@
 package com.topviec.topviec_be.service.activation;
 
+import com.topviec.topviec_be.dto.internal.ServiceQuotaAllocation;
 import com.topviec.topviec_be.dto.response.ResJobPostAddonDTO;
-import com.topviec.topviec_be.entity.AddonService;
-import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.JobPostAddon;
 import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.enums.services.ServiceCategory;
 import com.topviec.topviec_be.exception.AppException;
-import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.JobPostAddonRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
+import com.topviec.topviec_be.service.CompanyServiceQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * Category-level service cho nhóm JOB_POSTING (Tin tuyển dụng).
- *
- * Chứa logic áp dụng các dịch vụ đặc thù cho tin tuyển dụng, bao gồm:
- * - JOB_POST_HOT: Tin HOT
- * - JOB_POST_URGENT: Tin Gấp
- * - JOB_POST_REFRESH: Làm mới tin
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -40,112 +30,94 @@ public class JobPostingActivationService {
 
     private final JobPostingRepository jobPostingRepository;
     private final JobPostAddonRepository jobPostAddonRepository;
-    private final CompanyAddonRepository companyAddonRepository;
+    private final CompanyServiceQuotaService quotaService;
 
-    /**
-     * Dispatcher method: phân luồng xử lý tùy theo từng loại service code
-     */
     @Transactional
-    public ResJobPostAddonDTO activate(String serviceCode, JobPosting jobPosting, CompanyAddon companyAddon,
-            AddonService addonService) {
-        log.info("[JobPostingActivationService] Kích hoạt dịch vụ {} cho tin #{}", serviceCode, jobPosting.getId());
+    public ResJobPostAddonDTO activate(String serviceCode, JobPosting jobPosting, ServiceQuotaAllocation quota) {
+        log.info("[JobPostingActivationService] Activate service {} for job #{}", serviceCode, jobPosting.getId());
 
-        switch (serviceCode) {
-            case CODE_HOT:
-                return applyHotService(jobPosting, companyAddon, addonService);
-            case CODE_URGENT:
-                return applyUrgentService(jobPosting, companyAddon, addonService);
-            case CODE_REFRESH:
-                return applyRefreshService(jobPosting, companyAddon, addonService);
-            default:
-                throw AppException
-                        .badRequest("Mã dịch vụ nhóm Tuyển Dụng không hợp lệ hoặc chưa được hỗ trợ: " + serviceCode);
-        }
+        return switch (serviceCode) {
+            case CODE_HOT -> applyHotService(jobPosting, quota);
+            case CODE_URGENT -> applyUrgentService(jobPosting, quota);
+            case CODE_REFRESH -> applyRefreshService(jobPosting, quota);
+            default -> throw AppException
+                    .badRequest("Ma dich vu nhom tuyen dung khong hop le hoac chua duoc ho tro: " + serviceCode);
+        };
     }
 
-    /**
-     * Xử lý kích hoạt Tin HOT
-     */
-    private ResJobPostAddonDTO applyHotService(JobPosting jobPosting, CompanyAddon companyAddon,
-            AddonService addonService) {
+    public ResJobPostAddonDTO applyGenericAddon(Long jobPostingId, ServiceQuotaAllocation quota) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiredAt = quota.getDurationDays() != null
+                ? now.plusDays(quota.getDurationDays())
+                : null;
+
+        return createJobPostAddonRecord(jobPostingId, quota, now, expiredAt);
+    }
+
+    private ResJobPostAddonDTO applyHotService(JobPosting jobPosting, ServiceQuotaAllocation quota) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Kiểm tra tin đã HOT chưa (dựa vào JobPostAddon)
         long activeHotCountForJob = jobPostAddonRepository.countActiveAddonForJob(jobPosting.getId(), CODE_HOT, now);
         if (activeHotCountForJob > 0) {
-            throw AppException.badRequest("Tin tuyển dụng này đang ở trạng thái HOT. Không cần áp dụng thêm.");
+            throw AppException.badRequest("Tin tuyen dung nay dang o trang thai HOT. Khong can ap dung them.");
         }
 
-        // 2. Tính thời hạn HOT
-        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 30;
+        int durationDays = quota.getDurationDays() != null ? quota.getDurationDays() : 30;
         LocalDateTime hotExpiredAt = now.plusDays(durationDays);
 
-        // 4. Bật cờ isHot trên JobPosting để dễ truy vấn
         jobPosting.setIsHot(true);
         jobPostingRepository.save(jobPosting);
 
-        // 5. Tạo & trả JobPostAddon (status = ACTIVE)
-        return createJobPostAddonRecord(jobPosting.getId(), companyAddon, addonService, now, hotExpiredAt);
+        return createJobPostAddonRecord(jobPosting.getId(), quota, now, hotExpiredAt);
     }
 
-    /**
-     * Xử lý kích hoạt Tin Gấp
-     */
-    private ResJobPostAddonDTO applyUrgentService(JobPosting jobPosting, CompanyAddon companyAddon,
-            AddonService addonService) {
+    private ResJobPostAddonDTO applyUrgentService(JobPosting jobPosting, ServiceQuotaAllocation quota) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Kiểm tra tin đã URGENT chưa
         long activeUrgentCountForJob = jobPostAddonRepository.countActiveAddonForJob(jobPosting.getId(), CODE_URGENT, now);
         if (activeUrgentCountForJob > 0) {
-            throw AppException.badRequest("Tin tuyển dụng này đang ở trạng thái TUYỂN GẤP. Không cần áp dụng thêm.");
+            throw AppException.badRequest("Tin tuyen dung nay dang o trang thai TUYEN GAP. Khong can ap dung them.");
         }
 
-        // 2. Tính thời hạn URGENT (mặc định 14 ngày nếu không cấu hình)
-        int durationDays = addonService.getDurationDays() != null ? addonService.getDurationDays() : 14;
+        int durationDays = quota.getDurationDays() != null ? quota.getDurationDays() : 14;
         LocalDateTime urgentExpiredAt = now.plusDays(durationDays);
 
-        // 4. Bật cờ isUrgent trên JobPosting để dễ truy vấn
         jobPosting.setIsUrgent(true);
         jobPostingRepository.save(jobPosting);
 
-        // 5. Tạo & trả JobPostAddon (status = ACTIVE)
-        return createJobPostAddonRecord(jobPosting.getId(), companyAddon, addonService, now, urgentExpiredAt);
+        return createJobPostAddonRecord(jobPosting.getId(), quota, now, urgentExpiredAt);
     }
 
-    /**
-     * Xử lý kích hoạt Làm mới tin
-     */
-    private ResJobPostAddonDTO applyRefreshService(JobPosting jobPosting, CompanyAddon companyAddon,
-            AddonService addonService) {
-        // TODO: Logic làm mới tin (ví dụ update refreshed_at = now)
-        throw AppException.badRequest("Tính năng áp dụng Dịch Vụ Làm Mới Tin đang được xây dựng.");
+    private ResJobPostAddonDTO applyRefreshService(JobPosting jobPosting, ServiceQuotaAllocation quota) {
+        throw AppException.badRequest("Tinh nang ap dung Dich vu Lam Moi Tin dang duoc xay dung.");
     }
 
-    /**
-     * Hàm dùng chung để tạo record lịch sử sử dụng dịch vụ & trừ quota CompanyAddon
-     */
-    private ResJobPostAddonDTO createJobPostAddonRecord(Long jobPostingId, CompanyAddon companyAddon,
-            AddonService addonService, LocalDateTime startedAt, LocalDateTime expiredAt) {
+    private ResJobPostAddonDTO createJobPostAddonRecord(
+            Long jobPostingId, ServiceQuotaAllocation quota, LocalDateTime startedAt, LocalDateTime expiredAt) {
         JobPostAddon jobPostAddon = JobPostAddon.builder()
                 .jobPostingId(jobPostingId)
-                .companyAddonId(companyAddon.getId())
-                .addonServiceId(addonService.getId())
+                .companyAddonId(quota.getCompanyAddonId())
+                .addonServiceId(quota.getAddonServiceId())
+                .subscriptionUsageId(quota.getSubscriptionUsageId())
+                .serviceCode(quota.getServiceCode())
+                .usageSourceType(quota.getSourceType())
                 .startedAt(startedAt)
                 .expiredAt(expiredAt)
                 .status(JobPostAddonStatus.ACTIVE)
                 .build();
         JobPostAddon saved = jobPostAddonRepository.save(jobPostAddon);
 
-        companyAddon.setQuantityRemaining(companyAddon.getQuantityRemaining() - 1);
-        companyAddonRepository.save(companyAddon);
+        quotaService.consume(quota);
 
         return ResJobPostAddonDTO.builder()
                 .id(saved.getId())
                 .jobPostingId(saved.getJobPostingId())
                 .companyAddonId(saved.getCompanyAddonId())
                 .addonServiceId(saved.getAddonServiceId())
-                .addonName(addonService.getName())
+                .subscriptionUsageId(saved.getSubscriptionUsageId())
+                .serviceCode(saved.getServiceCode())
+                .usageSourceType(saved.getUsageSourceType())
+                .addonName(quota.getDisplayName())
                 .status(saved.getStatus())
                 .startedAt(saved.getStartedAt())
                 .expiredAt(saved.getExpiredAt())
