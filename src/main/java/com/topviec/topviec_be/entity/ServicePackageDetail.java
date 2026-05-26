@@ -36,4 +36,7 @@ public class ServicePackageDetail {
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
+
+    @Column(name = "duration_days")
+    private Integer durationDays;
 }

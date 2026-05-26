@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.service.impl;
 
+import com.topviec.topviec_be.dto.internal.ServiceQuotaAllocation;
 import com.topviec.topviec_be.dto.request.ReqApplyAddonDTO;
 import com.topviec.topviec_be.dto.request.ReqRenewSubscriptionDTO;
 import com.topviec.topviec_be.dto.response.ResCompanyAddonDTO;
@@ -11,17 +12,15 @@ import com.topviec.topviec_be.dto.response.ResSubscriptionRenewalDTO;
 import com.topviec.topviec_be.entity.AddonService;
 import com.topviec.topviec_be.entity.CompanyAddon;
 import com.topviec.topviec_be.entity.CompanySubscription;
-import com.topviec.topviec_be.entity.JobPostAddon;
 import com.topviec.topviec_be.entity.JobPosting;
 import com.topviec.topviec_be.entity.Order;
 import com.topviec.topviec_be.entity.OrderItem;
-import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.entity.ServicePackage;
 import com.topviec.topviec_be.entity.ServicePackageDetail;
+import com.topviec.topviec_be.entity.Services;
 import com.topviec.topviec_be.entity.SubscriptionRenewalLog;
 import com.topviec.topviec_be.entity.SubscriptionUsage;
 import com.topviec.topviec_be.enums.services.BillingCycle;
-import com.topviec.topviec_be.enums.services.JobPostAddonStatus;
 import com.topviec.topviec_be.enums.services.OrderItemType;
 import com.topviec.topviec_be.enums.services.OrderStatus;
 import com.topviec.topviec_be.enums.services.OrderType;
@@ -31,7 +30,6 @@ import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AddonServiceRepository;
 import com.topviec.topviec_be.repository.CompanyAddonRepository;
 import com.topviec.topviec_be.repository.CompanySubscriptionRepository;
-import com.topviec.topviec_be.repository.JobPostAddonRepository;
 import com.topviec.topviec_be.repository.JobPostingRepository;
 import com.topviec.topviec_be.repository.OrderRepository;
 import com.topviec.topviec_be.repository.ServicePackageDetailRepository;
@@ -40,16 +38,16 @@ import com.topviec.topviec_be.repository.ServiceRepository;
 import com.topviec.topviec_be.repository.SubscriptionRenewalLogRepository;
 import com.topviec.topviec_be.repository.SubscriptionUsageRepository;
 import com.topviec.topviec_be.service.CompanyService;
+import com.topviec.topviec_be.service.CompanyServiceQuotaService;
 import com.topviec.topviec_be.service.EmployerServiceManagementService;
 import com.topviec.topviec_be.service.activation.BrandingActivationService;
+import com.topviec.topviec_be.service.activation.JobPostingActivationService;
 import com.topviec.topviec_be.service.activation.ServiceActivationRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,8 +69,9 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         private final ServicePackageRepository servicePackageRepository;
         private final ServicePackageDetailRepository servicePackageDetailRepository;
         private final JobPostingRepository jobPostingRepository;
-        private final JobPostAddonRepository jobPostAddonRepository;
+        private final CompanyServiceQuotaService quotaService;
         private final ServiceActivationRouter serviceActivationRouter;
+        private final JobPostingActivationService jobPostingActivationService;
         private final BrandingActivationService brandingActivationService;
         private final OrderRepository orderRepository;
         private final SubscriptionRenewalLogRepository subscriptionRenewalLogRepository;
@@ -84,11 +83,11 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
 
                 CompanySubscription subscription = companySubscriptionRepository
                                 .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE)
-                                .orElseThrow(() -> AppException.notFound("Công ty chưa đăng ký gói dịch vụ nào."));
+                                .orElseThrow(() -> AppException.notFound("Cong ty chua dang ky goi dich vu nao."));
 
                 if (subscription.getExpiredAt() != null
                                 && subscription.getExpiredAt().isBefore(LocalDateTime.now())) {
-                        throw AppException.notFound("Gói dịch vụ đã hết hạn. Vui lòng gia hạn hoặc mua gói mới.");
+                        throw AppException.notFound("Goi dich vu da het han. Vui long gia han hoac mua goi moi.");
                 }
 
                 ServicePackage servicePackage = servicePackageRepository.findById(subscription.getServicePackageId())
@@ -129,11 +128,14 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         @Transactional(readOnly = true)
         public List<ResCompanyAddonDTO> getMyAddons(Long userId) {
                 Long companyId = getCompanyId(userId);
+                LocalDateTime now = LocalDateTime.now();
 
                 List<CompanyAddon> addons = companyAddonRepository
-                                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE);
+                                .findByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE)
+                                .stream()
+                                .filter(addon -> addon.getExpiredAt() == null || addon.getExpiredAt().isAfter(now))
+                                .collect(Collectors.toList());
 
-                // Gộp theo addon code: cùng code thì cộng dồn số lượng, khác code thì giữ riêng
                 Map<String, List<CompanyAddon>> grouped = new LinkedHashMap<>();
                 Map<String, AddonService> addonSvcMap = new LinkedHashMap<>();
 
@@ -153,10 +155,9 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                         AddonService addonSvc = addonSvcMap.get(addonCode);
                         Services svc = serviceRepository.findById(addonSvc.getServiceId()).orElse(null);
 
-                        int totalQty = group.stream().mapToInt(CompanyAddon::getQuantityTotal).sum();
-                        int remainingQty = group.stream().mapToInt(CompanyAddon::getQuantityRemaining).sum();
+                        int totalQty = group.stream().mapToInt(addon -> safeInt(addon.getQuantityTotal())).sum();
+                        int remainingQty = group.stream().mapToInt(addon -> safeInt(addon.getQuantityRemaining())).sum();
                         List<Long> ids = group.stream().map(CompanyAddon::getId).collect(Collectors.toList());
-
                         CompanyAddon representative = group.get(0);
 
                         LocalDateTime latestExpiry = group.stream()
@@ -200,126 +201,48 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         public ResJobPostAddonDTO applyAddonToJobPost(Long userId, Long jobPostingId, ReqApplyAddonDTO request) {
                 Long companyId = getCompanyId(userId);
 
-                // 1. Validate tin tuyển dụng
                 JobPosting jobPosting = jobPostingRepository.findByIdAndDeletedAtIsNull(jobPostingId)
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy tin tuyển dụng."));
+                                .orElseThrow(() -> AppException.notFound("Khong tim thay tin tuyen dung."));
 
                 if (!jobPosting.getCompanyId().equals(companyId)) {
-                        throw AppException.forbidden("Bạn không có quyền thao tác trên tin tuyển dụng này.");
+                        throw AppException.forbidden("Ban khong co quyen thao tac tren tin tuyen dung nay.");
                 }
 
-                // 2. Validate dịch vụ lẻ đã mua
-                CompanyAddon companyAddon = companyAddonRepository.findById(request.getCompanyAddonId())
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ lẻ."));
-
-                if (!companyAddon.getCompanyId().equals(companyId)) {
-                        throw AppException.forbidden("Dịch vụ lẻ này không thuộc công ty của bạn.");
-                }
-
-                if (companyAddon.getStatus() != SubscriptionStatus.ACTIVE) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hiệu lực.");
-                }
-
-                if (companyAddon.getExpiredAt() != null && companyAddon.getExpiredAt().isBefore(LocalDateTime.now())) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hạn sử dụng.");
-                }
-
-                if (companyAddon.getQuantityRemaining() <= 0) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết số lượng sử dụng.");
-                }
-
-                // 3. Lấy thông tin cấu hình dịch vụ lẻ
-                AddonService addonService = addonServiceRepository.findById(companyAddon.getAddonServiceId())
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin dịch vụ lẻ."));
-
-                // 4. Tìm service category and code để route
-                Services service = serviceRepository.findById(addonService.getServiceId()).orElse(null);
+                ServiceQuotaAllocation quota = resolveQuotaForUpdate(companyId, request);
+                Services service = quota.getService();
                 ServiceCategory serviceCategory = service != null ? service.getCategory() : null;
-                String serviceCode = service != null ? service.getCode() : null;
+                String serviceCode = quota.getServiceCode();
 
-                // 5. Nếu có handler trong Router → delegate hoàn toàn
-                if (serviceCategory != null && serviceCode != null
-                                && serviceActivationRouter.isSupported(serviceCategory, serviceCode)) {
-                        log.info("[applyAddon] Routing to handler: {} for job #{}", serviceCode, jobPostingId);
-                        return serviceActivationRouter.activate(serviceCategory, serviceCode, jobPosting, companyAddon,
-                                        addonService);
+                if (serviceCategory != ServiceCategory.JOB_POSTING) {
+                        throw AppException.badRequest("Dich vu nay khong thuoc nhom tin tuyen dung.");
                 }
 
-                // 6. Fallback: xử lý generic cho các dịch vụ chưa có handler riêng
+                if (serviceActivationRouter.isSupported(serviceCategory, serviceCode)) {
+                        log.info("[applyAddon] Routing to handler: {} for job #{}", serviceCode, jobPostingId);
+                        return serviceActivationRouter.activate(serviceCategory, serviceCode, jobPosting, quota);
+                }
+
                 log.info("[applyAddon] Generic fallback for service: {} on job #{}", serviceCode, jobPostingId);
-                return applyGenericAddon(jobPostingId, companyAddon, addonService);
-        }
-
-        /**
-         * Xử lý generic cho các dịch vụ chưa có handler riêng.
-         * Tạo JobPostAddon record và trừ số lượng.
-         */
-        private ResJobPostAddonDTO applyGenericAddon(Long jobPostingId, CompanyAddon companyAddon,
-                        AddonService addonService) {
-                LocalDateTime now = LocalDateTime.now();
-                LocalDateTime expiredAt = addonService.getDurationDays() != null
-                                ? now.plusDays(addonService.getDurationDays())
-                                : null;
-
-                JobPostAddon jobPostAddon = JobPostAddon.builder()
-                                .jobPostingId(jobPostingId)
-                                .companyAddonId(companyAddon.getId())
-                                .addonServiceId(addonService.getId())
-                                .startedAt(now)
-                                .expiredAt(expiredAt)
-                                .status(JobPostAddonStatus.ACTIVE)
-                                .build();
-
-                JobPostAddon saved = jobPostAddonRepository.save(jobPostAddon);
-
-                companyAddon.setQuantityRemaining(companyAddon.getQuantityRemaining() - 1);
-                companyAddonRepository.save(companyAddon);
-
-                return ResJobPostAddonDTO.builder()
-                                .id(saved.getId())
-                                .jobPostingId(saved.getJobPostingId())
-                                .companyAddonId(saved.getCompanyAddonId())
-                                .addonServiceId(saved.getAddonServiceId())
-                                .addonName(addonService.getName())
-                                .status(saved.getStatus())
-                                .startedAt(saved.getStartedAt())
-                                .expiredAt(saved.getExpiredAt())
-                                .createdAt(saved.getCreatedAt())
-                                .build();
+                return jobPostingActivationService.applyGenericAddon(jobPostingId, quota);
         }
 
         @Override
         @Transactional
         public ResCompanyBrandingDTO applyBrandingToCompany(Long userId, ReqApplyAddonDTO request) {
                 Long companyId = getCompanyId(userId);
+                ServiceQuotaAllocation quota = resolveQuotaForUpdate(companyId, request);
 
-                CompanyAddon companyAddon = companyAddonRepository.findById(request.getCompanyAddonId())
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy dịch vụ lẻ."));
-
-                if (!companyAddon.getCompanyId().equals(companyId)) {
-                        throw AppException.forbidden("Dịch vụ lẻ này không thuộc công ty của bạn.");
-                }
-                if (companyAddon.getStatus() != SubscriptionStatus.ACTIVE) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hiệu lực.");
-                }
-                if (companyAddon.getExpiredAt() != null && companyAddon.getExpiredAt().isBefore(LocalDateTime.now())) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết hạn sử dụng.");
-                }
-                if (companyAddon.getQuantityRemaining() <= 0) {
-                        throw AppException.badRequest("Dịch vụ lẻ này đã hết số lượng sử dụng.");
+                Services service = quota.getService();
+                if (service == null || service.getCategory() != ServiceCategory.BRANDING) {
+                        throw AppException.badRequest("Dich vu nay khong thuoc nhom branding.");
                 }
 
-                AddonService addonService = addonServiceRepository.findById(companyAddon.getAddonServiceId())
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin dịch vụ lẻ."));
-
-                Services service = serviceRepository.findById(addonService.getServiceId()).orElse(null);
-                String serviceCode = service != null ? service.getCode() : null;
-
+                String serviceCode = quota.getServiceCode();
                 if (!BrandingActivationService.isSupported(serviceCode)) {
-                        throw AppException.badRequest("Dịch vụ lẻ này không thuộc nhóm dịch vụ BRANDING.");
+                        throw AppException.badRequest("Dich vu branding nay chua duoc ho tro.");
                 }
 
-                return brandingActivationService.activate(serviceCode, companyId, companyAddon, addonService);
+                return brandingActivationService.activate(serviceCode, companyId, quota);
         }
 
         @Override
@@ -327,25 +250,22 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
         public ResSubscriptionRenewalDTO renewSubscription(Long userId, ReqRenewSubscriptionDTO request) {
                 Long companyId = getCompanyId(userId);
 
-                // 1. Tìm subscription ACTIVE hiện tại
                 CompanySubscription subscription = companySubscriptionRepository
                                 .findFirstByCompanyIdAndStatusOrderByCreatedAtDesc(companyId, SubscriptionStatus.ACTIVE)
                                 .orElseThrow(() -> AppException.badRequest(
-                                                "Không tìm thấy gói dịch vụ đang hoạt động. Vui lòng mua gói mới."));
+                                                "Khong tim thay goi dich vu dang hoat dong. Vui long mua goi moi."));
 
-                // 2. Lấy thông tin gói (cùng gói hiện tại)
                 ServicePackage servicePackage = servicePackageRepository.findById(subscription.getServicePackageId())
-                                .orElseThrow(() -> AppException.notFound("Không tìm thấy thông tin gói dịch vụ."));
+                                .orElseThrow(() -> AppException.notFound("Khong tim thay thong tin goi dich vu."));
 
                 if (servicePackage.getIsActive() == null || !servicePackage.getIsActive()) {
-                        throw AppException.badRequest("Gói dịch vụ này không còn hoạt động. Không thể gia hạn.");
+                        throw AppException.badRequest("Goi dich vu nay khong con hoat dong. Khong the gia han.");
                 }
 
                 if (subscription.getExpiredAt() == null) {
-                        throw AppException.badRequest("Gói dịch vụ không có ngày hết hạn, không thể gia hạn.");
+                        throw AppException.badRequest("Goi dich vu khong co ngay het han, khong the gia han.");
                 }
 
-                // 3. Tạo Order gia hạn
                 Order order = Order.builder()
                                 .companyId(companyId)
                                 .orderCode("ORD-RN-" + System.currentTimeMillis())
@@ -369,16 +289,14 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                 .build();
                 savedOrder.setOrderItems(new ArrayList<>(List.of(item)));
 
-                // 4. Kéo dài expiredAt (nối tiếp, không mất thời gian còn lại)
                 LocalDateTime oldExpiredAt = subscription.getExpiredAt();
                 LocalDateTime newExpiredAt = subscription.getBillingCycle() == BillingCycle.MONTHLY
                                 ? oldExpiredAt.plusMonths(1)
                                 : oldExpiredAt.plusYears(1);
                 subscription.setExpiredAt(newExpiredAt);
-                subscription.setReminderSentAt(null); // Reset để chu kỳ mới có thể nhắc lại
+                subscription.setReminderSentAt(null);
                 companySubscriptionRepository.save(subscription);
 
-                // 5. Cộng dồn quota cho mỗi feature
                 List<ServicePackageDetail> details = servicePackageDetailRepository
                                 .findByServicePackageId(servicePackage.getId());
                 List<SubscriptionUsage> usages = subscriptionUsageRepository
@@ -395,13 +313,11 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                         .orElse(null);
 
                         if (usage != null) {
-                                // Cộng dồn: giữ lại phần chưa dùng + thêm quota mới
                                 usage.setQuantityTotal(usage.getQuantityTotal() + detail.getQuantity());
                                 usage.setQuantityRemaining(usage.getQuantityRemaining() + detail.getQuantity());
                                 usage.setResetAt(newExpiredAt);
                                 subscriptionUsageRepository.save(usage);
                         } else {
-                                // Feature mới chưa có — tạo usage mới
                                 SubscriptionUsage newUsage = SubscriptionUsage.builder()
                                                 .companySubscriptionId(subscription.getId())
                                                 .companyId(companyId)
@@ -415,7 +331,6 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                         totalQuotaAdded += detail.getQuantity();
                 }
 
-                // 6. Ghi log gia hạn
                 SubscriptionRenewalLog renewalLog = SubscriptionRenewalLog.builder()
                                 .companySubscriptionId(subscription.getId())
                                 .orderId(savedOrder.getId())
@@ -426,7 +341,6 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                 .build();
                 SubscriptionRenewalLog savedLog = subscriptionRenewalLogRepository.save(renewalLog);
 
-                // 7. Build response
                 List<SubscriptionUsage> updatedUsages = subscriptionUsageRepository
                                 .findByCompanySubscriptionId(subscription.getId());
 
@@ -460,11 +374,29 @@ public class EmployerServiceManagementServiceImpl implements EmployerServiceMana
                                 .build();
         }
 
+        private ServiceQuotaAllocation resolveQuotaForUpdate(Long companyId, ReqApplyAddonDTO request) {
+                if (request.getCompanyAddonId() != null) {
+                        ServiceQuotaAllocation quota = quotaService.findAddonQuotaForUpdate(companyId, request.getCompanyAddonId());
+                        if (request.getServiceCode() != null && !request.getServiceCode().isBlank()) {
+                                String requestedCode = request.getServiceCode().trim().toUpperCase();
+                                if (!requestedCode.equals(quota.getServiceCode())) {
+                                        throw AppException.badRequest("companyAddonId khong khop voi serviceCode.");
+                                }
+                        }
+                        return quota;
+                }
+                return quotaService.findAvailableQuotaForUpdate(companyId, request.getServiceCode());
+        }
+
         private Long getCompanyId(Long userId) {
                 Long companyId = companyService.getCompanyIdByUserId(userId);
                 if (companyId == null) {
-                        throw AppException.badRequest("Chưa có hồ sơ công ty.");
+                        throw AppException.badRequest("Chua co ho so cong ty.");
                 }
                 return companyId;
+        }
+
+        private int safeInt(Integer value) {
+                return value != null ? value : 0;
         }
 }

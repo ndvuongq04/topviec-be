@@ -38,5 +38,7 @@ public class ReqServicePackageDTO {
 
         @NotNull(message = "Số lượng không được để trống")
         private Integer quantity;
+
+        private Integer durationDays;
     }
 }

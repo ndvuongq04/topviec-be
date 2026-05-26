@@ -2,6 +2,7 @@ package com.topviec.topviec_be.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.topviec.topviec_be.enums.services.BrandingAddonStatus;
+import com.topviec.topviec_be.enums.services.ServiceUsageSourceType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,7 +29,7 @@ public class CompanyBranding {
     @JoinColumn(name = "company_id", insertable = false, updatable = false)
     private Company company;
 
-    @Column(name = "company_addon_id", nullable = false)
+    @Column(name = "company_addon_id")
     private Long companyAddonId;
 
     @JsonIgnore
@@ -36,7 +37,7 @@ public class CompanyBranding {
     @JoinColumn(name = "company_addon_id", insertable = false, updatable = false)
     private CompanyAddon companyAddon;
 
-    @Column(name = "addon_service_id", nullable = false)
+    @Column(name = "addon_service_id")
     private Long addonServiceId;
 
     @JsonIgnore
@@ -44,8 +45,20 @@ public class CompanyBranding {
     @JoinColumn(name = "addon_service_id", insertable = false, updatable = false)
     private AddonService addonService;
 
+    @Column(name = "subscription_usage_id")
+    private Long subscriptionUsageId;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_usage_id", insertable = false, updatable = false)
+    private SubscriptionUsage subscriptionUsage;
+
     @Column(name = "service_code", length = 100, nullable = false)
     private String serviceCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_source_type", length = 30)
+    private ServiceUsageSourceType usageSourceType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)

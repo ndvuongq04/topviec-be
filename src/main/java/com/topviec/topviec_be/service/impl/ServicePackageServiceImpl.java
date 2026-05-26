@@ -145,6 +145,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
                     .servicePackageId(pkg.getId())
                     .serviceId(service.getId())
                     .quantity(item.getQuantity())
+                    .durationDays(item.getDurationDays())
                     .build();
 
             servicePackageDetailRepository.save(detail);
@@ -172,6 +173,7 @@ public class ServicePackageServiceImpl implements ServicePackageService {
                             .serviceCategoryName(svc != null && svc.getCategory() != null ? svc.getCategory().getValue() : null)
                             .serviceUnit(svc != null ? svc.getUnit() : null)
                             .quantity(d.getQuantity())
+                            .durationDays(d.getDurationDays())
                             .build();
                 })
                 .collect(Collectors.toList());

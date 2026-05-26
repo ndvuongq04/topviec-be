@@ -35,6 +35,7 @@ import com.topviec.topviec_be.repository.TalentPoolRepository;
 import com.topviec.topviec_be.repository.UserRepository;
 import com.topviec.topviec_be.service.CvService;
 import com.topviec.topviec_be.service.TalentPoolService;
+import com.topviec.topviec_be.service.activation.CandidateActivationService;
 import com.topviec.topviec_be.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,6 +71,7 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     private final ApplicationEventPublisher eventPublisher;
     private final TokenService tokenService;
     private final CvService cvService;
+    private final CandidateActivationService candidateActivationService;
 
     @Value("${app.talent-pool-invite-url}")
     private String talentPoolInviteUrl;
@@ -528,8 +530,17 @@ public class TalentPoolServiceImpl implements TalentPoolService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ResultPaginationDTO searchCandidates(Long companyId, Integer locationId, Pageable pageable) {
+        // Kiểm tra và trừ lượt tùy theo số trang
+        if (pageable.getPageNumber() == 0) {
+            // Trang đầu tiên: Thực hiện trừ 1 lượt tìm kiếm
+            candidateActivationService.consumeCvSearchQuota(companyId);
+        } else {
+            // Từ trang 2 trở đi: Chỉ kiểm tra xem còn hạn/lượt không, không trừ lượt
+            candidateActivationService.checkCvSearchQuota(companyId);
+        }
+
         Page<CandidateProfile> page = candidateProfileRepository.searchCandidatesByLocation(locationId, pageable);
 
         List<CandidateProfile> profiles = page.getContent();

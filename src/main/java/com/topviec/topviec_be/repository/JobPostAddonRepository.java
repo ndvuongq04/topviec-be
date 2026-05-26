@@ -13,53 +13,49 @@ import java.util.List;
 @Repository
 public interface JobPostAddonRepository extends JpaRepository<JobPostAddon, Long> {
 
-    /** Đếm xem 1 tin tuyển dụng có đang kích hoạt dịch vụ nào đó không */
     @Query("SELECT COUNT(jpa) FROM JobPostAddon jpa " +
-           "JOIN jpa.addonService asv " +
-           "JOIN asv.service s " +
+           "LEFT JOIN jpa.addonService asv " +
+           "LEFT JOIN asv.service s " +
            "WHERE jpa.jobPostingId = :jobPostingId " +
-           "AND s.code = :serviceCode " +
+           "AND (jpa.serviceCode = :serviceCode OR s.code = :serviceCode) " +
            "AND jpa.status = 'ACTIVE' " +
-           "AND jpa.expiredAt > :now")
-    long countActiveAddonForJob(@Param("jobPostingId") Long jobPostingId, 
-                                @Param("serviceCode") String serviceCode, 
+           "AND (jpa.expiredAt IS NULL OR jpa.expiredAt > :now)")
+    long countActiveAddonForJob(@Param("jobPostingId") Long jobPostingId,
+                                @Param("serviceCode") String serviceCode,
                                 @Param("now") LocalDateTime now);
 
-    /** Đếm tổng số tin đang sử dụng dịch vụ (dùng kiểm tra slot cho HOT) */
     @Query("SELECT COUNT(jpa) FROM JobPostAddon jpa " +
-           "JOIN jpa.addonService asv " +
-           "JOIN asv.service s " +
+           "LEFT JOIN jpa.addonService asv " +
+           "LEFT JOIN asv.service s " +
            "JOIN jpa.jobPosting j " +
-           "WHERE s.code = :serviceCode " +
+           "WHERE (jpa.serviceCode = :serviceCode OR s.code = :serviceCode) " +
            "AND jpa.status = 'ACTIVE' " +
-           "AND jpa.expiredAt > :now " +
+           "AND (jpa.expiredAt IS NULL OR jpa.expiredAt > :now) " +
            "AND j.deletedAt IS NULL " +
            "AND j.status = 'published'")
-    long countActiveGlobalAddons(@Param("serviceCode") String serviceCode, 
+    long countActiveGlobalAddons(@Param("serviceCode") String serviceCode,
                                  @Param("now") LocalDateTime now);
 
-    /** Lấy danh sách tin đang sử dụng dịch vụ (dùng lấy tin HOT cho trang chủ) */
     @Query("SELECT jpa.jobPosting FROM JobPostAddon jpa " +
-           "JOIN jpa.addonService asv " +
-           "JOIN asv.service s " +
-           "WHERE s.code = :serviceCode " +
+           "LEFT JOIN jpa.addonService asv " +
+           "LEFT JOIN asv.service s " +
+           "WHERE (jpa.serviceCode = :serviceCode OR s.code = :serviceCode) " +
            "AND jpa.status = 'ACTIVE' " +
-           "AND jpa.expiredAt > :now " +
+           "AND (jpa.expiredAt IS NULL OR jpa.expiredAt > :now) " +
            "AND jpa.jobPosting.deletedAt IS NULL " +
            "AND jpa.jobPosting.status = 'published' " +
            "ORDER BY jpa.startedAt DESC")
     List<com.topviec.topviec_be.entity.JobPosting> findActiveGlobalAddonsPosts(
-            @Param("serviceCode") String serviceCode, 
-            @Param("now") LocalDateTime now, 
+            @Param("serviceCode") String serviceCode,
+            @Param("now") LocalDateTime now,
             Pageable pageable);
 
-    /** Tìm các lần kích hoạt dịch vụ đã hết hạn (dùng cho scheduler) */
     @Query("SELECT jpa FROM JobPostAddon jpa " +
-           "JOIN jpa.addonService asv " +
-           "JOIN asv.service s " +
-           "WHERE s.code = :serviceCode " +
+           "LEFT JOIN jpa.addonService asv " +
+           "LEFT JOIN asv.service s " +
+           "WHERE (jpa.serviceCode = :serviceCode OR s.code = :serviceCode) " +
            "AND jpa.status = 'ACTIVE' " +
            "AND jpa.expiredAt <= :now")
-    List<JobPostAddon> findExpiredAddons(@Param("serviceCode") String serviceCode, 
+    List<JobPostAddon> findExpiredAddons(@Param("serviceCode") String serviceCode,
                                          @Param("now") LocalDateTime now);
 }
