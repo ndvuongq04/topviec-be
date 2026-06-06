@@ -34,6 +34,7 @@ public class PublicJobPostingController {
             @RequestParam(required = false) Long companyId,
             @RequestParam(required = false) Long industryId,
             @RequestParam(required = false) Long levelId,
+            @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String workType,
             @RequestParam(required = false) Boolean isFeatured,
             @RequestParam(required = false) Boolean isUrgent,
@@ -45,7 +46,7 @@ public class PublicJobPostingController {
             @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
 
         return ResponseEntity.ok(jobPostingService.getPublicList(
-                keyword, companyId, industryId, levelId, workType,
+                keyword, companyId, industryId, levelId, locationId, workType,
                 isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax, pageable));
     }
@@ -74,7 +75,7 @@ public class PublicJobPostingController {
             @PageableDefault(size = 10) Pageable pageable) {
 
         return ResponseEntity.ok(jobPostingService.getPublicList(
-                null, null, null, null, null,
+                null, null, null, null, null, null,
                 null, null, true, null, null,
                 null, null, pageable));
     }

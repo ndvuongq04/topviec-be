@@ -39,7 +39,7 @@ public interface JobPostingService {
 
         /** Lấy danh sách tin published (ứng viên), hỗ trợ filter + phân trang. */
         ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
-                        Long levelId, String workType,
+                        Long levelId, Long locationId, String workType,
                         Boolean isFeatured, Boolean isUrgent, Boolean isHot,
                         Long salaryMin, Long salaryMax,
                         Integer experienceYearsMin, Integer experienceYearsMax,

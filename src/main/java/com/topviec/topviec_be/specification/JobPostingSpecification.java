@@ -1,5 +1,6 @@
 package com.topviec.topviec_be.specification;
 
+import com.topviec.topviec_be.entity.JobPostLocation;
 import com.topviec.topviec_be.entity.JobPosting;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -47,6 +48,22 @@ public class JobPostingSpecification {
         return (root, query, cb) -> levelId == null
                 ? null
                 : cb.equal(root.get("levelId"), levelId);
+    }
+
+    public static Specification<JobPosting> hasLocation(Long locationId) {
+        return (root, query, cb) -> {
+            if (locationId == null) {
+                return null;
+            }
+
+            var subquery = query.subquery(Long.class);
+            var location = subquery.from(JobPostLocation.class);
+            subquery.select(location.get("jobPostId"))
+                    .where(
+                            cb.equal(location.get("jobPostId"), root.get("id")),
+                            cb.equal(location.get("provinceId"), locationId));
+            return cb.exists(subquery);
+        };
     }
 
     public static Specification<JobPosting> hasWorkType(String workType) {
@@ -163,7 +180,7 @@ public class JobPostingSpecification {
 
     public static Specification<JobPosting> withPublicFilter(
             String keyword, Long companyId, Long industryId, Long levelId,
-            String workType, Boolean isFeatured, Boolean isUrgent, Boolean isHot,
+            Long locationId, String workType, Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax) {
 
@@ -173,6 +190,7 @@ public class JobPostingSpecification {
                 .and(hasCompany(companyId))
                 .and(hasIndustry(industryId))
                 .and(hasLevel(levelId))
+                .and(hasLocation(locationId))
                 .and(hasWorkType(workType))
                 .and(isFeatured(isFeatured))
                 .and(isUrgent(isUrgent))

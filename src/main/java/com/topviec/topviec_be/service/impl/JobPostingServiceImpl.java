@@ -177,14 +177,14 @@ public class JobPostingServiceImpl implements JobPostingService {
     @Override
     @Transactional(readOnly = true)
     public ResultPaginationDTO getPublicList(String keyword, Long companyId, Long industryId,
-            Long levelId, String workType,
+            Long levelId, Long locationId, String workType,
             Boolean isFeatured, Boolean isUrgent, Boolean isHot,
             Long salaryMin, Long salaryMax,
             Integer experienceYearsMin, Integer experienceYearsMax,
             Pageable pageable) {
 
         Specification<JobPosting> spec = JobPostingSpecification.withPublicFilter(
-                keyword, companyId, industryId, levelId, workType,
+                keyword, companyId, industryId, levelId, locationId, workType,
                 isFeatured, isUrgent, isHot, salaryMin, salaryMax,
                 experienceYearsMin, experienceYearsMax);
 
