@@ -153,7 +153,10 @@ public class EmployerComplaintController {
             @Valid @RequestBody ReqSubmitAppealDTO request) {
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(appealService.create(extractUserId(jwt), new ReqCreateAppealDTO(id, request.getContent())));
+                .body(appealService.create(extractUserId(jwt), ReqCreateAppealDTO.builder()
+                        .complaintId(id)
+                        .content(request.getContent())
+                        .build()));
     }
 
     private Long extractUserId(Jwt jwt) {

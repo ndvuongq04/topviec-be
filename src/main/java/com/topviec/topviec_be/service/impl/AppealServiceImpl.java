@@ -4,6 +4,7 @@ import com.topviec.topviec_be.dto.request.ReqCreateAppealDTO;
 import com.topviec.topviec_be.dto.request.ReqUnsuspendDTO;
 import com.topviec.topviec_be.dto.response.ResAppealDTO;
 import com.topviec.topviec_be.entity.AdminUser;
+import com.topviec.topviec_be.entity.AppealEvidence;
 import com.topviec.topviec_be.entity.Complaint;
 import com.topviec.topviec_be.entity.ComplaintAppeal;
 import com.topviec.topviec_be.entity.Company;
@@ -17,6 +18,7 @@ import com.topviec.topviec_be.enums.complaints.ViolationSource;
 import com.topviec.topviec_be.enums.users.UserType;
 import com.topviec.topviec_be.exception.AppException;
 import com.topviec.topviec_be.repository.AdminUserRepository;
+import com.topviec.topviec_be.repository.AppealEvidenceRepository;
 import com.topviec.topviec_be.repository.ComplaintAppealRepository;
 import com.topviec.topviec_be.repository.ComplaintRepository;
 import com.topviec.topviec_be.repository.CompanyRepository;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ public class AppealServiceImpl implements AppealService {
     private final AdminUserRepository adminUserRepository;
     private final ViolationLogRepository violationLogRepository;
     private final EmployerViolationScoreRepository violationScoreRepository;
+    private final AppealEvidenceRepository appealEvidenceRepository;
 
     @Override
     @Transactional
@@ -95,7 +99,20 @@ public class AppealServiceImpl implements AppealService {
                 .status(AppealStatus.PENDING.getValue())
                 .build());
 
-        return toResponse(appeal, complaint, jobPosting, company, null);
+        // Save evidence files if provided
+        List<AppealEvidence> savedEvidences = new ArrayList<>();
+        if (request.getEvidences() != null && !request.getEvidences().isEmpty()) {
+            for (ReqCreateAppealDTO.EvidenceItem item : request.getEvidences()) {
+                AppealEvidence evidence = AppealEvidence.builder()
+                        .appealId(appeal.getId())
+                        .fileUrl(item.getFileUrl())
+                        .fileType(item.getFileType().getValue())
+                        .build();
+                savedEvidences.add(appealEvidenceRepository.save(evidence));
+            }
+        }
+
+        return toResponse(appeal, complaint, jobPosting, company, null, savedEvidences);
     }
 
     @Override
@@ -146,13 +163,21 @@ public class AppealServiceImpl implements AppealService {
                 : adminUserRepository.findAllById(adminIds).stream()
                         .collect(Collectors.toMap(AdminUser::getAdminUsersId, a -> a));
 
+        // Batch load evidences
+        List<Long> appealIds = appeals.stream().map(ComplaintAppeal::getId).toList();
+        Map<Long, List<AppealEvidence>> evidenceMap = appealIds.isEmpty()
+                ? Collections.emptyMap()
+                : appealEvidenceRepository.findByAppealIdIn(appealIds).stream()
+                        .collect(Collectors.groupingBy(AppealEvidence::getAppealId));
+
         return appeals.stream()
                 .map(appeal -> {
                     Complaint complaint = complaintMap.get(appeal.getComplaintId());
                     JobPosting jobPosting = complaint != null ? jobPostMap.get(complaint.getJobPostId()) : null;
                     Company company = jobPosting != null ? companyMap.get(jobPosting.getCompanyId()) : null;
                     AdminUser reviewer = appeal.getReviewedBy() != null ? adminMap.get(appeal.getReviewedBy()) : null;
-                    return toResponse(appeal, complaint, jobPosting, company, reviewer);
+                    List<AppealEvidence> evidences = evidenceMap.getOrDefault(appeal.getId(), Collections.emptyList());
+                    return toResponse(appeal, complaint, jobPosting, company, reviewer, evidences);
                 })
                 .toList();
     }
@@ -189,7 +214,8 @@ public class AppealServiceImpl implements AppealService {
                     AdminUser reviewer = appeal.getReviewedBy() != null
                             ? adminUserRepository.findById(appeal.getReviewedBy()).orElse(null)
                             : null;
-                    return toResponse(appeal, complaint, jobPosting, company, reviewer);
+                    List<AppealEvidence> evidences = appealEvidenceRepository.findByAppealId(appeal.getId());
+                    return toResponse(appeal, complaint, jobPosting, company, reviewer, evidences);
                 });
     }
 
@@ -204,7 +230,8 @@ public class AppealServiceImpl implements AppealService {
         AdminUser reviewer = appeal.getReviewedBy() != null
                 ? adminUserRepository.findById(appeal.getReviewedBy()).orElse(null)
                 : null;
-        return toResponse(appeal, complaint, jobPosting, company, reviewer);
+        List<AppealEvidence> evidences = appealEvidenceRepository.findByAppealId(appeal.getId());
+        return toResponse(appeal, complaint, jobPosting, company, reviewer, evidences);
     }
 
     @Override
@@ -291,7 +318,8 @@ public class AppealServiceImpl implements AppealService {
         appeal.setAdminNote(adminNote);
         appealRepository.save(appeal);
 
-        return toResponse(appeal, complaint, jobPosting, company, adminUser);
+        List<AppealEvidence> evidences = appealEvidenceRepository.findByAppealId(appeal.getId());
+        return toResponse(appeal, complaint, jobPosting, company, adminUser, evidences);
     }
 
     private ResAppealDTO toResponse(
@@ -299,7 +327,8 @@ public class AppealServiceImpl implements AppealService {
             Complaint complaint,
             JobPosting jobPosting,
             Company company,
-            AdminUser reviewer) {
+            AdminUser reviewer,
+            List<AppealEvidence> evidences) {
 
         ResAppealDTO.ComplaintInfo complaintInfo = null;
         if (complaint != null) {
@@ -321,6 +350,17 @@ public class AppealServiceImpl implements AppealService {
                 .fullName(reviewer.getFullName())
                 .build();
 
+        List<ResAppealDTO.EvidenceDTO> evidenceDTOs = null;
+        if (evidences != null && !evidences.isEmpty()) {
+            evidenceDTOs = evidences.stream()
+                    .map(e -> ResAppealDTO.EvidenceDTO.builder()
+                            .id(e.getId())
+                            .fileUrl(e.getFileUrl())
+                            .fileType(e.getFileType())
+                            .build())
+                    .toList();
+        }
+
         return ResAppealDTO.builder()
                 .id(appeal.getId())
                 .employerId(appeal.getEmployerId())
@@ -329,6 +369,7 @@ public class AppealServiceImpl implements AppealService {
                 .status(appeal.getStatus())
                 .adminNote(appeal.getAdminNote())
                 .reviewedByAdmin(adminInfo)
+                .evidences(evidenceDTOs)
                 .reviewedAt(appeal.getReviewedAt())
                 .createdAt(appeal.getCreatedAt())
                 .updatedAt(appeal.getUpdatedAt())

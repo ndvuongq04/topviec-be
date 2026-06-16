@@ -24,8 +24,15 @@ public class FileValidator {
             "image/png",
             "image/webp");
 
+    private static final Set<String> ALLOWED_EVIDENCE_MIME_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/pdf");
+
     private static final Set<String> ALLOWED_CV_EXTENSIONS = Set.of("pdf", "doc", "docx");
     private static final Set<String> ALLOWED_IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
+    private static final Set<String> ALLOWED_EVIDENCE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "pdf");
 
     private static final Map<FileUploadType, Long> SIZE_LIMIT = Map.of(
             FileUploadType.CV, MAX_FILE_SIZE,
@@ -33,7 +40,9 @@ public class FileValidator {
             FileUploadType.CV_TEMPLATE_THUMBNAIL, MAX_IMAGE_SIZE,
             FileUploadType.COMPANY_LOGO, MAX_IMAGE_SIZE,
             FileUploadType.COMPANY_COVER, MAX_IMAGE_SIZE,
-            FileUploadType.BUSINESS_LICENSE, MAX_FILE_SIZE);
+            FileUploadType.BUSINESS_LICENSE, MAX_FILE_SIZE,
+            FileUploadType.COMPLAINT_EVIDENCE, MAX_FILE_SIZE,
+            FileUploadType.APPEAL_EVIDENCE, MAX_FILE_SIZE);
 
     private static final Map<FileUploadType, Set<String>> MIME_LIMIT = Map.of(
             FileUploadType.CV, ALLOWED_CV_MIME_TYPES,
@@ -41,7 +50,9 @@ public class FileValidator {
             FileUploadType.CV_TEMPLATE_THUMBNAIL, ALLOWED_IMAGE_MIME_TYPES,
             FileUploadType.COMPANY_LOGO, ALLOWED_IMAGE_MIME_TYPES,
             FileUploadType.COMPANY_COVER, ALLOWED_IMAGE_MIME_TYPES,
-            FileUploadType.BUSINESS_LICENSE, ALLOWED_CV_MIME_TYPES);
+            FileUploadType.BUSINESS_LICENSE, ALLOWED_CV_MIME_TYPES,
+            FileUploadType.COMPLAINT_EVIDENCE, ALLOWED_EVIDENCE_MIME_TYPES,
+            FileUploadType.APPEAL_EVIDENCE, ALLOWED_EVIDENCE_MIME_TYPES);
 
     private static final Map<FileUploadType, Set<String>> EXT_LIMIT = Map.of(
             FileUploadType.CV, ALLOWED_CV_EXTENSIONS,
@@ -49,7 +60,9 @@ public class FileValidator {
             FileUploadType.CV_TEMPLATE_THUMBNAIL, ALLOWED_IMAGE_EXTENSIONS,
             FileUploadType.COMPANY_LOGO, ALLOWED_IMAGE_EXTENSIONS,
             FileUploadType.COMPANY_COVER, ALLOWED_IMAGE_EXTENSIONS,
-            FileUploadType.BUSINESS_LICENSE, ALLOWED_CV_EXTENSIONS);
+            FileUploadType.BUSINESS_LICENSE, ALLOWED_CV_EXTENSIONS,
+            FileUploadType.COMPLAINT_EVIDENCE, ALLOWED_EVIDENCE_EXTENSIONS,
+            FileUploadType.APPEAL_EVIDENCE, ALLOWED_EVIDENCE_EXTENSIONS);
 
     public void validate(MultipartFile file, FileUploadType type) {
         if (file == null || file.isEmpty()) {
@@ -86,6 +99,7 @@ public class FileValidator {
             case COMPANY_LOGO -> "Vui long chon logo cong ty";
             case COMPANY_COVER -> "Vui long chon anh bia cong ty";
             case BUSINESS_LICENSE -> "Vui long chon giay phep kinh doanh";
+            case COMPLAINT_EVIDENCE, APPEAL_EVIDENCE -> "Vui long chon file bang chung";
         };
     }
 
@@ -98,6 +112,7 @@ public class FileValidator {
             case COMPANY_LOGO -> "Logo cong ty qua lon, vui long chon file nho hon " + sizeLabel;
             case COMPANY_COVER -> "Anh bia qua lon, vui long chon anh nho hon " + sizeLabel;
             case BUSINESS_LICENSE -> "Giay phep kinh doanh qua lon, vui long chon file nho hon " + sizeLabel;
+            case COMPLAINT_EVIDENCE, APPEAL_EVIDENCE -> "File bang chung qua lon, vui long chon file nho hon " + sizeLabel;
         };
     }
 
@@ -109,6 +124,7 @@ public class FileValidator {
             case COMPANY_LOGO -> "Logo cong ty chi chap nhan JPG, PNG hoac WEBP";
             case COMPANY_COVER -> "Anh bia chi chap nhan JPG, PNG hoac WEBP";
             case BUSINESS_LICENSE -> "Giay phep kinh doanh chi chap nhan PDF, DOC hoac DOCX";
+            case COMPLAINT_EVIDENCE, APPEAL_EVIDENCE -> "Bang chung chi chap nhan JPG, PNG, WEBP hoac PDF";
         };
     }
 }

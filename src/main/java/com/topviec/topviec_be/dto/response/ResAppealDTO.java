@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -34,6 +35,9 @@ public class ResAppealDTO {
 
     /** Admin đã xử lý kháng cáo */
     private AdminInfo reviewedByAdmin;
+
+    /** Bằng chứng đính kèm */
+    private List<EvidenceDTO> evidences;
 
     private LocalDateTime reviewedAt;
     private LocalDateTime createdAt;
@@ -66,5 +70,16 @@ public class ResAppealDTO {
     public static class AdminInfo {
         private Long adminUserId;
         private String fullName;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class EvidenceDTO {
+        private Long id;
+        private String fileUrl;
+        private String fileType;
     }
 }
