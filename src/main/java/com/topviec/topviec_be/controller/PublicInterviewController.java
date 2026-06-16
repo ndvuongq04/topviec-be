@@ -53,6 +53,21 @@ public class PublicInterviewController {
     }
 
     /**
+     * POST /interview-schedules/generate-slot-token
+     * UV đã đăng nhập lấy token để mở trang chọn slot (không cần vào email).
+     */
+    @PostMapping("/generate-slot-token")
+    public ResponseEntity<Map<String, String>> generateSlotToken(
+            @RequestBody Map<String, Long> body,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = Long.parseLong(jwt.getSubject());
+        Long applicationId = body.get("applicationId");
+        Long roundId = body.get("roundId");
+        String token = interviewService.generateSlotSelectionToken(userId, applicationId, roundId);
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    /**
      * GET /interview-schedules/applications/{applicationId}
      * Lấy danh sách lịch phỏng vấn của ứng viên trong đơn ứng tuyển này (yêu cầu
      * đăng nhập)

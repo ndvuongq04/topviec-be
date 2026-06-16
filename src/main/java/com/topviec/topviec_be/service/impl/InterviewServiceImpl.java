@@ -463,8 +463,17 @@ public class InterviewServiceImpl implements InterviewService {
                 companyName = company.getName();
         }
 
+        // Lấy các batch number mà ứng viên này được mời
+        List<Integer> batchNumbers = invitationRepository
+                .findByApplicationIdAndRoundIdOrderByBatchNumberAsc(applicationId, roundId)
+                .stream()
+                .map(InterviewSlotInvitation::getBatchNumber)
+                .distinct()
+                .toList();
+
         List<ResInterviewSlotDTO> availableSlots = slotRepository
-                .findByRoundIdOrderByStartTimeAsc(roundId).stream()
+                .findByRoundIdAndBatchNumberInOrderByBatchNumberAscStartTimeAsc(roundId, batchNumbers)
+                .stream()
                 .filter(slot -> slot.getRegisteredCount() < slot.getMaxCandidates())
                 .map(slot -> ResInterviewSlotDTO.builder()
                         .id(slot.getId())
@@ -507,9 +516,19 @@ public class InterviewServiceImpl implements InterviewService {
         InterviewSlot slot = slotRepository.findById(slotId)
                 .orElseThrow(() -> AppException.notFound("Không tìm thấy ca phỏng vấn"));
 
-        // Chỉ validate slot thuộc đúng round (không còn applicationId trong slot)
+        // Validate slot thuộc đúng round
         if (!slot.getRoundId().equals(tokenRoundId)) {
             throw AppException.badRequest("Ca phỏng vấn không thuộc vòng phỏng vấn này");
+        }
+
+        // Validate slot thuộc batch mà ứng viên này được mời
+        List<Integer> batchNumbers = invitationRepository
+                .findByApplicationIdAndRoundIdOrderByBatchNumberAsc(tokenApplicationId, tokenRoundId)
+                .stream()
+                .map(InterviewSlotInvitation::getBatchNumber)
+                .toList();
+        if (!batchNumbers.contains(slot.getBatchNumber())) {
+            throw AppException.badRequest("Ca phỏng vấn không thuộc lời mời của bạn");
         }
 
         // Check UV đã có lịch THẬT (isDefault = false) cho round này chưa
@@ -561,6 +580,32 @@ public class InterviewServiceImpl implements InterviewService {
         log.info("📧 [TODO] Gửi email xác nhận slot cho application={}, round={}", tokenApplicationId, tokenRoundId);
 
         return "Xác nhận lịch phỏng vấn thành công!";
+    }
+
+    // =========================================================================
+    // UV đã đăng nhập lấy token để chọn slot (không cần vào email)
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public String generateSlotSelectionToken(Long userId, Long applicationId, Long roundId) {
+        Application application = applicationRepository.findByIdAndCandidateUserId(applicationId, userId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy đơn ứng tuyển của bạn"));
+
+        if (!ApplicationStatus.SCHEDULE_PENDING.getValue().equals(application.getStatus())) {
+            throw AppException.badRequest("Đơn ứng tuyển không ở trạng thái chờ chọn lịch");
+        }
+
+        InterviewSlotInvitation invitation = invitationRepository
+                .findTopByApplicationIdAndRoundIdOrderByBatchNumberDesc(applicationId, roundId)
+                .orElseThrow(() -> AppException.notFound("Không tìm thấy lời mời chọn lịch cho vòng này"));
+
+        if (invitation.getDeadline().isBefore(LocalDateTime.now())) {
+            throw AppException.badRequest("Đã hết hạn chọn lịch. Vui lòng liên hệ nhà tuyển dụng để được gia hạn");
+        }
+
+        Duration ttl = Duration.between(LocalDateTime.now(), invitation.getDeadline());
+        return tokenService.generateInterviewSlotToken(applicationId, roundId, ttl);
     }
 
     @Override
